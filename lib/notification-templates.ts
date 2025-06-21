@@ -1,0 +1,75 @@
+import type { NotificationTemplate } from "./types/notification-templates"
+
+export const defaultTemplates: NotificationTemplate[] = [
+  {
+    id: "job-assigned",
+    name: "Job Assigned",
+    category: "job",
+    type: "info",
+    title: "New Job Assigned: {jobType}",
+    description: "You've been assigned a new {jobType} job in {location}. Estimated value: {amount}",
+    variables: ["jobType", "location", "amount"],
+    actionLabel: "View Job Details",
+    actionUrl: "/jobs/{jobId}",
+    tags: ["job", "assignment", "work"],
+    createdAt: new Date(),
+    usageCount: 0,
+  },
+  {
+    id: "payment-received",
+    name: "Payment Received",
+    category: "payment",
+    type: "success",
+    title: "Payment Received",
+    description: "Payment of {amount} has been processed for job #{jobId}. Funds will be available in {timeframe}.",
+    variables: ["amount", "jobId", "timeframe"],
+    actionLabel: "View Payment",
+    actionUrl: "/payments/{paymentId}",
+    tags: ["payment", "income", "success"],
+    createdAt: new Date(),
+    usageCount: 0,
+  },
+  {
+    id: "system-maintenance",
+    name: "System Maintenance",
+    category: "system",
+    type: "warning",
+    title: "Scheduled Maintenance",
+    description:
+      "BEAM system maintenance scheduled for {date} from {startTime} to {endTime}. Limited functionality expected.",
+    variables: ["date", "startTime", "endTime"],
+    tags: ["maintenance", "system", "downtime"],
+    createdAt: new Date(),
+    usageCount: 0,
+  },
+  {
+    id: "network-invitation",
+    name: "Network Invitation",
+    category: "network",
+    type: "info",
+    title: "Network Invitation",
+    description: "{operatorName} has invited you to join their operator network. This could lead to new opportunities.",
+    variables: ["operatorName"],
+    actionLabel: "View Invitation",
+    actionUrl: "/network/invitations/{invitationId}",
+    tags: ["network", "invitation", "opportunity"],
+    createdAt: new Date(),
+    usageCount: 0,
+  },
+  {
+    id: "performance-milestone",
+    name: "Performance Milestone",
+    category: "general",
+    type: "success",
+    title: "Milestone Achieved!",
+    description: "Congratulations! You've reached {milestone}. Your efficiency score is now {score}%.",
+    variables: ["milestone", "score"],
+    tags: ["achievement", "performance", "milestone"],
+    createdAt: new Date(),
+    usageCount: 0,
+  },
+]
+
+export function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key) => variables[key] || match)
+}
