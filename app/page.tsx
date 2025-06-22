@@ -78,9 +78,12 @@ export default function HomePage() {
                 <Button
                   size="lg"
                   className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
+                  asChild
                 >
-                  <span>Explore Platform</span>
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <Link href="/dashboard/client">
+                    <span>Explore Platform</span>
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
                 </Button>
                 <Button
                   size="lg"
@@ -408,7 +411,7 @@ export default function HomePage() {
                 accelerate their success.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/signup">
+                <Link href="/dashboard/client">
                   <Button
                     size="lg"
                     className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"

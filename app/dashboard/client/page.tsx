@@ -20,9 +20,12 @@ import {
   Star,
   Bell,
 } from "lucide-react"
+import { NewProjectModal } from "@/components/new-project-modal"
+import { RolesManager } from "@/components/roles-manager"
 
 export default function ClientDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
 
   // Mock data
   const stats = {
@@ -109,7 +112,7 @@ export default function ClientDashboard() {
               <Button variant="ghost" size="sm">
                 <Bell className="h-4 w-4" />
               </Button>
-              <Button>
+              <Button onClick={() => setShowNewProjectModal(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Project
               </Button>
@@ -204,9 +207,10 @@ export default function ClientDashboard() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="roles">Roles</TabsTrigger>
             <TabsTrigger value="operators">Operators</TabsTrigger>
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
           </TabsList>
@@ -276,7 +280,11 @@ export default function ClientDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <Button className="h-20 flex-col space-y-2" variant="outline">
+                    <Button
+                      className="h-20 flex-col space-y-2"
+                      variant="outline"
+                      onClick={() => setShowNewProjectModal(true)}
+                    >
                       <Plus className="h-6 w-6" />
                       <span>New Project</span>
                     </Button>
@@ -360,7 +368,7 @@ export default function ClientDashboard() {
                       Filter
                     </Button>
                   </div>
-                  <Button>
+                  <Button onClick={() => setShowNewProjectModal(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     New Project
                   </Button>
@@ -372,6 +380,10 @@ export default function ClientDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="roles">
+            <RolesManager />
           </TabsContent>
 
           <TabsContent value="operators">
@@ -405,6 +417,9 @@ export default function ClientDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* New Project Modal */}
+      <NewProjectModal open={showNewProjectModal} onOpenChange={setShowNewProjectModal} />
     </div>
   )
 }
