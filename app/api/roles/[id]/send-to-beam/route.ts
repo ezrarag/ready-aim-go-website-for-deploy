@@ -1,91 +1,95 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase/client"
-import type { BeamJobPayload } from "@/lib/types/roles"
+import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/database.types"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+const supabaseAdmin = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+)
+
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const roleId = params.id
+
+  if (!roleId) {
+    return new NextResponse("Role ID is required", { status: 400 })
+  }
+
   try {
-    // Fetch the role and client info
-    const { data: role, error: roleError } = await supabase
-      .from("roles")
-      .select(`
-        *,
-        users!roles_client_id_fkey (
-          full_name,
-          company
-        )
-      `)
-      .eq("id", params.id)
+    // Fetch the role from Supabase
+    const { data: role, error: roleError } = await supabaseAdmin.from("roles").select("*").eq("id", roleId).single()
+
+    if (roleError) {
+      console.error("Error fetching role:", roleError)
+      return new NextResponse("Error fetching role", { status: 500 })
+    }
+
+    if (!role) {
+      return new NextResponse("Role not found", { status: 404 })
+    }
+
+    // Fetch the user from Supabase
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", role.clientId)
       .single()
 
-    if (roleError || !role) {
-      console.error("Error fetching role:", roleError)
-      return NextResponse.json({ error: "Role not found" }, { status: 404 })
+    if (userError) {
+      console.error("Error fetching user:", userError)
+      return new NextResponse("Error fetching user", { status: 500 })
     }
 
-    // Only send Live roles to BEAM
-    if (role.status !== "Live") {
-      return NextResponse.json({ error: "Only Live roles can be sent to BEAM" }, { status: 400 })
-    }
-
-    // Prepare payload for BEAM
-    const beamPayload: BeamJobPayload = {
-      title: role.title,
-      description: role.description,
-      category: role.category,
-      skills: role.skills,
-      pay: role.pay_range,
-      deadline: role.deadline,
-      workstream: role.workstream,
-      tags: role.tags,
-      mediaUrl: role.media_url,
-      clientName: role.users?.company || role.users?.full_name || "ReadyAimGo Client",
-      location: role.location,
-    }
-
-    // Log the request for now (will be actual API call later)
-    console.log("🚀 Sending role to BEAM:", {
-      roleId: role.id,
-      endpoint: "https://beam-platform.com/api/beam/create-job",
-      payload: beamPayload,
+    // Send to BEAM platform
+    const beamResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/beam/create-job`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: role.title,
+        description: role.description,
+        category: role.category,
+        skills: role.skills,
+        pay_range: role.payRange,
+        deadline: role.deadline,
+        location: role.location,
+        workstream: role.workstream,
+        visibility: role.visibility,
+        tags: role.tags,
+        media_url: role.mediaUrl,
+        client_name: user?.user_metadata?.full_name || "Unknown Client",
+        client_id: role.clientId,
+      }),
     })
 
-    // TODO: Replace with actual API call when BEAM endpoint is ready
-    // const response = await fetch('https://beam-platform.com/api/beam/create-job', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${process.env.BEAM_API_KEY}`
-    //   },
-    //   body: JSON.stringify(beamPayload)
-    // })
-
-    // Simulate successful response for now
-    const mockBeamResponse = {
-      success: true,
-      jobId: `beam_${Date.now()}`,
-      message: "Job successfully created on BEAM platform",
+    if (!beamResponse.ok) {
+      const errorData = await beamResponse.json()
+      throw new Error(`BEAM API error: ${errorData.error}`)
     }
 
+    const beamResult = await beamResponse.json()
+    console.log("✅ Successfully sent to BEAM:", beamResult)
+
     // Update role status to indicate it's been sent to BEAM
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("roles")
       .update({
         status: "Live",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", params.id)
+      .eq("id", roleId)
 
     if (updateError) {
       console.error("Error updating role status:", updateError)
     }
 
     return NextResponse.json({
-      message: "Role successfully sent to BEAM",
-      beamResponse: mockBeamResponse,
-      payload: beamPayload,
+      success: true,
+      message: "Role successfully sent to BEAM platform",
+      beamData: beamResult.data,
     })
-  } catch (error) {
-    console.error("Error sending role to BEAM:", error)
-    return NextResponse.json({ error: "Failed to send role to BEAM" }, { status: 500 })
+  } catch (error: any) {
+    console.error("Error sending to BEAM:", error)
+    return new NextResponse(error.message || "Internal Server Error", { status: 500 })
   }
 }

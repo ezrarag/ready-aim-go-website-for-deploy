@@ -102,6 +102,16 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }
 
   const initializePushNotifications = async () => {
+    /* 1️⃣ fetch public config (contains the VAPID key) */
+    try {
+      const res = await fetch("/api/public-config")
+      const { vapidPublicKey } = (await res.json()) as { vapidPublicKey: string }
+      pushService.setVapidPublicKey(vapidPublicKey)
+    } catch (err) {
+      console.error("Failed to load public config:", err)
+    }
+
+    /* 2️⃣ then init SW / push logic */
     const initialized = await pushService.initialize()
     if (initialized) {
       const permission = Notification.permission

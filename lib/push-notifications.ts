@@ -13,6 +13,11 @@ export class PushNotificationService {
     this.config = config
   }
 
+  /* NEW: allow late injection of the key (so we don’t embed it in the bundle) */
+  setVapidPublicKey(key: string) {
+    this.config.vapidPublicKey = key
+  }
+
   async initialize(): Promise<boolean> {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       console.warn("Push notifications not supported")
@@ -21,8 +26,29 @@ export class PushNotificationService {
 
     try {
       // Register service worker
-      this.registration = await navigator.serviceWorker.register("/sw.js")
-      console.log("Service Worker registered:", this.registration)
+      const swPrimary = "/service-worker.js" // guaranteed to exist (added above)
+      const swFallback = "/sw.js" // keeps legacy path working
+      try {
+        // Use `type: "module"` for modern browsers and proper MIME detection
+        this.registration = await navigator.serviceWorker.register(swPrimary, {
+          type: "module",
+          scope: "/",
+        })
+        console.log("Service Worker registered:", this.registration)
+      } catch (err) {
+        console.error(`Primary Service-Worker registration failed (${swPrimary}):`, err)
+        // Fall back to the legacy path if it exists
+        try {
+          this.registration = await navigator.serviceWorker.register(swFallback, {
+            type: "module",
+            scope: "/",
+          })
+          console.log("Service Worker registered using fallback path:", this.registration)
+        } catch (fallbackErr) {
+          console.error(`Fallback Service-Worker registration failed (${swFallback}):`, fallbackErr)
+          return false
+        }
+      }
 
       // Wait for service worker to be ready
       await navigator.serviceWorker.ready
@@ -175,9 +201,11 @@ export class PushNotificationService {
   }
 }
 
-// Initialize push notification service
+//
+// Instantiate with an EMPTY key – will be filled at runtime
+//
 export const pushService = new PushNotificationService({
-  vapidPublicKey: "BEl62iUYgUivxIkv69yViEuiBIa40HI6YLOw2kINzrnHJmrYkXvdHiunv4QUoIXcDkdkk73ZhHJcqkgYVDdw", // Demo key
+  vapidPublicKey: "",
   appleBusinessId: "your-apple-business-id",
   appleTeamId: "your-apple-team-id",
   appleKeyId: "your-apple-key-id",
