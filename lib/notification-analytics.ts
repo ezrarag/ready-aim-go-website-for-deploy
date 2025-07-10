@@ -1,5 +1,7 @@
 import type { NotificationAnalytics, AnalyticsMetrics } from "./types/notification-templates"
 
+const isBrowser = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+
 export class NotificationAnalyticsService {
   private analytics: NotificationAnalytics[] = []
 
@@ -8,6 +10,7 @@ export class NotificationAnalyticsService {
   }
 
   private loadAnalytics() {
+    if (!isBrowser()) return
     const stored = localStorage.getItem("readyaimgo-notification-analytics")
     if (stored) {
       try {
@@ -22,6 +25,7 @@ export class NotificationAnalyticsService {
   }
 
   private saveAnalytics() {
+    if (!isBrowser()) return
     localStorage.setItem("readyaimgo-notification-analytics", JSON.stringify(this.analytics))
   }
 
@@ -131,6 +135,7 @@ export class NotificationAnalyticsService {
   }
 
   exportAnalytics(): string {
+    if (!isBrowser()) return "[]"
     return JSON.stringify(this.analytics, null, 2)
   }
 }
