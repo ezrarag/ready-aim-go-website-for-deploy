@@ -39,6 +39,143 @@ const platformFeatures = [
     icon: <Shield className="h-6 w-6 text-indigo-600" />, bg: "bg-indigo-100", title: "Secure & Reliable", desc: "Enterprise-grade security with 99.9% uptime and comprehensive data protection.", modal: "Placeholder for Secure & Reliable details." },
 ]
 
+// Operator Types Data
+
+type OperatorType = {
+  title: string;
+  slug: string;
+  shortDescription: string;
+  longDescription: string;
+  benefits: string[];
+};
+
+const operatorTypes: OperatorType[] = [
+  {
+    title: "Web Dev Operator",
+    slug: "web-dev",
+    shortDescription: "Help build client websites and internal tools.",
+    longDescription: `As a Web Dev Operator, you will build production-grade tools, dashboards, and client-facing apps. You’ll also work with others to support codebases, integrate APIs, and help expand the ReadyAim Go product suite.\n\nYou receive fractional ownership in any system you help build, with paid opportunities introduced as revenue grows.`,
+    benefits: [
+      "Fractional ownership",
+      "Build real apps used by clients",
+      "Expand your dev portfolio",
+      "Potential for paid compensation"
+    ]
+  },
+  {
+    title: "Property Manager",
+    slug: "property-mgr",
+    shortDescription: "Connect businesses to physical real estate. Manage leases, site access, etc.",
+    longDescription: `As a Property Manager Operator, you connect businesses to real estate, manage leases, site access, and more.\n\nGain real estate exposure, possible commissions, and build your network.`,
+    benefits: [
+      "Real estate exposure",
+      "Possible commissions",
+      "Network building"
+    ]
+  },
+  {
+    title: "Driver / Pilot",
+    slug: "driver",
+    shortDescription: "Operate physical mobility assets (cars, planes) for high-value delivery.",
+    longDescription: `As a Driver or Pilot Operator, you operate mobility assets for high-value delivery.\n\nEnjoy flexible work, income opportunities, and scalable contract operations.`,
+    benefits: [
+      "Flexible work",
+      "Income opportunities",
+      "Scalable contract operations"
+    ]
+  },
+  {
+    title: "Creative Operator",
+    slug: "creative",
+    shortDescription: "Assist with content design, branding, and visual identity.",
+    longDescription: `As a Creative Operator, you assist with content design, branding, and visual identity.\n\nGrow your portfolio, take on creative leadership, and earn fractional equity in projects.`,
+    benefits: [
+      "Portfolio growth",
+      "Creative leadership opportunities",
+      "Fractional equity"
+    ]
+  },
+  {
+    title: "Community Builder",
+    slug: "community",
+    shortDescription: "Grow and manage our ecosystem: onboarding clients, partners, and feedback.",
+    longDescription: `As a Community Builder, you grow and manage the ReadyAimGo ecosystem: onboarding clients, partners, and gathering feedback.\n\nEarn social capital, partner equity potential, and take on a leadership role.`,
+    benefits: [
+      "Social capital",
+      "Partner equity potential",
+      "Leadership role"
+    ]
+  },
+];
+
+function OperatorTypeGrid({ operatorTypes, onSelect }: { operatorTypes: OperatorType[], onSelect: (type: OperatorType) => void }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      {operatorTypes.map((type: OperatorType) => (
+        <div
+          key={type.slug}
+          className="relative rounded-2xl overflow-hidden shadow-lg bg-white cursor-pointer group transition-transform border border-gray-200 hover:shadow-xl"
+          onClick={() => onSelect(type)}
+        >
+          <div className="p-6 flex flex-col h-full justify-between">
+            <div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                {/* Icon could be dynamic per type if desired */}
+                <Briefcase className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">{type.title}</h3>
+              <p className="text-gray-600 mb-4">{type.shortDescription}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-auto">
+              {type.benefits.slice(0, 2).map((b: string) => (
+                <span key={b} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-xs">{b}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OperatorTypeModal({ type, open, onClose }: { type: OperatorType | null, open: boolean, onClose: () => void }) {
+  return (
+    <AnimatePresence>
+      {open && type && (
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed inset-0 z-[100] flex flex-col justify-end"
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-lg" onClick={onClose} />
+          <motion.div
+            className="relative w-full max-w-2xl bg-white rounded-t-3xl shadow-2xl p-8 m-4 flex flex-col mx-auto"
+            initial={{ y: 80 }}
+            animate={{ y: 0 }}
+            exit={{ y: 80 }}
+          >
+            <h2 className="text-2xl font-bold mb-2">{type.title}</h2>
+            <p className="text-gray-700 mb-4 whitespace-pre-line">{type.longDescription}</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {type.benefits.map((b: string) => (
+                <span key={b} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs">{b}</span>
+              ))}
+            </div>
+            <button
+              className="inline-block bg-black text-white px-6 py-3 rounded-xl font-semibold hover:bg-gray-900 transition mb-8 self-start"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 type Project = {
   id: number
   title: string
@@ -209,6 +346,8 @@ export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [projectModal, setProjectModal] = useState<Project | null>(null)
+  const [operatorTypeModal, setOperatorTypeModal] = useState<OperatorType | null>(null)
+  const [operatorModalOpen, setOperatorModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -388,11 +527,14 @@ export default function HomePage() {
                       </div>
                     </div>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent fullscreen>
                     <DialogHeader>
                       <DialogTitle>Operator Network</DialogTitle>
-                      <DialogDescription>Feature details coming soon...</DialogDescription>
+                      <DialogDescription>Browse and connect with operator types below.</DialogDescription>
                     </DialogHeader>
+                    <OperatorTypeGrid operatorTypes={operatorTypes} onSelect={(type) => { setOperatorTypeModal(type); setOperatorModalOpen(true); }} />
+                    <OperatorTypeModal type={operatorTypeModal} open={operatorModalOpen} onClose={() => setOperatorModalOpen(false)} />
+                    <PlatformFeatureMenu />
                   </DialogContent>
                 </Dialog>
                 {/* Add more features as needed, each wrapped in a Dialog */}
