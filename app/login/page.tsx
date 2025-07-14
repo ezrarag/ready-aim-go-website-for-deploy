@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft } from "lucide-react"
 import { useNotifications } from "@/contexts/notification-context"
+import { supabase } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -43,6 +44,33 @@ export default function LoginPage() {
       addNotification({
         title: "Login failed",
         description: "Invalid email or password. Please try again.",
+        type: "error",
+        category: "general",
+        persistent: false,
+      })
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' })
+      if (error) {
+        addNotification({
+          title: "Google sign-in failed",
+          description: error.message,
+          type: "error",
+          category: "general",
+          persistent: false,
+        })
+        setIsLoading(false)
+      }
+      // On success, Supabase will redirect automatically
+    } catch (error: any) {
+      addNotification({
+        title: "Google sign-in failed",
+        description: error.message || "An error occurred during Google sign-in.",
         type: "error",
         category: "general",
         persistent: false,
@@ -115,6 +143,19 @@ export default function LoginPage() {
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
+
+            <div className="my-6 flex items-center justify-center">
+              <span className="text-gray-400 text-xs">or</span>
+            </div>
+            <Button
+              type="button"
+              className="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 font-semibold shadow-sm"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 48 48"><g><path d="M44.5 20H24v8.5h11.7C34.7 33.9 29.8 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#FFC107"/><path d="M6.3 14.7l7 5.1C15.1 17.1 19.2 14 24 14c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#FF3D00"/><path d="M24 43.5c5.7 0 10.6-1.9 14.5-5.2l-6.7-5.5C29.8 37 24 37 24 37c-5.8 0-10.7-3.1-13.2-7.5l-7 5.4C7.8 40.8 15.3 43.5 24 43.5z" fill="#4CAF50"/><path d="M44.5 20H24v8.5h11.7c-1.2 3.2-4.2 6.5-11.7 6.5-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#1976D2"/></g></svg>
+              {isLoading ? "Signing in with Google..." : "Sign in with Google"}
+            </Button>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">

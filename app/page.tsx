@@ -6,56 +6,239 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowRight, Star, Users, Briefcase, TrendingUp, CheckCircle, Zap, Shield, Globe, Play } from "lucide-react"
+import { ArrowRight, Star, Users, Briefcase, TrendingUp, CheckCircle, Zap, Shield, Globe, Play, User } from "lucide-react"
+import StickyFloatingHeader from "@/components/ui/sticky-floating-header"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { supabase } from "@/lib/supabase/client"
+
+const menuGroups = [
+  [
+    { label: "Menu 1", onClick: () => {}, icon: null },
+    { label: "Menu 2", onClick: () => {}, icon: null },
+  ],
+  [
+    { label: "I'm interested", onClick: () => {}, primary: true },
+  ],
+]
+
+// Platform features data for cards and modals
+const platformFeatures = [
+  {
+    icon: <Users className="h-6 w-6 text-blue-600" />, bg: "bg-blue-100", title: "Client Dashboard", desc: "Manage projects, track progress, and collaborate with operators in one unified interface.", modal: "Placeholder for Client Dashboard details." },
+  {
+    icon: <Briefcase className="h-6 w-6 text-green-600" />, bg: "bg-green-100", title: "Operator Marketplace", desc: "Browse and connect with verified creative professionals across all disciplines.", modal: "Placeholder for Operator Marketplace details." },
+  {
+    icon: <Globe className="h-6 w-6 text-purple-600" />, bg: "bg-purple-100", title: "Website Generator", desc: "Auto-generated websites with integrated storefronts and content management.", modal: "Placeholder for Website Generator details." },
+  {
+    icon: <Zap className="h-6 w-6 text-yellow-600" />, bg: "bg-yellow-100", title: "BEAM Operations", desc: "Automated workflow management connecting clients and operators seamlessly.", modal: "Placeholder for BEAM Operations details." },
+  {
+    icon: <TrendingUp className="h-6 w-6 text-red-600" />, bg: "bg-red-100", title: "Analytics & Insights", desc: "Comprehensive analytics to track performance and optimize your creative operations.", modal: "Placeholder for Analytics & Insights details." },
+  {
+    icon: <Shield className="h-6 w-6 text-indigo-600" />, bg: "bg-indigo-100", title: "Secure & Reliable", desc: "Enterprise-grade security with 99.9% uptime and comprehensive data protection.", modal: "Placeholder for Secure & Reliable details." },
+]
+
+type Project = {
+  id: number
+  title: string
+  description: string
+  imageUrl: string
+  liveUrl: string
+  tags: string[]
+}
+
+function ProjectGrid({ projects, onSelect }: { projects: Project[]; onSelect: (project: Project) => void }) {
+  if (!projects) return null;
+  if (projects.length === 0) return <div className="text-center text-gray-500 py-12">No projects found.</div>;
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      {projects.map((project: Project) => (
+        <div
+          key={project.id}
+          className="relative rounded-2xl overflow-hidden shadow-lg bg-white cursor-pointer group transition-transform"
+          onClick={() => onSelect(project)}
+        >
+          {/* Website screenshot as card background */}
+          <img
+            src={`https://api.microlink.io/?url=${encodeURIComponent(project.liveUrl)}&screenshot=true&meta=false&embed=screenshot.url&colorScheme=light`}
+            alt={project.title}
+            className="absolute inset-0 w-full h-full object-cover z-0"
+            onError={e => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+          />
+          {/* Overlay on hover */}
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            initial={false}
+            animate={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+          >
+            <button className="bg-white text-black rounded-2xl px-8 py-4 text-lg font-medium shadow-lg flex items-center gap-2">
+              <span className="mr-2">→</span> VOTE NOW
+            </button>
+          </motion.div>
+          {/* Card content (bottom left) */}
+          <div className="absolute left-6 bottom-6 flex items-center gap-3 z-20">
+            <div className="w-10 h-10 rounded-full bg-black/80 flex items-center justify-center">
+              <User className="text-white w-6 h-6" />
+            </div>
+            <div className="text-white text-lg font-semibold drop-shadow">{project.title}</div>
+          </div>
+          {/* Bottom right icons (on hover) */}
+          <div className="absolute right-6 bottom-6 flex items-center gap-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="text-white text-2xl">
+              ↗
+            </a>
+            <button className="text-white text-2xl">🔖</button>
+          </div>
+          {/* Card background (for non-hover state) */}
+          <div className="w-full h-[320px]" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// WebsiteScreenshotPreview: Shows a live preview of a website using microlink.io
+function WebsiteScreenshotPreview({ url }: { url: string }) {
+  if (!url) return null;
+  return (
+    <div className="w-full flex justify-center my-6">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block w-full max-w-xl rounded-2xl overflow-hidden shadow-lg border border-gray-200 bg-white">
+        <img
+          src={`https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url&colorScheme=light`}
+          alt="Website preview"
+          className="w-full h-64 object-cover bg-gray-100"
+          onError={e => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+        />
+      </a>
+    </div>
+  );
+}
+
+function ProjectModal({ project, open, onClose }: { project: Project | null, open: boolean, onClose: () => void }) {
+  return (
+    <AnimatePresence>
+      {open && project && (
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed inset-0 z-[100] flex flex-col justify-end"
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-lg" onClick={onClose} />
+          <motion.div
+            className="relative w-full max-w-3xl bg-white rounded-t-3xl shadow-2xl p-8 m-4 flex flex-col mx-auto"
+            initial={{ y: 80 }}
+            animate={{ y: 0 }}
+            exit={{ y: 80 }}
+          >
+            {/* Only show website screenshot as main visual */}
+            <div className="w-full flex justify-center mb-6">
+              <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="block w-full max-w-xl rounded-2xl overflow-hidden shadow-lg border border-gray-200 bg-white">
+                <img
+                  src={`https://api.microlink.io/?url=${encodeURIComponent(project.liveUrl)}&screenshot=true&meta=false&embed=screenshot.url&colorScheme=light`}
+                  alt="Website preview"
+                  className="w-full h-64 object-cover bg-gray-100"
+                  onError={e => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                />
+              </a>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">{project.title}</h2>
+            <p className="text-gray-700 mb-4">{project.description}</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {project.tags.map((tag: string) => (
+                <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-xs">{tag}</span>
+              ))}
+            </div>
+            <a
+              href={project.liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-black text-white px-6 py-3 rounded-xl font-semibold hover:bg-gray-900 transition mb-8"
+            >
+              Get Started
+            </a>
+            {/* Bottom menu bar */}
+            <div className="flex items-center justify-between border-t pt-4 mt-4">
+              <div className="flex gap-4">
+                <button className="text-gray-500 font-medium">Placeholder 1</button>
+                <button className="text-gray-500 font-medium">Placeholder 2</button>
+              </div>
+              <button className="text-2xl font-bold text-gray-700 hover:text-black" onClick={onClose} aria-label="Close">×</button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// PlatformFeatureMenu: Custom menu for platform feature modals
+function PlatformFeatureMenu({ onClose }: { onClose?: () => void }) {
+  return (
+    <div className="absolute left-1/2 bottom-8 transform -translate-x-1/2 z-50 max-w-2xl w-full px-4 pointer-events-none">
+      <div className="flex items-center bg-neutral-800 rounded-2xl shadow-lg px-2 py-2 gap-2 relative z-10 pointer-events-auto w-full justify-center">
+        {/* Logo */}
+        <div className="bg-neutral-900 rounded-xl w-16 h-16 flex items-center justify-center text-white text-3xl font-bold mr-2">
+          W.
+        </div>
+        {/* Menu Buttons */}
+        <button className="bg-neutral-700 text-white rounded-xl px-6 py-4 text-lg font-medium mx-1">Website</button>
+        <button className="bg-neutral-700 text-white rounded-xl px-6 py-4 text-lg font-medium mx-1">Apps</button>
+        <button className="bg-neutral-700 text-white rounded-xl px-6 py-4 text-lg font-medium mx-1">SmartTech</button>
+        {/* Get Started Button */}
+        <a href="#" className="bg-yellow-300 text-black rounded-xl px-8 py-4 text-lg font-semibold ml-2 hover:bg-yellow-200 transition-colors">Start</a>
+      </div>
+      {/* Close Button (X) */}
+      <DialogClose asChild>
+        <button
+          className="absolute -right-20 top-1/2 -translate-y-1/2 bg-neutral-800 rounded-xl w-16 h-16 flex items-center justify-center text-white text-4xl font-bold shadow-lg hover:bg-neutral-700 transition-colors z-20 pointer-events-auto"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          &times;
+        </button>
+      </DialogClose>
+    </div>
+  )
+}
 
 export default function HomePage() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [projectModal, setProjectModal] = useState<Project | null>(null)
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true)
+      const { data, error } = await supabase.from("projects").select("*")
+      if (error) {
+        setProjects([])
+      } else {
+        // If tags is a comma-separated string, convert to array
+        const normalized = (data || []).map((p: any) => ({
+          ...p,
+          liveUrl: p.live_url, // ✅ key fix
+          imageUrl: p.image_url,
+          createdAt: p.created_at,
+          tags: Array.isArray(p.tags)
+            ? p.tags
+            : typeof p.tags === "string"
+            ? p.tags.split(",").map((t: string) => t.trim())
+            : [],
+        }))
+        setProjects(normalized)
+      }
+      setLoading(false)
+    }
+    fetchProjects()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Navigation Card */}
-      <div className="p-4">
-        <Card className="bg-white shadow-lg rounded-2xl overflow-hidden">
-          <nav className="px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-3">
-                    <Zap className="h-5 w-5 text-white" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-gray-900">READYAIMGO</h1>
-                </div>
-              </div>
-              <div className="hidden md:flex items-center space-x-8">
-                <Link href="#platform" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Platform
-                </Link>
-                <Link href="#services" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Services
-                </Link>
-                <Link href="#marketplace" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Marketplace
-                </Link>
-                <Link href="#operators" className="text-gray-600 hover:text-gray-900 font-medium">
-                  Operators
-                </Link>
-                <Link href="/about" className="text-gray-600 hover:text-gray-900 font-medium">
-                  About
-                </Link>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Link href="/login">
-                  <Button variant="ghost" className="text-gray-600">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button className="bg-black text-white hover:bg-gray-800 rounded-full px-6">Get Started</Button>
-                </Link>
-              </div>
-            </div>
-          </nav>
-        </Card>
-      </div>
-
+      <StickyFloatingHeader pageTitle="Home" />
       {/* Hero Section */}
       <section className="relative overflow-hidden px-4 pb-8">
         <Card className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-2xl">
@@ -80,7 +263,7 @@ export default function HomePage() {
                   className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
                   asChild
                 >
-                  <Link href="/dashboard/client">
+                  <Link href="/login">
                     <span>Explore Platform</span>
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
@@ -91,7 +274,7 @@ export default function HomePage() {
                   className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
                 >
                   <Play className="mr-2 h-5 w-5" />
-                  <span>Watch Demo</span>
+                  <span className="text-white group-hover:text-black transition-colors">Watch Demo</span>
                 </Button>
               </div>
 
@@ -148,9 +331,8 @@ export default function HomePage() {
         </Card>
       </section>
 
-      {/* Rest of the content wrapped in cards */}
+      {/* What We Offer (Platform Features) */}
       <div className="px-4 space-y-8">
-        {/* What We Offer */}
         <section className="py-20">
           <Card className="bg-white rounded-2xl shadow-lg p-8">
             <div className="text-center mb-4">
@@ -158,87 +340,64 @@ export default function HomePage() {
                 What We Offer
               </Badge>
             </div>
-
             <h2 className="text-4xl lg:text-5xl font-bold text-center text-gray-900 mb-6">
               COMPREHENSIVE CREATIVE SOLUTIONS
             </h2>
-
             <p className="text-xl text-gray-600 text-center max-w-3xl mx-auto mb-16">
               Our comprehensive services encompass creative project management, skilled operator networks, and premium
               marketplace solutions.
             </p>
-
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <div className="space-y-8">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Users className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Client Platform</h3>
-                      <p className="text-gray-600">
-                        Custom dashboards, project management, and automated website generation with integrated
-                        storefronts and content publishing.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Briefcase className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Operator Network</h3>
-                      <p className="text-gray-600">
-                        Connect with verified creative professionals across design, development, marketing, audio,
-                        video, and consulting services.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Globe className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">BEAM Integration</h3>
-                      <p className="text-gray-600">
-                        Seamless operations pipeline connecting clients and operators with real-time task management and
-                        automated workflows.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <Card className="overflow-hidden">
-                  <div className="aspect-[4/3] bg-gradient-to-br from-indigo-500 to-purple-600 relative">
-                    <div className="absolute inset-0 bg-black/20" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center text-white">
-                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Zap className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-2xl font-bold mb-2">Platform Demo</h3>
-                        <p className="text-white/80">See ReadyAimGo in action</p>
+              <div className="space-y-8">
+                {/* Feature 1: Client Platform */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="flex items-start space-x-4 cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition">
+                      <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Users className="h-6 w-6 text-indigo-600" />
                       </div>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-gray-900">01</h4>
-                        <p className="text-sm text-gray-600">Client Dashboard</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-500">Next: Operator Network</div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Client Platform</h3>
+                        <p className="text-gray-600">
+                          Custom dashboards, project management, and automated website generation with integrated
+                          storefronts and content publishing.
+                        </p>
                       </div>
                     </div>
-                  </div>
-                </Card>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Client Platform</DialogTitle>
+                      <DialogDescription>Feature details coming soon...</DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+                {/* Feature 2: Operator Network */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="flex items-start space-x-4 cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition">
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Briefcase className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Operator Network</h3>
+                        <p className="text-gray-600">
+                          Connect with verified creative professionals across design, development, marketing, audio,
+                          video, and consulting services.
+                        </p>
+                      </div>
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Operator Network</DialogTitle>
+                      <DialogDescription>Feature details coming soon...</DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+                {/* Add more features as needed, each wrapped in a Dialog */}
               </div>
+              {/* ...other content... */}
             </div>
           </Card>
         </section>
@@ -254,149 +413,60 @@ export default function HomePage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                  <Users className="h-6 w-6 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Client Dashboard</h3>
-                <p className="text-gray-600 mb-4">
-                  Manage projects, track progress, and collaborate with operators in one unified interface.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Project management
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Real-time updates
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    File sharing
-                  </li>
-                </ul>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <Briefcase className="h-6 w-6 text-green-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Operator Marketplace</h3>
-                <p className="text-gray-600 mb-4">
-                  Browse and connect with verified creative professionals across all disciplines.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Verified operators
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Skill-based matching
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Portfolio reviews
-                  </li>
-                </ul>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Globe className="h-6 w-6 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Website Generator</h3>
-                <p className="text-gray-600 mb-4">
-                  Auto-generated websites with integrated storefronts and content management.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Custom domains
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    E-commerce ready
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    SEO optimized
-                  </li>
-                </ul>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
-                  <Zap className="h-6 w-6 text-yellow-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">BEAM Operations</h3>
-                <p className="text-gray-600 mb-4">
-                  Automated workflow management connecting clients and operators seamlessly.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Task automation
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Progress tracking
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Quality assurance
-                  </li>
-                </ul>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
-                  <TrendingUp className="h-6 w-6 text-red-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Analytics & Insights</h3>
-                <p className="text-gray-600 mb-4">
-                  Comprehensive analytics to track performance and optimize your creative operations.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Performance metrics
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    ROI tracking
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Custom reports
-                  </li>
-                </ul>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="h-6 w-6 text-indigo-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Secure & Reliable</h3>
-                <p className="text-gray-600 mb-4">
-                  Enterprise-grade security with 99.9% uptime and comprehensive data protection.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    End-to-end encryption
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Regular backups
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    24/7 monitoring
-                  </li>
-                </ul>
-              </Card>
+              {platformFeatures.map((feature) => {
+                if (feature.title === "Website Generator") {
+                  return (
+                    <Dialog key={feature.title}>
+                      <DialogTrigger asChild>
+                        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                          <div className={`w-12 h-12 ${feature.bg} rounded-lg flex items-center justify-center mb-4`}>
+                            {feature.icon}
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                          <p className="text-gray-600 mb-4">{feature.desc}</p>
+                        </Card>
+                      </DialogTrigger>
+                      <DialogContent fullscreen>
+                        <div className="relative min-h-[400px] flex flex-col justify-start h-full">
+                          <DialogHeader>
+                            <DialogTitle>Project Showcase</DialogTitle>
+                            <DialogDescription>Explore our best work below.</DialogDescription>
+                          </DialogHeader>
+                          {loading ? (
+                            <div className="text-center text-gray-500 py-12">Loading projects...</div>
+                          ) : (
+                            <ProjectGrid projects={projects} onSelect={setProjectModal} />
+                          )}
+                          <ProjectModal project={projectModal} open={!!projectModal} onClose={() => setProjectModal(null)} />
+                          <PlatformFeatureMenu />
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )
+                }
+                return (
+                  <Dialog key={feature.title}>
+                    <DialogTrigger asChild>
+                      <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                        <div className={`w-12 h-12 ${feature.bg} rounded-lg flex items-center justify-center mb-4`}>
+                          {feature.icon}
+                        </div>
+                        <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                        <p className="text-gray-600 mb-4">{feature.desc}</p>
+                      </Card>
+                    </DialogTrigger>
+                    <DialogContent fullscreen>
+                      <div className="relative min-h-[400px] flex flex-col justify-start h-full">
+                        <DialogHeader>
+                          <DialogTitle>{feature.title}</DialogTitle>
+                          <DialogDescription>{feature.modal}</DialogDescription>
+                        </DialogHeader>
+                        <PlatformFeatureMenu />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )
+              })}
             </div>
           </Card>
         </section>
@@ -426,7 +496,7 @@ export default function HomePage() {
                     variant="outline"
                     className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
                   >
-                    <span>Schedule Demo</span>
+                    <span className="text-white group-hover:text-black transition-colors">Schedule Demo</span>
                   </Button>
                 </Link>
               </div>

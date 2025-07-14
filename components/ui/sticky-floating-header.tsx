@@ -1,0 +1,150 @@
+import React, { useRef, useState, useLayoutEffect } from "react"
+import { Zap, Menu as MenuIcon } from "lucide-react"
+import clsx from "clsx"
+import { motion, AnimatePresence } from "framer-motion"
+
+interface StickyFloatingHeaderProps {
+  pageTitle: string
+  className?: string
+}
+
+export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className }) => {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const rightMenuRef = useRef<HTMLDivElement>(null)
+  const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
+
+  useLayoutEffect(() => {
+    if (rightMenuRef.current) {
+      setDropdownWidth(rightMenuRef.current.offsetWidth)
+    }
+  }, [rightMenuRef.current])
+
+  return (
+    <header
+      className={clsx(
+        "sticky top-0 z-30 w-full flex justify-between items-center px-6 pt-6 pointer-events-none",
+        className
+      )}
+      style={{ background: "transparent" }}
+    >
+      {/* Left: Icon + Page Title */}
+      <div className="pointer-events-auto flex items-center gap-3 bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 min-w-[160px]">
+        <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#C7BFFF]">
+          <Zap className="h-5 w-5 text-black" />
+        </span>
+        <span className="font-bold text-black text-base">{pageTitle}</span>
+      </div>
+      {/* Right: Hamburger + Dropdown */}
+      <div
+        className="pointer-events-auto flex items-center bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 gap-4 min-w-[260px] relative"
+        ref={rightMenuRef}
+      >
+        {/* Hamburger Icon */}
+        <button
+          className="flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-transparent focus:outline-none"
+          aria-label="Open menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <motion.div
+            initial={false}
+            animate={menuOpen ? "open" : "closed"}
+            variants={{
+              closed: { rotate: 0 },
+              open: { rotate: 90 },
+            }}
+            className="w-6 h-6 flex items-center justify-center"
+          >
+            {/* Hamburger to X animation */}
+            <motion.svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <motion.rect
+                x="4"
+                y="7"
+                width="16"
+                height="2"
+                rx="1"
+                fill="black"
+                animate={menuOpen ? { rotate: 45, y: 9 } : { rotate: 0, y: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              />
+              <motion.rect
+                x="4"
+                y="15"
+                width="16"
+                height="2"
+                rx="1"
+                fill="black"
+                animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              />
+            </motion.svg>
+          </motion.div>
+        </button>
+        {/* I'm interested button */}
+        <button className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px]">
+          I'm interested
+        </button>
+        {/* Dropdown Panel */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              style={{ width: dropdownWidth, right: 0 }}
+              className="absolute top-[calc(100%+16px)] right-0 bg-[#F7F5F4] rounded-3xl shadow-2xl p-8 z-50 flex flex-col gap-6 border border-gray-100"
+            >
+              {/* Top row: X and I'm interested */}
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-2xl font-bold border-none shadow"
+                  aria-label="Close menu"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  ×
+                </button>
+                <button className="flex items-center justify-center px-8 h-14 rounded-2xl font-semibold text-base bg-black text-white shadow-md min-w-[160px] text-center">
+                  I'm interested
+                </button>
+              </div>
+              {/* Solutions */}
+              <div>
+                <div className="text-lg text-[#8B8892] font-medium mb-2">Solutions</div>
+                <div className="flex flex-col gap-1">
+                  <a href="#" className="font-bold text-black text-lg py-1">Multi-unit</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Public</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Business</a>
+                </div>
+              </div>
+              {/* Informations */}
+              <div>
+                <div className="text-lg text-[#8B8892] font-medium mb-2">Informations</div>
+                <div className="flex flex-col gap-1">
+                  <a href="#" className="font-bold text-black text-lg py-1">Become a partner</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Blog</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Contact</a>
+                </div>
+              </div>
+              {/* Bottom row: Contact and language selector */}
+              <div className="flex items-center justify-between mt-4 gap-2">
+                <button className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">Contact</button>
+                <div className="flex gap-2">
+                  <button className="w-14 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">fr</button>
+                  <button className="w-14 h-12 rounded-2xl bg-black text-white font-semibold text-base shadow border border-transparent">en</button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </header>
+  )
+}
+
+export default StickyFloatingHeader 
