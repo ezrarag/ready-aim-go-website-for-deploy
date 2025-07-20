@@ -48,16 +48,18 @@ interface NotificationProviderProps {
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [templates, setTemplates] = useState<NotificationTemplate[]>(defaultTemplates)
+  const [templates, setTemplates] = useState<NotificationTemplate[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isPushEnabled, setIsPushEnabled] = useState(false)
   const { toast } = useToast()
+  const [hydrated, setHydrated] = useState(false)
 
   // Load data on mount
   useEffect(() => {
     loadNotifications()
     loadTemplates()
     initializePushNotifications()
+    setHydrated(true)
   }, [])
 
   // Save notifications to localStorage whenever they change
@@ -317,29 +319,33 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
   const unreadCount = notifications.filter((notification) => !notification.read).length
 
-  const value: ExtendedNotificationContextType = {
-    notifications,
-    unreadCount,
-    addNotification,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    clearAllNotifications,
-    getNotificationsByCategory,
-    templates,
-    addTemplate,
-    updateTemplate,
-    deleteTemplate,
-    sendFromTemplate,
-    searchQuery,
-    setSearchQuery,
-    searchResults,
-    getAnalytics,
-    trackNotificationEvent,
-    isPushEnabled,
-    enablePushNotifications,
-    disablePushNotifications,
-  }
+  if (!hydrated) return null;
 
-  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
+  return (
+    <NotificationContext.Provider value={{
+      notifications,
+      unreadCount: notifications.filter((n) => !n.read).length,
+      addNotification,
+      markAsRead,
+      markAllAsRead,
+      deleteNotification,
+      clearAllNotifications,
+      getNotificationsByCategory,
+      templates,
+      addTemplate,
+      updateTemplate,
+      deleteTemplate,
+      sendFromTemplate,
+      searchQuery,
+      setSearchQuery,
+      searchResults: [],
+      getAnalytics,
+      trackNotificationEvent,
+      isPushEnabled,
+      enablePushNotifications,
+      disablePushNotifications,
+    }}>
+      {children}
+    </NotificationContext.Provider>
+  )
 }

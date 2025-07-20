@@ -9,35 +9,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowRight, Star, Users, Briefcase, TrendingUp, CheckCircle, Zap, Shield, Globe, Play, User } from "lucide-react"
 import StickyFloatingHeader from "@/components/ui/sticky-floating-header"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { supabase } from "@/lib/supabase/client"
-
-const menuGroups = [
-  [
-    { label: "Menu 1", onClick: () => {}, icon: null },
-    { label: "Menu 2", onClick: () => {}, icon: null },
-  ],
-  [
-    { label: "I'm interested", onClick: () => {}, primary: true },
-  ],
-]
-
-// Platform features data for cards and modals
-const platformFeatures = [
-  {
-    icon: <Users className="h-6 w-6 text-blue-600" />, bg: "bg-blue-100", title: "Client Dashboard", desc: "Manage projects, track progress, and collaborate with operators in one unified interface.", modal: "Placeholder for Client Dashboard details." },
-  {
-    icon: <Briefcase className="h-6 w-6 text-green-600" />, bg: "bg-green-100", title: "Operator Marketplace", desc: "Browse and connect with verified creative professionals across all disciplines.", modal: "Placeholder for Operator Marketplace details." },
-  {
-    icon: <Globe className="h-6 w-6 text-purple-600" />, bg: "bg-purple-100", title: "Website Generator", desc: "Auto-generated websites with integrated storefronts and content management.", modal: "Placeholder for Website Generator details." },
-  {
-    icon: <Zap className="h-6 w-6 text-yellow-600" />, bg: "bg-yellow-100", title: "BEAM Operations", desc: "Automated workflow management connecting clients and operators seamlessly.", modal: "Placeholder for BEAM Operations details." },
-  {
-    icon: <TrendingUp className="h-6 w-6 text-red-600" />, bg: "bg-red-100", title: "Analytics & Insights", desc: "Comprehensive analytics to track performance and optimize your creative operations.", modal: "Placeholder for Analytics & Insights details." },
-  {
-    icon: <Shield className="h-6 w-6 text-indigo-600" />, bg: "bg-indigo-100", title: "Secure & Reliable", desc: "Enterprise-grade security with 99.9% uptime and comprehensive data protection.", modal: "Placeholder for Secure & Reliable details." },
-]
+import { useRouter } from "next/navigation"
 
 // Operator Types Data
 
@@ -342,12 +317,72 @@ function PlatformFeatureMenu({ onClose }: { onClose?: () => void }) {
   )
 }
 
+// Platform features data for cards and modals
+const platformFeatures = [
+  {
+    icon: <Users className="h-6 w-6 text-blue-600" />, bg: "bg-blue-100", title: "Client Dashboard", desc: "Manage projects, track progress, and collaborate with operators in one unified interface.", modal: "Placeholder for Client Dashboard details." },
+  {
+    icon: <Briefcase className="h-6 w-6 text-green-600" />, bg: "bg-green-100", title: "Operator Marketplace", desc: "Browse and connect with verified creative professionals across all disciplines.", modal: "Placeholder for Operator Marketplace details." },
+  {
+    icon: <Globe className="h-6 w-6 text-purple-600" />, bg: "bg-purple-100", title: "Website Generator", desc: "Auto-generated websites with integrated storefronts and content management.", modal: "Placeholder for Website Generator details." },
+  {
+    icon: <Zap className="h-6 w-6 text-yellow-600" />, bg: "bg-yellow-100", title: "BEAM Operations", desc: "Automated workflow management connecting clients and operators seamlessly.", modal: "Placeholder for BEAM Operations details." },
+  {
+    icon: <TrendingUp className="h-6 w-6 text-red-600" />, bg: "bg-red-100", title: "Analytics & Insights", desc: "Comprehensive analytics to track performance and optimize your creative operations.", modal: "Placeholder for Analytics & Insights details." },
+  {
+    icon: <Shield className="h-6 w-6 text-indigo-600" />, bg: "bg-indigo-100", title: "Secure & Reliable", desc: "Enterprise-grade security with 99.9% uptime and comprehensive data protection.", modal: "Placeholder for Secure & Reliable details." },
+]
+
 export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [projectModal, setProjectModal] = useState<Project | null>(null)
   const [operatorTypeModal, setOperatorTypeModal] = useState<OperatorType | null>(null)
   const [operatorModalOpen, setOperatorModalOpen] = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
+  const router = useRouter()
+
+  // Handler for onboarding navigation
+  const handleOnboarding = useCallback(() => {
+    // router.push('/login') // Commented out login redirect
+    router.push('/onboarding')
+  }, [router])
+
+  // Handler for demo video
+  const handleShowDemo = useCallback(() => {
+    setShowDemo(true)
+  }, [])
+  const handleHideDemo = useCallback(() => {
+    setShowDemo(false)
+  }, [])
+
+  const menuGroups = [
+    [
+      { label: "Menu 1", onClick: () => {}, icon: null },
+      { label: "Menu 2", onClick: () => {}, icon: null },
+    ],
+    [
+      { label: "I'm interested", onClick: handleOnboarding, primary: true },
+    ],
+  ]
+
+  // Check if user is authenticated and has completed onboarding
+  useEffect(() => {
+    async function checkAuthAndOnboarding() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('contract_accepted_at, stripe_customer_id, is_demo_client')
+          .eq('id', user.id)
+          .single()
+        if (profile && (profile.contract_accepted_at && (profile.stripe_customer_id || profile.is_demo_client))) {
+          router.replace('/dashboard/client')
+        }
+      }
+    }
+    checkAuthAndOnboarding()
+  }, [router])
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -376,97 +411,88 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <StickyFloatingHeader pageTitle="Home" />
+    <div className="min-h-screen bg-gray-100 relative">
+      <StickyFloatingHeader pageTitle="Home" onInterested={handleOnboarding} />
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 pb-8">
-        <Card className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="relative px-8 py-24 lg:py-32">
-            <div className="max-w-4xl">
-              <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-                CONNECT YOUR
-                <br />
-                <span className="text-indigo-400">CREATIVE VISION</span>
-                <br />
-                TODAY
-              </h1>
-
-              <p className="text-xl text-gray-200 mb-8 max-w-2xl leading-relaxed">
-                We provide tailored creative solutions, connecting clients with skilled operators through personalized
-                experiences that meet your unique needs and aspirations.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                <Button
-                  size="lg"
-                  className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
-                  asChild
+      <section className="relative overflow-hidden px-4 pb-8 z-10">
+        <Card className={`bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700`}>
+          <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[400px] p-0' : 'px-8 py-24 lg:py-32 min-h-[400px]' } flex items-center justify-center`}>
+            <AnimatePresence>
+              {showDemo ? (
+                <motion.div
+                  key="demo-video"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.7 }}
+                  className="absolute inset-0 w-full h-full flex items-center justify-center"
+                  style={{ borderRadius: 'inherit', overflow: 'hidden' }}
                 >
-                  <Link href="/login">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls
+                    className="absolute inset-0 w-full h-full object-cover rounded-2xl"
+                    src="https://fnaasdxpkrhjmotiemog.supabase.co/storage/v1/object/public/bucket/homepage/5764594-hd_1920_1080_30fps.mp4"
+                    style={{ pointerEvents: 'auto' }}
+                  />
+                  <motion.button
+                    key="close-demo"
+                    initial={{ opacity: 0, y: -40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -40 }}
+                    transition={{ duration: 0.5 }}
+                    className="absolute top-4 right-4 z-20 bg-black/70 text-white rounded-full p-3 shadow-lg hover:bg-black"
+                    onClick={handleHideDemo}
+                    aria-label="Close demo video"
+                  >
+                    ×
+                  </motion.button>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+            {!showDemo && (
+              <div className="max-w-4xl w-full">
+                {/* Matrix/letter-cycling effect for text */}
+                <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+                  <MatrixText text="READY" />
+                  <br />
+                  <span className="text-indigo-600"><MatrixText text="AIM" /></span>
+                  <br />
+                  <MatrixText text="GO" />
+                </h1>
+                <p className="text-xl text-gray-700 mb-8 max-w-2xl leading-relaxed">
+                  <MatrixText text="We provide tailored creative solutions, connecting clients with skilled operators through personalized experiences that meet your unique needs and aspirations." />
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                  <Button
+                    size="lg"
+                    className="bg-black text-white hover:bg-gray-900 rounded-full px-8 py-4 text-lg font-semibold"
+                    onClick={handleOnboarding}
+                  >
                     <span>Explore Platform</span>
                     <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
-                >
-                  <Play className="mr-2 h-5 w-5" />
-                  <span className="text-white group-hover:text-black transition-colors">Watch Demo</span>
-                </Button>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-black text-black bg-white hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
+                    onClick={handleShowDemo}
+                  >
+                    <Play className="mr-2 h-5 w-5" />
+                    <span className="text-black">Watch Demo</span>
+                  </Button>
+                </div>
+                {/* Stats */}
+                <HomeStats />
               </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-8">
-                <div>
-                  <div className="text-4xl font-bold text-white mb-1">500+</div>
-                  <div className="text-gray-300 font-medium">Projects Complete</div>
-                </div>
-                <div>
-                  <div className="text-4xl font-bold text-white mb-1">150+</div>
-                  <div className="text-gray-300 font-medium">Active Operators</div>
-                </div>
-                <div>
-                  <div className="text-4xl font-bold text-white mb-1">$2M+</div>
-                  <div className="text-gray-300 font-medium">Creator Value</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Floating testimonials */}
-          <div className="absolute bottom-8 right-8 hidden lg:block">
-            <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white p-4">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="flex -space-x-2">
-                  <Avatar className="w-8 h-8 border-2 border-white">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback>JD</AvatarFallback>
-                  </Avatar>
-                  <Avatar className="w-8 h-8 border-2 border-white">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback>SM</AvatarFallback>
-                  </Avatar>
-                  <Avatar className="w-8 h-8 border-2 border-white">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback>AL</AvatarFallback>
-                  </Avatar>
-                </div>
-                <div className="text-sm">
-                  <div className="flex items-center">
-                    <span className="font-semibold">10+ Featured</span>
-                    <div className="flex ml-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-300">5/5 Rating</div>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <HomeTestimonials />
         </Card>
       </section>
 
@@ -745,4 +771,138 @@ export default function HomePage() {
       </footer>
     </div>
   )
+}
+
+// MatrixText component for letter-cycling effect
+function MatrixText({ text }: { text: string }) {
+  const [display, setDisplay] = useState(text)
+  const interval = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    let frame = 0
+    interval.current = setInterval(() => {
+      setDisplay((prev) =>
+        prev
+          .split("")
+          .map((char, i) => {
+            if (char === " " || i > frame) return char
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            return chars[Math.floor(Math.random() * chars.length)]
+          })
+          .join("")
+      )
+      frame++
+      if (frame > text.length) {
+        clearInterval(interval.current!);
+        setDisplay(text)
+      }
+    }, 30)
+    return () => clearInterval(interval.current!);
+  }, [text])
+  return <span>{display}</span>
+}
+
+function HomeStats() {
+  const [stats, setStats] = useState({
+    projectsComplete: 0,
+    activeOperators: 0,
+    creatorValue: 0,
+    loading: true,
+  });
+  useEffect(() => {
+    async function fetchStats() {
+      // Projects Complete
+      const { count: projectsComplete } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed');
+      // Active Operators
+      const { data: operatorIds } = await supabase
+        .from('projects')
+        .select('operator_id')
+        .neq('operator_id', null);
+      const uniqueOperators = new Set((operatorIds || []).map(p => p.operator_id));
+      const activeOperators = uniqueOperators.size;
+      // Creator Value
+      const { data: completedProjects } = await supabase
+        .from('projects')
+        .select('budget')
+        .eq('status', 'completed');
+      const creatorValue = (completedProjects || []).reduce((sum, p) => sum + (p.budget || 0), 0);
+      setStats({
+        projectsComplete: projectsComplete || 0,
+        activeOperators,
+        creatorValue,
+        loading: false,
+      });
+    }
+    fetchStats();
+  }, []);
+  if (stats.loading) {
+    return <div>Loading stats...</div>;
+  }
+  return (
+    <div className="grid grid-cols-3 gap-8">
+      <div>
+        <div className="text-4xl font-bold text-gray-900 mb-1">{stats.projectsComplete}</div>
+        <div className="text-gray-500 font-medium">Projects Complete</div>
+      </div>
+      <div>
+        <div className="text-4xl font-bold text-gray-900 mb-1">{stats.activeOperators}</div>
+        <div className="text-gray-500 font-medium">Active Operators</div>
+      </div>
+      <div>
+        <div className="text-4xl font-bold text-gray-900 mb-1">${stats.creatorValue.toLocaleString()}</div>
+        <div className="text-gray-500 font-medium">Creator Value</div>
+      </div>
+    </div>
+  );
+}
+
+function HomeTestimonials() {
+  const [testimonials, setTestimonials] = useState<any[] | null>(null);
+  useEffect(() => {
+    async function fetchTestimonials() {
+      // Try to fetch from Supabase
+      const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setTestimonials(data);
+      } else {
+        // Fallback to static testimonials
+        setTestimonials([
+          { name: "Jane Doe", avatar: "/placeholder.svg", rating: 5, text: "ReadyAimGo made my project a breeze!" },
+          { name: "Sam Miller", avatar: "/placeholder.svg", rating: 5, text: "The operator network is top notch." },
+          { name: "Alex Lee", avatar: "/placeholder.svg", rating: 5, text: "I love the BEAM platform!" },
+        ]);
+      }
+    }
+    fetchTestimonials();
+  }, []);
+  if (!testimonials) return null;
+  return (
+    <div className="absolute bottom-8 right-8 hidden lg:block">
+      <Card className="bg-white/10 backdrop-blur-md border-white/20 text-gray-900 p-4">
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="flex -space-x-2">
+            {testimonials.map((t, i) => (
+              <Avatar key={i} className="w-8 h-8 border-2 border-white">
+                <AvatarImage src={t.avatar} />
+                <AvatarFallback>{t.name.split(" ").map((n: string) => n[0]).join("")}</AvatarFallback>
+              </Avatar>
+            ))}
+          </div>
+          <div className="text-sm">
+            <div className="flex items-center">
+              <span className="font-semibold">{testimonials.length}+ Featured</span>
+              <div className="flex ml-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                ))}
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">5/5 Rating</div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
 }

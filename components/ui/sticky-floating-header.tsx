@@ -6,9 +6,10 @@ import { motion, AnimatePresence } from "framer-motion"
 interface StickyFloatingHeaderProps {
   pageTitle: string
   className?: string
+  onInterested?: () => void
 }
 
-export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className }) => {
+export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className, onInterested }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const rightMenuRef = useRef<HTMLDivElement>(null)
   const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
@@ -86,7 +87,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
           </motion.div>
         </button>
         {/* I'm interested button */}
-        <button className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px]">
+        <button className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px]" onClick={onInterested}>
           I'm interested
         </button>
         {/* Dropdown Panel */}
@@ -109,7 +110,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
                 >
                   ×
                 </button>
-                <button className="flex items-center justify-center px-8 h-14 rounded-2xl font-semibold text-base bg-black text-white shadow-md min-w-[160px] text-center">
+                <button className="flex items-center justify-center px-8 h-14 rounded-2xl font-semibold text-base bg-black text-white shadow-md min-w-[160px] text-center" onClick={onInterested}>
                   I'm interested
                 </button>
               </div>

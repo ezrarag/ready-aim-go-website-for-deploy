@@ -22,52 +22,24 @@ import {
 } from "lucide-react"
 import { NewProjectModal } from "@/components/new-project-modal"
 import { RolesManager } from "@/components/roles-manager"
+import { MockUserProvider, useMockUser } from "@/components/MockUserProvider";
 
-export default function ClientDashboard() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+function ClientDashboardContent() {
+  const { mockUserId, userData, toggleUser, currentUser, loading } = useMockUser();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
-  // Mock data
-  const stats = {
-    activeProjects: 8,
-    completedProjects: 24,
-    activeOperators: 12,
-    totalSpent: 15420,
-    averageRating: 4.8,
+  if (loading || !userData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500 text-lg">Loading dashboard...</div>
+      </div>
+    );
   }
 
-  const recentProjects = [
-    {
-      id: "1",
-      title: "Brand Identity Design",
-      type: "design",
-      status: "in-progress",
-      operator: { name: "Sarah Chen", avatar: "/placeholder.svg" },
-      progress: 75,
-      deadline: "2024-02-15",
-      budget: 2500,
-    },
-    {
-      id: "2",
-      title: "Website Development",
-      type: "development",
-      status: "review",
-      operator: { name: "Mike Rodriguez", avatar: "/placeholder.svg" },
-      progress: 90,
-      deadline: "2024-02-20",
-      budget: 5000,
-    },
-    {
-      id: "3",
-      title: "Social Media Campaign",
-      type: "marketing",
-      status: "open",
-      operator: null,
-      progress: 0,
-      deadline: "2024-02-25",
-      budget: 1500,
-    },
-  ]
+  const stats = userData.stats;
+  const recentProjects = userData.projects.slice(0, 3); // Show 3 most recent
+  const activity = userData.activity;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -109,6 +81,9 @@ export default function ClientDashboard() {
               <h1 className="text-2xl font-bold text-gray-900">ReadyAimGo</h1>
             </div>
             <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm" onClick={toggleUser}>
+                Switch User ({currentUser.name})
+              </Button>
               <Button variant="ghost" size="sm">
                 <Bell className="h-4 w-4" />
               </Button>
@@ -118,7 +93,7 @@ export default function ClientDashboard() {
               </Button>
               <Avatar>
                 <AvatarImage src="/placeholder.svg" />
-                <AvatarFallback>BC</AvatarFallback>
+                <AvatarFallback>{(() => { const parts: string[] = currentUser.name.split(" "); return parts.map((n: string) => n[0]).join(""); })()}</AvatarFallback>
               </Avatar>
             </div>
           </div>
@@ -128,12 +103,12 @@ export default function ClientDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, Britney!</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {userData.name}!</h2>
           <p className="text-gray-600">Here's what's happening with your creative projects.</p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -157,20 +132,6 @@ export default function ClientDashboard() {
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Operators</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.activeOperators}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Users className="h-6 w-6 text-purple-600" />
                 </div>
               </div>
             </CardContent>
@@ -313,34 +274,25 @@ export default function ClientDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        <span className="font-medium">Sarah Chen</span> completed the logo design for Brand Identity
-                        project
-                      </p>
-                      <p className="text-xs text-gray-500">2 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        <span className="font-medium">Mike Rodriguez</span> submitted website mockups for review
-                      </p>
-                      <p className="text-xs text-gray-500">4 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        New operator <span className="font-medium">Alex Kim</span> applied for Social Media Campaign
-                      </p>
-                      <p className="text-xs text-gray-500">6 hours ago</p>
-                    </div>
-                  </div>
+                  {activity.length === 0 ? (
+                    <div className="text-gray-500 text-sm">No recent activity.</div>
+                  ) : (
+                    activity.map((item) => (
+                      <div key={item.id} className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">{item.action}</span>
+                            {item.project_title && (
+                              <span> on <span className="font-semibold">{item.project_title}</span></span>
+                            )}
+                            {item.details && <span>: {item.details}</span>}
+                          </p>
+                          <p className="text-xs text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -421,5 +373,13 @@ export default function ClientDashboard() {
       {/* New Project Modal */}
       <NewProjectModal open={showNewProjectModal} onOpenChange={setShowNewProjectModal} />
     </div>
-  )
+  );
+}
+
+export default function ClientDashboard() {
+  return (
+    <MockUserProvider>
+      <ClientDashboardContent />
+    </MockUserProvider>
+  );
 }

@@ -9,9 +9,13 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
+import { useEffect, useState } from "react"
 
 export function Toaster() {
   const { toasts } = useToast()
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => { setHydrated(true) }, [])
+  if (!hydrated) return null
 
   return (
     <ToastProvider>

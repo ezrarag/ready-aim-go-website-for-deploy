@@ -19,3 +19,13 @@ export async function getUserProfile(supabaseClient: SupabaseClient) {
     .single();
   return { user, profile, error: profileError };
 }
+
+export async function getProfileByEmail(email: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .single();
+  if (error) return null;
+  return data;
+}

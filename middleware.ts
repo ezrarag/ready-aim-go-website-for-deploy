@@ -1,60 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const DASHBOARD_ROUTES = [
-  '/dashboard',
-  '/dashboard/client',
-  '/dashboard/operator',
-  '/dashboard/admin',
-];
+// Temporary mock profile so we can simulate onboarding/role-based redirects
+const mockProfile = {
+  role: 'client', // change to 'operator' to test operator dashboard
+  is_demo_client: false,
+  contract_accepted_at: new Date().toISOString(), // or null to test contract step
+};
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  // Only run on dashboard routes
-  if (!DASHBOARD_ROUTES.some((route) => pathname.startsWith(route))) {
+
+  // Allow API routes and static files
+  if (pathname.startsWith('/api') || pathname.includes('.')) {
     return NextResponse.next();
   }
 
-  // Get the Supabase session from cookies
-  const supabaseToken = req.cookies.get('sb-access-token')?.value;
-  if (!supabaseToken) {
-    // Not authenticated
-    return NextResponse.redirect(new URL('/login', req.url));
+  // Skip Supabase session/auth checks
+  console.log('[Middleware] Skipping login, simulating profile:', mockProfile);
+
+  // Redirect logic based on the simulated profile
+  if (!mockProfile) {
+    return NextResponse.redirect(new URL('/onboarding', req.url));
   }
 
-  // Fetch user profile from Supabase REST API
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles?select=role&id=eq.${req.cookies.get('sb-user-id')?.value}`, {
-    headers: {
-      apikey: supabaseKey || '',
-      Authorization: `Bearer ${supabaseToken}`,
-    },
-  });
-  const profileData = await profileRes.json();
-  const role = profileData?.[0]?.role;
-
-  if (!role) {
-    // No profile or role found
-    return NextResponse.redirect(new URL('/login', req.url));
+  if (!mockProfile.contract_accepted_at) {
+    return NextResponse.redirect(new URL('/onboarding/contract', req.url));
   }
 
-  // Determine correct dashboard path
-  const roleToDashboard = {
-    client: '/dashboard/client',
-    operator: '/dashboard/operator',
-    admin: '/dashboard/admin',
-  };
-  const correctDashboard = roleToDashboard[role as keyof typeof roleToDashboard];
-
-  // If user is on the wrong dashboard, redirect
-  if (!pathname.startsWith(correctDashboard)) {
-    return NextResponse.redirect(new URL(correctDashboard, req.url));
+  if (pathname.startsWith('/dashboard/operator') && mockProfile.role !== 'operator') {
+    return NextResponse.redirect(new URL('/dashboard/client', req.url));
   }
 
-  // Otherwise, allow
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*'], // Protects all dashboard routes
 }; 
