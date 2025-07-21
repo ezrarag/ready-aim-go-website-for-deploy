@@ -132,6 +132,14 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
                   <a href="#" className="font-bold text-black text-lg py-1">Contact</a>
                 </div>
               </div>
+              {/* Platform Overview */}
+              <div>
+                <div className="text-lg text-[#8B8892] font-medium mb-2">Platform Overview</div>
+                <div className="flex flex-col gap-1">
+                  <a href="/platform/what-we-offer" className="font-bold text-black text-lg py-1">What We Offer</a>
+                  <a href="/platform/features" className="font-bold text-black text-lg py-1">Platform Features</a>
+                </div>
+              </div>
               {/* Bottom row: Contact and language selector */}
               <div className="flex items-center justify-between mt-4 gap-2">
                 <button className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">Contact</button>

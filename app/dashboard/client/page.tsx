@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,12 +23,74 @@ import {
 import { NewProjectModal } from "@/components/new-project-modal"
 import { RolesManager } from "@/components/roles-manager"
 import { MockUserProvider, useMockUser } from "@/components/MockUserProvider";
+import { supabase } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 
 function ClientDashboardContent() {
   const { mockUserId, userData, toggleUser, currentUser, loading } = useMockUser();
   const [activeTab, setActiveTab] = useState("overview");
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [editingTodo, setEditingTodo] = useState<string | null>(null);
+  const [editText, setEditText] = useState<string>("");
 
+  useEffect(() => {
+    if (!userData) return;
+    async function fetchTodos() {
+      if (!userData) return;
+      const clientId = (userData as any).id || userData.email;
+      let query = supabase
+        .from('client_todos')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (statusFilter) query = query.eq('status', statusFilter);
+      const { data } = await query;
+      if (data) setTodos(data);
+    }
+    fetchTodos();
+  }, [userData, statusFilter]);
+
+  const handleEdit = (todo: any) => {
+    setEditingTodo(todo.id);
+    setEditText(todo.title);
+  };
+
+  const handleEditSave = async (todo: any) => {
+    await supabase.from('client_todos').update({ title: editText }).eq('id', todo.id);
+    setEditingTodo(null);
+    setEditText("");
+    // Refresh todos
+    if (!userData) return;
+    const clientId = (userData as any).id || userData.email;
+    let query = supabase
+      .from('client_todos')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+    if (statusFilter) query = query.eq('status', statusFilter);
+    const { data } = await query;
+    if (data) setTodos(data);
+  };
+
+  const handleStatusChange = async (todo: any, newStatus: string) => {
+    await supabase.from('client_todos').update({ status: newStatus }).eq('id', todo.id);
+    // Refresh todos
+    if (!userData) return;
+    const clientId = (userData as any).id || userData.email;
+    let query = supabase
+      .from('client_todos')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+    if (statusFilter) query = query.eq('status', statusFilter);
+    const { data } = await query;
+    if (data) setTodos(data);
+  };
+
+  // Only render dashboard after data is loaded (client-only)
   if (loading || !userData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -168,12 +230,13 @@ function ClientDashboardContent() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="roles">Roles</TabsTrigger>
             <TabsTrigger value="operators">Operators</TabsTrigger>
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
+            <TabsTrigger value="todos">TODOs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -367,6 +430,71 @@ function ClientDashboardContent() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="todos">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your TODOs</CardTitle>
+                <CardDescription>Tasks and requests for your account</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 mb-4">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-48">
+                      <span>{statusFilter ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) : "All Statuses"}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {todos.length === 0 ? (
+                  <div className="text-gray-500">No TODOs found.</div>
+                ) : (
+                  <ul className="space-y-2">
+                    {todos.map((todo) => (
+                      <li key={todo.id} className="flex items-center gap-4 border-b py-2">
+                        {editingTodo === todo.id ? (
+                          <>
+                            <Input
+                              value={editText}
+                              onChange={e => setEditText(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button size="sm" onClick={() => handleEditSave(todo)}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingTodo(null)}>Cancel</Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 cursor-pointer" onClick={() => handleEdit(todo)}>{todo.title}</span>
+                            <Select
+                              value={todo.status}
+                              onValueChange={val => handleStatusChange(todo, val)}
+                            >
+                              <SelectTrigger className="w-36">
+                                <span>{todo.status.charAt(0).toUpperCase() + todo.status.slice(1)}</span>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(todo)}>Edit</Button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -377,6 +505,7 @@ function ClientDashboardContent() {
 }
 
 export default function ClientDashboard() {
+  // Ensure dashboard is only rendered on the client
   return (
     <MockUserProvider>
       <ClientDashboardContent />

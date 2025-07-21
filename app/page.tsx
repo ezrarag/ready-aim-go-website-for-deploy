@@ -435,7 +435,7 @@ export default function HomePage() {
                     playsInline
                     controls
                     className="absolute inset-0 w-full h-full object-cover rounded-2xl"
-                    src="https://fnaasdxpkrhjmotiemog.supabase.co/storage/v1/object/public/bucket/homepage/5764594-hd_1920_1080_30fps.mp4"
+                    src="https://fnaasdxpkrhjmotiemog.supabase.co/storage/v1/object/public/bucket/homepage/first-draft.mp4"
                     style={{ pointerEvents: 'auto' }}
                   />
                   <motion.button
@@ -464,7 +464,7 @@ export default function HomePage() {
                   <MatrixText text="GO" />
                 </h1>
                 <p className="text-xl text-gray-700 mb-8 max-w-2xl leading-relaxed">
-                  <MatrixText text="We provide tailored creative solutions, connecting clients with skilled operators through personalized experiences that meet your unique needs and aspirations." />
+                  <MatrixText text="Full Stack Virtual Asset Management" />
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 mb-12">
                   <Button
@@ -496,182 +496,38 @@ export default function HomePage() {
         </Card>
       </section>
 
-      {/* What We Offer (Platform Features) */}
-      <div className="px-4 space-y-8">
-        <section className="py-20">
-          <Card className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="text-center mb-4">
-              <Badge variant="secondary" className="mb-4">
-                What We Offer
-              </Badge>
-            </div>
-            <h2 className="text-4xl lg:text-5xl font-bold text-center text-gray-900 mb-6">
-              COMPREHENSIVE CREATIVE SOLUTIONS
-            </h2>
-            <p className="text-xl text-gray-600 text-center max-w-3xl mx-auto mb-16">
-              Our comprehensive services encompass creative project management, skilled operator networks, and premium
-              marketplace solutions.
+      {/* CTA Section */}
+      <section className="py-20">
+        <Card className="bg-gray-900 text-white rounded-2xl shadow-2xl p-12">
+          <div className="text-center">
+            <h2 className="text-4xl font-bold mb-6">Ready to Transform Your Creative Process?</h2>
+            <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
+              Join thousands of creators and operators who trust ReadyAimGo to streamline their workflows and
+              accelerate their success.
             </p>
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="space-y-8">
-                {/* Feature 1: Client Platform */}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <div className="flex items-start space-x-4 cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition">
-                      <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Users className="h-6 w-6 text-indigo-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Client Platform</h3>
-                        <p className="text-gray-600">
-                          Custom dashboards, project management, and automated website generation with integrated
-                          storefronts and content publishing.
-                        </p>
-                      </div>
-                    </div>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Client Platform</DialogTitle>
-                      <DialogDescription>Feature details coming soon...</DialogDescription>
-                    </DialogHeader>
-                  </DialogContent>
-                </Dialog>
-                {/* Feature 2: Operator Network */}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <div className="flex items-start space-x-4 cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition">
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Briefcase className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Operator Network</h3>
-                        <p className="text-gray-600">
-                          Connect with verified creative professionals across design, development, marketing, audio,
-                          video, and consulting services.
-                        </p>
-                      </div>
-                    </div>
-                  </DialogTrigger>
-                  <DialogContent fullscreen>
-                    <DialogHeader>
-                      <DialogTitle>Operator Network</DialogTitle>
-                      <DialogDescription>Browse and connect with operator types below.</DialogDescription>
-                    </DialogHeader>
-                    <OperatorTypeGrid operatorTypes={operatorTypes} onSelect={(type) => { setOperatorTypeModal(type); setOperatorModalOpen(true); }} />
-                    <OperatorTypeModal type={operatorTypeModal} open={operatorModalOpen} onClose={() => setOperatorModalOpen(false)} />
-                    <PlatformFeatureMenu />
-                  </DialogContent>
-                </Dialog>
-                {/* Add more features as needed, each wrapped in a Dialog */}
-              </div>
-              {/* ...other content... */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/dashboard/client">
+                <Button
+                  size="lg"
+                  className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
+                >
+                  <span>Start Your Journey</span>
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/contact">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
+                >
+                  <span className="text-white group-hover:text-black transition-colors">Schedule Demo</span>
+                </Button>
+              </Link>
             </div>
-          </Card>
-        </section>
-
-        {/* Platform Features */}
-        <section id="platform" className="py-20">
-          <Card className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">Platform Features</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Everything you need to manage creative projects and connect with top operators
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {platformFeatures.map((feature) => {
-                if (feature.title === "Website Generator") {
-                  return (
-                    <Dialog key={feature.title}>
-                      <DialogTrigger asChild>
-                        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                          <div className={`w-12 h-12 ${feature.bg} rounded-lg flex items-center justify-center mb-4`}>
-                            {feature.icon}
-                          </div>
-                          <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                          <p className="text-gray-600 mb-4">{feature.desc}</p>
-                        </Card>
-                      </DialogTrigger>
-                      <DialogContent fullscreen>
-                        <div className="relative min-h-[400px] flex flex-col justify-start h-full">
-                          <DialogHeader>
-                            <DialogTitle>Project Showcase</DialogTitle>
-                            <DialogDescription>Explore our best work below.</DialogDescription>
-                          </DialogHeader>
-                          {loading ? (
-                            <div className="text-center text-gray-500 py-12">Loading projects...</div>
-                          ) : (
-                            <ProjectGrid projects={projects} onSelect={setProjectModal} />
-                          )}
-                          <ProjectModal project={projectModal} open={!!projectModal} onClose={() => setProjectModal(null)} />
-                          <PlatformFeatureMenu />
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )
-                }
-                return (
-                  <Dialog key={feature.title}>
-                    <DialogTrigger asChild>
-                      <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className={`w-12 h-12 ${feature.bg} rounded-lg flex items-center justify-center mb-4`}>
-                          {feature.icon}
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                        <p className="text-gray-600 mb-4">{feature.desc}</p>
-                      </Card>
-                    </DialogTrigger>
-                    <DialogContent fullscreen>
-                      <div className="relative min-h-[400px] flex flex-col justify-start h-full">
-                        <DialogHeader>
-                          <DialogTitle>{feature.title}</DialogTitle>
-                          <DialogDescription>{feature.modal}</DialogDescription>
-                        </DialogHeader>
-                        <PlatformFeatureMenu />
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )
-              })}
-            </div>
-          </Card>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20">
-          <Card className="bg-gray-900 text-white rounded-2xl shadow-2xl p-12">
-            <div className="text-center">
-              <h2 className="text-4xl font-bold mb-6">Ready to Transform Your Creative Process?</h2>
-              <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-                Join thousands of creators and operators who trust ReadyAimGo to streamline their workflows and
-                accelerate their success.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/dashboard/client">
-                  <Button
-                    size="lg"
-                    className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
-                  >
-                    <span>Start Your Journey</span>
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="/contact">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
-                  >
-                    <span className="text-white group-hover:text-black transition-colors">Schedule Demo</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        </section>
-      </div>
+          </div>
+        </Card>
+      </section>
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 py-12 mt-8">
