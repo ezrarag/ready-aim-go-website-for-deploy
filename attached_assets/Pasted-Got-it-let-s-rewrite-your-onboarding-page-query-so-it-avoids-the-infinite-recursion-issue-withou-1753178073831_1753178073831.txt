@@ -1,0 +1,72 @@
+Got it — let’s rewrite your /onboarding page query so it avoids the infinite recursion issue (without turning off RLS).
+
+The recursion usually happens because your profiles query joins back into clients (or vice versa), which then loops due to Supabase’s auto-generated foreign key relationships.
+
+⸻
+
+What to Change
+	1.	Stop using nested selects like this:
+
+supabase
+  .from('profiles')
+  .select('*, clients(*)')
+  .eq('id', user.id)
+  .single();
+
+These nested selects cause Supabase to query both tables, and if both tables have policies referencing each other, Postgres can get stuck in recursion.
+
+	2.	Split into two separate queries instead.
+
+⸻
+
+Fixed Query (Use Two Calls)
+
+import { supabase } from '../supabaseClient';
+
+async function fetchUserAndClient(userId) {
+  // Fetch just the profile first (no joins)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (profileError) {
+    console.error('Error fetching profile:', profileError);
+    return { profile: null, client: null };
+  }
+
+  // Fetch client record separately (if it exists)
+  const { data: client, error: clientError } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('id', userId) // assuming client.id matches profile.id
+    .single();
+
+  if (clientError && clientError.code !== 'PGRST116') {
+    // PGRST116 means "no rows found", which might be fine
+    console.error('Error fetching client:', clientError);
+  }
+
+  return { profile, client };
+}
+
+Then in your /onboarding page, call:
+
+const { profile, client } = await fetchUserAndClient(user.id);
+
+// Use profile for general info
+// Use client for client-specific dashboard elements
+
+
+⸻
+
+Next Step to Test
+	1.	Replace your existing Supabase query on the onboarding page with the two-step approach above.
+	2.	Push the change (or run it in Replit).
+	3.	Try logging in via Google again — see if you get past the infinite recursion modal and actually hit the dashboard.
+
+⸻
+
+Do you want me to write this as a Cursor-ready patch (so you can just paste it into Cursor and it auto-applies to your /onboarding page),
+or would you prefer me to show the exact diff (before/after) so you can update it manually? Or both?
