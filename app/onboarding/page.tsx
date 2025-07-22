@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -18,42 +19,79 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const checkAuthAndOnboarding = async () => {
-      const sessionResult = await supabase.auth.getSession()
-      console.log("[Onboarding] Supabase session:", sessionResult)
-      const { data: { user } } = await supabase.auth.getUser()
-      console.log("[Onboarding] Supabase user:", user)
-      if (!user) {
-        console.log("[Onboarding] No user, redirecting to /login")
-        router.replace("/login")
-        return
-      }
-      setUser(user)
-      // Fetch profile to check onboarding status and role
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("contract_accepted_at, is_demo_client, full_name, role")
-        .eq("id", user.id)
-        .single()
-      console.log("[Onboarding] Profile record:", profile, profileError)
-      if (profile) {
-        console.log("contract_accepted_at:", profile.contract_accepted_at)
-        console.log("is_demo_client:", profile.is_demo_client)
-        console.log("role:", profile.role)
-      }
-      if (profileError) {
-        setError("Failed to load profile.")
+      try {
+        // Get current session and user
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log("[Onboarding] Session:", session, sessionError)
+        
+        if (sessionError || !session?.user) {
+          console.log("[Onboarding] No valid session, redirecting to /login")
+          router.replace("/login")
+          return
+        }
+
+        const user = session.user
+        setUser(user)
+        console.log("[Onboarding] User:", user)
+
+        // Fetch profile separately (no joins to avoid recursion)
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, contract_accepted_at, is_demo_client, full_name, role")
+          .eq("id", user.id)
+          .single()
+
+        console.log("[Onboarding] Profile query result:", profileData, profileError)
+
+        // Handle profile errors
+        if (profileError) {
+          if (profileError.code === 'PGRST116') {
+            // No profile exists, create one
+            console.log("[Onboarding] No profile found, creating new profile")
+            const { data: newProfile, error: createError } = await supabase
+              .from("profiles")
+              .insert({
+                id: user.id,
+                full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                role: 'client'
+              })
+              .select("id, contract_accepted_at, is_demo_client, full_name, role")
+              .single()
+
+            if (createError) {
+              console.error("[Onboarding] Failed to create profile:", createError)
+              setError("Failed to create user profile.")
+              setChecking(false)
+              return
+            }
+            setProfile(newProfile)
+          } else {
+            console.error("[Onboarding] Profile query error:", profileError)
+            setError("Failed to load profile.")
+            setChecking(false)
+            return
+          }
+        } else {
+          setProfile(profileData)
+        }
+
+        // Check if onboarding is complete
+        const currentProfile = profileData || profile
+        if (currentProfile && (currentProfile.contract_accepted_at || currentProfile.is_demo_client)) {
+          const redirectPath = currentProfile.role === "operator" ? "/dashboard/operator" : "/dashboard/client"
+          console.log("[Onboarding] User already onboarded, redirecting to:", redirectPath)
+          router.replace(redirectPath)
+          return
+        }
+
         setChecking(false)
-        return
+      } catch (error) {
+        console.error("[Onboarding] Unexpected error:", error)
+        setError("An unexpected error occurred.")
+        setChecking(false)
       }
-      setProfile(profile)
-      if (profile && (profile.contract_accepted_at || profile.is_demo_client)) {
-        const redirectPath = profile.role === "operator" ? "/dashboard/operator" : "/dashboard/client"
-        console.log("[Onboarding] Redirecting to:", redirectPath)
-        router.replace(redirectPath)
-        return
-      }
-      setChecking(false)
     }
+
     checkAuthAndOnboarding()
   }, [router])
 
@@ -71,49 +109,61 @@ export default function OnboardingPage() {
   const handleDemo = async () => {
     setLoading(true)
     setError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setError("Not authenticated")
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Not authenticated")
+        setLoading(false)
+        return
+      }
+
+      // Update profile with demo status and contract acceptance
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          is_demo_client: true,
+          contract_accepted_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+
+      if (updateError) {
+        console.error("Failed to update profile for demo:", updateError)
+        setError(updateError.message)
+        setLoading(false)
+        return
+      }
+
+      console.log("[Onboarding] Demo profile updated, redirecting to client dashboard")
+      router.push("/dashboard/client")
+    } catch (error: any) {
+      console.error("Demo setup error:", error)
+      setError(error.message || "Failed to set up demo access")
       setLoading(false)
-      return
     }
-    // Fetch current profile to check for full_name
-    let fullName = "Demo User"
-    const { data: profileData, error: profileFetchError } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .single()
-    if (profileData && profileData.full_name) {
-      fullName = profileData.full_name
-    }
-    const { error: upsertError } = await supabase.from("profiles").upsert({
-      id: user.id,
-      is_demo_client: true,
-      contract_accepted_at: new Date().toISOString(),
-      full_name: fullName,
-    })
-    if (upsertError) {
-      setError(upsertError.message)
-      setLoading(false)
-      console.error("Failed to upsert profile after Start Demo:", upsertError)
-      return
-    }
-    router.push("/dashboard/client")
   }
 
   const handlePaidPlan = async () => {
     setLoading(true)
     setError(null)
-    // Call API to create Stripe Checkout session
-    const res = await fetch("/api/stripe/create-checkout-session", { method: "POST" })
-    const { url, error: apiError } = await res.json()
-    if (apiError) {
-      setError(apiError)
+    
+    try {
+      // Call API to create Stripe Checkout session
+      const res = await fetch("/api/stripe/create-checkout-session", { method: "POST" })
+      const data = await res.json()
+      
+      if (!res.ok || data.error) {
+        setError(data.error || "Failed to create checkout session")
+        setLoading(false)
+        return
+      }
+
+      window.location.href = data.url
+    } catch (error: any) {
+      console.error("Stripe checkout error:", error)
+      setError(error.message || "Failed to start checkout")
       setLoading(false)
-      return
     }
-    window.location.href = url
   }
 
   if (checking) {
@@ -154,4 +204,4 @@ export default function OnboardingPage() {
       </DialogContent>
     </Dialog>
   )
-} 
+}
