@@ -41,10 +41,11 @@ export default function OnboardingPage() {
           .eq("id", user.id)
           .single()
 
-        console.log("[Onboarding] Profile query result:", profileData, profileError)
-
-        // Handle profile errors
+        // Improved error logging for debugging
         if (profileError) {
+          // Log all possible details about the error
+          console.error("[Onboarding] Profile query error:", profileError, JSON.stringify(profileError), Object.keys(profileError || {}));
+          // Suggestion: If you see an empty error object, check that the 'profiles' table exists, has the correct columns, and RLS policies allow access for this user.
           if (profileError.code === 'PGRST116') {
             // No profile exists, create one
             console.log("[Onboarding] No profile found, creating new profile")
@@ -58,15 +59,16 @@ export default function OnboardingPage() {
               .select("id, contract_accepted_at, is_demo_client, full_name, role")
               .single()
 
+            // Improved error logging for profile creation
             if (createError) {
-              console.error("[Onboarding] Failed to create profile:", createError)
+              console.error("[Onboarding] Failed to create profile:", createError, JSON.stringify(createError), Object.keys(createError || {}));
+              // Suggestion: If you see an empty error object, check that the 'profiles' table exists, has the correct columns, and RLS policies allow access for this user.
               setError("Failed to create user profile.")
               setChecking(false)
               return
             }
             setProfile(newProfile)
           } else {
-            console.error("[Onboarding] Profile query error:", profileError)
             setError("Failed to load profile.")
             setChecking(false)
             return
@@ -127,9 +129,11 @@ export default function OnboardingPage() {
         })
         .eq("id", user.id)
 
+      // Improved error logging for update
       if (updateError) {
-        console.error("Failed to update profile for demo:", updateError)
-        setError(updateError.message)
+        console.error("Failed to update profile for demo:", updateError, JSON.stringify(updateError), Object.keys(updateError || {}));
+        // Suggestion: If you see an empty error object, check that the 'profiles' table exists, has the correct columns, and RLS policies allow access for this user.
+        setError(updateError.message || "Failed to update profile.")
         setLoading(false)
         return
       }
