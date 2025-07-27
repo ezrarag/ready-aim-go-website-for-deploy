@@ -343,9 +343,37 @@ export default function HomePage() {
   const router = useRouter()
 
   // Handler for onboarding navigation
-  const handleOnboarding = useCallback(() => {
-    // router.push('/login') // Commented out login redirect
-    router.push('/onboarding')
+  const handleOnboarding = useCallback(async () => {
+    try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        // User not logged in, redirect to login
+        router.push('/login')
+        return
+      }
+
+      // User is logged in, check if they have completed onboarding
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('contract_accepted_at, stripe_customer_id, is_demo_client, role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile && (profile.contract_accepted_at && (profile.stripe_customer_id || profile.is_demo_client))) {
+        // User has completed onboarding, redirect to appropriate dashboard
+        const dashboardPath = profile.role === 'operator' ? '/dashboard/operator' : '/dashboard/client'
+        router.push(dashboardPath)
+      } else {
+        // User is logged in but hasn't completed onboarding
+        router.push('/onboarding')
+      }
+    } catch (error) {
+      console.error('Error checking user status:', error)
+      // Fallback to login if there's an error
+      router.push('/login')
+    }
   }, [router])
 
   // Handler for demo video
@@ -387,23 +415,29 @@ export default function HomePage() {
   useEffect(() => {
     const fetchProjects = async () => {
       setLoading(true)
-      const { data, error } = await supabase.from("projects").select("*")
-      if (error) {
+      try {
+        const { data, error } = await supabase.from("projects").select("*")
+        if (error) {
+          console.error('Error fetching projects:', error)
+          setProjects([])
+        } else {
+          // If tags is a comma-separated string, convert to array
+          const normalized = (data || []).map((p: any) => ({
+            ...p,
+            liveUrl: p.live_url, // ✅ key fix
+            imageUrl: p.image_url,
+            createdAt: p.created_at,
+            tags: Array.isArray(p.tags)
+              ? p.tags
+              : typeof p.tags === "string"
+              ? p.tags.split(",").map((t: string) => t.trim())
+              : [],
+          }))
+          setProjects(normalized)
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error)
         setProjects([])
-      } else {
-        // If tags is a comma-separated string, convert to array
-        const normalized = (data || []).map((p: any) => ({
-          ...p,
-          liveUrl: p.live_url, // ✅ key fix
-          imageUrl: p.image_url,
-          createdAt: p.created_at,
-          tags: Array.isArray(p.tags)
-            ? p.tags
-            : typeof p.tags === "string"
-            ? p.tags.split(",").map((t: string) => t.trim())
-            : [],
-        }))
-        setProjects(normalized)
       }
       setLoading(false)
     }
@@ -629,31 +663,65 @@ export default function HomePage() {
   )
 }
 
-// MatrixText component for letter-cycling effect
+// MatrixText component for letter-cycling effect - faster and one word at a time
 function MatrixText({ text }: { text: string }) {
   const [display, setDisplay] = useState(text)
   const interval = useRef<NodeJS.Timeout | null>(null)
+  const [currentWordIndex, setCurrentWordIndex] = useState(0)
+  const [mounted, setMounted] = useState(false)
+  
   useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  useEffect(() => {
+    if (!mounted) return
+    
+    const words = text.split(" ")
     let frame = 0
+    let currentWord = words[currentWordIndex] || ""
+    
     interval.current = setInterval(() => {
-      setDisplay((prev) =>
-        prev
-          .split("")
-          .map((char, i) => {
-            if (char === " " || i > frame) return char
-            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-            return chars[Math.floor(Math.random() * chars.length)]
-          })
-          .join("")
-      )
+      setDisplay((prev) => {
+        const currentWords = prev.split(" ")
+        const targetWord = words[currentWordIndex] || ""
+        
+        if (frame <= targetWord.length) {
+          // Animate current word
+          const animatedWord = targetWord
+            .split("")
+            .map((char, i) => {
+              if (i < frame) return char
+              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+              return chars[Math.floor(Math.random() * chars.length)]
+            })
+            .join("")
+          
+          currentWords[currentWordIndex] = animatedWord
+          return currentWords.join(" ")
+        } else {
+          // Move to next word
+          setCurrentWordIndex((prev) => (prev + 1) % words.length)
+          frame = 0
+          return prev
+        }
+      })
+      
       frame++
-      if (frame > text.length) {
-        clearInterval(interval.current!);
-        setDisplay(text)
+    }, 15) // Faster animation
+    
+    return () => {
+      if (interval.current) {
+        clearInterval(interval.current)
       }
-    }, 30)
-    return () => clearInterval(interval.current!);
-  }, [text])
+    }
+  }, [text, currentWordIndex, mounted])
+  
+  // Return static text during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return <span>{text}</span>
+  }
+  
   return <span>{display}</span>
 }
 
@@ -664,38 +732,74 @@ function HomeStats() {
     creatorValue: 0,
     loading: true,
   });
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  useEffect(() => {
+    if (!mounted) return;
+    
     async function fetchStats() {
-      // Projects Complete
-      const { count: projectsComplete } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
-      // Active Operators
-      const { data: operatorIds } = await supabase
-        .from('projects')
-        .select('operator_id')
-        .neq('operator_id', null);
-      const uniqueOperators = new Set((operatorIds || []).map(p => p.operator_id));
-      const activeOperators = uniqueOperators.size;
-      // Creator Value
-      const { data: completedProjects } = await supabase
-        .from('projects')
-        .select('budget')
-        .eq('status', 'completed');
-      const creatorValue = (completedProjects || []).reduce((sum, p) => sum + (p.budget || 0), 0);
-      setStats({
-        projectsComplete: projectsComplete || 0,
-        activeOperators,
-        creatorValue,
-        loading: false,
-      });
+      try {
+        // Projects Complete
+        const { count: projectsComplete } = await supabase
+          .from('projects')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'completed');
+        // Active Operators
+        const { data: operatorIds } = await supabase
+          .from('projects')
+          .select('operator_id')
+          .neq('operator_id', null);
+        const uniqueOperators = new Set((operatorIds || []).map(p => p.operator_id));
+        const activeOperators = uniqueOperators.size;
+        // Creator Value
+        const { data: completedProjects } = await supabase
+          .from('projects')
+          .select('budget')
+          .eq('status', 'completed');
+        const creatorValue = (completedProjects || []).reduce((sum, p) => sum + (p.budget || 0), 0);
+        setStats({
+          projectsComplete: projectsComplete || 0,
+          activeOperators,
+          creatorValue,
+          loading: false,
+        });
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        setStats({
+          projectsComplete: 0,
+          activeOperators: 0,
+          creatorValue: 0,
+          loading: false,
+        });
+      }
     }
     fetchStats();
-  }, []);
-  if (stats.loading) {
-    return <div>Loading stats...</div>;
+  }, [mounted]);
+  
+  // Return static content during SSR to prevent hydration mismatch
+  if (!mounted || stats.loading) {
+    return (
+      <div className="grid grid-cols-3 gap-8">
+        <div>
+          <div className="text-4xl font-bold text-gray-900 mb-1">0</div>
+          <div className="text-gray-500 font-medium">Projects Complete</div>
+        </div>
+        <div>
+          <div className="text-4xl font-bold text-gray-900 mb-1">0</div>
+          <div className="text-gray-500 font-medium">Active Operators</div>
+        </div>
+        <div>
+          <div className="text-4xl font-bold text-gray-900 mb-1">$0</div>
+          <div className="text-gray-500 font-medium">Creator Value</div>
+        </div>
+      </div>
+    );
   }
+  
   return (
     <div className="grid grid-cols-3 gap-8">
       <div>
@@ -716,13 +820,31 @@ function HomeStats() {
 
 function HomeTestimonials() {
   const [testimonials, setTestimonials] = useState<any[] | null>(null);
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  useEffect(() => {
+    if (!mounted) return;
+    
     async function fetchTestimonials() {
-      // Try to fetch from Supabase
-      const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setTestimonials(data);
-      } else {
+      try {
+        // Try to fetch from Supabase
+        const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          setTestimonials(data);
+        } else {
+          // Fallback to static testimonials
+          setTestimonials([
+            { name: "Jane Doe", avatar: "/placeholder.svg", rating: 5, text: "ReadyAimGo made my project a breeze!" },
+            { name: "Sam Miller", avatar: "/placeholder.svg", rating: 5, text: "The operator network is top notch." },
+            { name: "Alex Lee", avatar: "/placeholder.svg", rating: 5, text: "I love the BEAM platform!" },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching testimonials:', error);
         // Fallback to static testimonials
         setTestimonials([
           { name: "Jane Doe", avatar: "/placeholder.svg", rating: 5, text: "ReadyAimGo made my project a breeze!" },
@@ -732,8 +854,10 @@ function HomeTestimonials() {
       }
     }
     fetchTestimonials();
-  }, []);
-  if (!testimonials) return null;
+  }, [mounted]);
+  
+  // Return null during SSR to prevent hydration mismatch
+  if (!mounted || !testimonials) return null;
   return (
     <div className="absolute bottom-8 right-8 hidden lg:block">
       <Card className="bg-white/10 backdrop-blur-md border-white/20 text-gray-900 p-4">

@@ -1,5 +1,5 @@
-import React, { useRef, useState, useLayoutEffect } from "react"
-import { Zap, Menu as MenuIcon } from "lucide-react"
+import React, { useRef, useState, useLayoutEffect, useEffect } from "react"
+import { Zap, Menu as MenuIcon, User } from "lucide-react"
 import clsx from "clsx"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -7,6 +7,64 @@ interface StickyFloatingHeaderProps {
   pageTitle: string
   className?: string
   onInterested?: () => void
+}
+
+// Animated button component that cycles between "I'm interested" and "Log in" with user icon
+function AnimatedInterestedButton({ onClick }: { onClick?: () => void }) {
+  const [currentText, setCurrentText] = useState("I'm interested")
+  const [isAnimating, setIsAnimating] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cycle between texts every 30 seconds
+    intervalRef.current = setInterval(() => {
+      setIsAnimating(true)
+      setTimeout(() => {
+        setCurrentText(prev => prev === "I'm interested" ? "Log in" : "I'm interested")
+        setIsAnimating(false)
+      }, 500) // Animation duration
+    }, 30000) // 30 seconds
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [])
+
+  return (
+    <button 
+      className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px] transition-all duration-500" 
+      onClick={onClick}
+    >
+      <AnimatePresence mode="wait">
+        {currentText === "I'm interested" ? (
+          <motion.span
+            key="interested"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center"
+          >
+            I'm interested
+          </motion.span>
+        ) : (
+          <motion.span
+            key="login"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center gap-2"
+          >
+            <User className="h-4 w-4" />
+            Log in
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  )
 }
 
 export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className, onInterested }) => {
@@ -87,9 +145,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
           </motion.div>
         </button>
         {/* I'm interested button */}
-        <button className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px]" onClick={onInterested}>
-          I'm interested
-        </button>
+        <AnimatedInterestedButton onClick={onInterested} />
         {/* Dropdown Panel */}
         <AnimatePresence>
           {menuOpen && (
@@ -110,9 +166,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
                 >
                   ×
                 </button>
-                <button className="flex items-center justify-center px-8 h-14 rounded-2xl font-semibold text-base bg-black text-white shadow-md min-w-[160px] text-center" onClick={onInterested}>
-                  I'm interested
-                </button>
+                <AnimatedInterestedButton onClick={onInterested} />
               </div>
               {/* Solutions */}
               <div>
