@@ -23,6 +23,11 @@
   - Updated client dashboard to use real user data instead of mock data
   - Added avatar_url column migration for profiles table
 
+- [x] **Landing Page Improvements**
+  - Fixed black border on homepage card
+  - Removed border styling to match original design
+  - Maintained shadow and rounded corners
+
 ### 🗄️ **Database & Backend**
 - [x] **Admin Dashboard Database Fixes**
   - Created comprehensive SQL fix script (`fix-admin-dashboard.sql`)
@@ -133,20 +138,20 @@
   - [x] Added admin panel access button
   - [x] Implemented admin URL display
   - [x] Added client login functionality
-- [x] **GitHub TODO.me Integration**
+- [x] **GitHub TODO.md Integration**
   - [x] Created GitHub service for fetching TODO items
   - [x] Added TODO item priority and status indicators
   - [x] Implemented error handling for GitHub API calls
-  - [x] Added loading states for TODO.me content
+  - [x] Added loading states for TODO.md content
 - [x] **Real Slack Integration**
   - [x] Created Slack service with real API integration
   - [x] Added connection status indicators
   - [x] Implemented background agent messaging
   - [x] Added error handling and loading states
   - [x] Created service configuration system
-- [x] **Dynamic GitHub TODO.me**
+- [x] **Dynamic GitHub TODO.md**
   - [x] Enhanced GitHub service with real API calls
-  - [x] Added TODO.me file parsing
+  - [x] Added TODO.md file parsing
   - [x] Implemented priority and status extraction
   - [x] Added configuration status indicators
   - [x] Created fallback to mock data when not configured

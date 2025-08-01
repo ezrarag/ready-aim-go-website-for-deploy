@@ -517,7 +517,7 @@ export default function HomePage() {
       <StickyFloatingHeader pageTitle="Home" onInterested={handleLogin} />
       {/* Hero Section */}
       <section className="relative overflow-hidden px-4 pb-8 z-10">
-        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700">
+        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700 border-0">
           <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[400px] p-0' : 'px-8 py-24 lg:py-32 min-h-[400px]' } flex items-center justify-center`}>
             <AnimatePresence>
               {showDemo ? (
