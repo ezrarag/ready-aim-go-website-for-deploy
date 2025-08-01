@@ -333,6 +333,86 @@ const platformFeatures = [
     icon: <Shield className="h-6 w-6 text-indigo-600" />, bg: "bg-indigo-100", title: "Secure & Reliable", desc: "Enterprise-grade security with 99.9% uptime and comprehensive data protection.", modal: "Placeholder for Secure & Reliable details." },
 ]
 
+// Login Modal Component
+function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const router = useRouter()
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent('/dashboard/client')}`
+        }
+      })
+      
+      if (error) {
+        throw error
+      }
+      
+      onClose()
+    } catch (error: any) {
+      console.error("Google sign-in error:", error)
+      setIsGoogleLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md bg-white rounded-2xl p-8">
+        <DialogHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <Shield className="h-12 w-12 text-blue-600" />
+          </div>
+          <DialogTitle className="text-2xl font-bold">ReadyAimGo Access</DialogTitle>
+          <DialogDescription>Sign in with your Google account to access the platform</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              Connect with our platform to start your journey.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            className="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-3 font-semibold shadow-sm h-12"
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <>
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+                Signing in with Google...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 48 48">
+                  <g>
+                    <path d="M44.5 20H24v8.5h11.7C34.7 33.9 29.8 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#FFC107"/>
+                    <path d="M6.3 14.7l7 5.1C15.1 17.1 19.2 14 24 14c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#FF3D00"/>
+                    <path d="M24 43.5c5.7 0 10.6-1.9 14.5-5.2l-6.7-5.5C29.8 37 24 37 24 37c-5.8 0-10.7-3.1-13.2-7.5l-7 5.4C7.8 40.8 15.3 43.5 24 43.5z" fill="#4CAF50"/>
+                    <path d="M44.5 20H24v8.5h11.7c-1.2 3.2-4.2 6.5-11.7 6.5-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 .9 8.3 2.7l6.2-6.2C34.2 4.5 29.3 2.5 24 2.5c-6.6 0-12.2 2.7-16.2 7.2z" fill="#1976D2"/>
+                  </g>
+                </svg>
+                Sign in with Google
+              </>
+            )}
+          </Button>
+
+          <div className="text-center">
+            <p className="text-xs text-gray-500">
+              Secure authentication powered by Google.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -340,39 +420,27 @@ export default function HomePage() {
   const [operatorTypeModal, setOperatorTypeModal] = useState<OperatorType | null>(null)
   const [operatorModalOpen, setOperatorModalOpen] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
   const router = useRouter()
 
-  // Handler for onboarding navigation
-  const handleOnboarding = useCallback(async () => {
+  // Handler for login modal
+  const handleLogin = useCallback(async () => {
     try {
       // Check if user is authenticated
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
-        // User not logged in, redirect to login
-        router.push('/login')
+        // User not logged in, open login modal
+        setLoginModalOpen(true)
         return
       }
 
-      // User is logged in, check if they have completed onboarding
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('contract_accepted_at, stripe_customer_id, is_demo_client, role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile && (profile.contract_accepted_at && (profile.stripe_customer_id || profile.is_demo_client))) {
-        // User has completed onboarding, redirect to appropriate dashboard
-        const dashboardPath = profile.role === 'operator' ? '/dashboard/operator' : '/dashboard/client'
-        router.push(dashboardPath)
-      } else {
-        // User is logged in but hasn't completed onboarding
-        router.push('/onboarding')
-      }
+      // User is logged in, redirect directly to client dashboard
+      router.push('/dashboard/client')
     } catch (error) {
       console.error('Error checking user status:', error)
-      // Fallback to login if there's an error
-      router.push('/login')
+      // Fallback to login modal if there's an error
+      setLoginModalOpen(true)
     }
   }, [router])
 
@@ -390,7 +458,7 @@ export default function HomePage() {
       { label: "Menu 2", onClick: () => {}, icon: null },
     ],
     [
-      { label: "I'm interested", onClick: handleOnboarding, primary: true },
+      { label: "I'm interested", onClick: handleLogin, primary: true },
     ],
   ]
 
@@ -446,10 +514,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-100 relative">
-      <StickyFloatingHeader pageTitle="Home" onInterested={handleOnboarding} />
+      <StickyFloatingHeader pageTitle="Home" onInterested={handleLogin} />
       {/* Hero Section */}
       <section className="relative overflow-hidden px-4 pb-8 z-10">
-        <Card className={`bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700`}>
+        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700">
           <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[400px] p-0' : 'px-8 py-24 lg:py-32 min-h-[400px]' } flex items-center justify-center`}>
             <AnimatePresence>
               {showDemo ? (
@@ -489,34 +557,25 @@ export default function HomePage() {
             </AnimatePresence>
             {!showDemo && (
               <div className="max-w-4xl w-full">
-                {/* Matrix/letter-cycling effect for text */}
+                {/* Static text without animations */}
                 <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-                  <MatrixText text="READY" />
+                  READY
                   <br />
-                  <span className="text-indigo-600"><MatrixText text="AIM" /></span>
+                  <span className="text-indigo-600">AIM</span>
                   <br />
-                  <MatrixText text="GO" />
+                  GO
                 </h1>
                 <p className="text-xl text-gray-700 mb-8 max-w-2xl leading-relaxed">
-                  <MatrixText text="Full Stack Virtual Asset Management" />
+                  Full Stack Virtual Asset Management
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 mb-12">
                   <Button
                     size="lg"
                     className="bg-black text-white hover:bg-gray-900 rounded-full px-8 py-4 text-lg font-semibold"
-                    onClick={handleOnboarding}
-                  >
-                    <span>Explore Platform</span>
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-black text-black bg-white hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
                     onClick={handleShowDemo}
                   >
                     <Play className="mr-2 h-5 w-5" />
-                    <span className="text-black">Watch Demo</span>
+                    <span className="text-white">Watch Demo</span>
                   </Button>
                 </div>
                 {/* Stats */}
@@ -530,200 +589,13 @@ export default function HomePage() {
         </Card>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <Card className="bg-gray-900 text-white rounded-2xl shadow-2xl p-12">
-          <div className="text-center">
-            <h2 className="text-4xl font-bold mb-6">Ready to Transform Your Creative Process?</h2>
-            <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Join thousands of creators and operators who trust ReadyAimGo to streamline their workflows and
-              accelerate their success.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/dashboard/client">
-                <Button
-                  size="lg"
-                  className="bg-white text-black hover:bg-gray-100 rounded-full px-8 py-4 text-lg font-semibold"
-                >
-                  <span>Start Your Journey</span>
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href="/contact">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white hover:bg-white hover:text-black rounded-full px-8 py-4 text-lg font-semibold"
-                >
-                  <span className="text-white group-hover:text-black transition-colors">Schedule Demo</span>
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </Card>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-12 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center mb-4">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-3">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">ReadyAimGo</h3>
-              </div>
-              <p className="text-gray-600">
-                Connecting creators with skilled operators through the power of BEAM technology.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">Platform</h4>
-              <ul className="space-y-2 text-gray-600">
-                <li>
-                  <Link href="/dashboard" className="hover:text-gray-900">
-                    Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/marketplace" className="hover:text-gray-900">
-                    Marketplace
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/operators" className="hover:text-gray-900">
-                    Find Operators
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/pricing" className="hover:text-gray-900">
-                    Pricing
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">Resources</h4>
-              <ul className="space-y-2 text-gray-600">
-                <li>
-                  <Link href="/docs" className="hover:text-gray-900">
-                    Documentation
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/help" className="hover:text-gray-900">
-                    Help Center
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/blog" className="hover:text-gray-900">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/api" className="hover:text-gray-900">
-                    API
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-600">
-                <li>
-                  <Link href="/about" className="hover:text-gray-900">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/careers" className="hover:text-gray-900">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-gray-900">
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy" className="hover:text-gray-900">
-                    Privacy
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-200 mt-8 pt-8 text-center text-gray-600">
-            <p>&copy; 2024 ReadyAimGo. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      {/* Login Modal */}
+      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   )
 }
 
-// MatrixText component for letter-cycling effect - faster and one word at a time
-function MatrixText({ text }: { text: string }) {
-  const [display, setDisplay] = useState(text)
-  const interval = useRef<NodeJS.Timeout | null>(null)
-  const [currentWordIndex, setCurrentWordIndex] = useState(0)
-  const [mounted, setMounted] = useState(false)
-  
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-  
-  useEffect(() => {
-    if (!mounted) return
-    
-    const words = text.split(" ")
-    let frame = 0
-    let currentWord = words[currentWordIndex] || ""
-    
-    interval.current = setInterval(() => {
-      setDisplay((prev) => {
-        const currentWords = prev.split(" ")
-        const targetWord = words[currentWordIndex] || ""
-        
-        if (frame <= targetWord.length) {
-          // Animate current word
-          const animatedWord = targetWord
-            .split("")
-            .map((char, i) => {
-              if (i < frame) return char
-              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-              return chars[Math.floor(Math.random() * chars.length)]
-            })
-            .join("")
-          
-          currentWords[currentWordIndex] = animatedWord
-          return currentWords.join(" ")
-        } else {
-          // Move to next word
-          setCurrentWordIndex((prev) => (prev + 1) % words.length)
-          frame = 0
-          return prev
-        }
-      })
-      
-      frame++
-    }, 15) // Faster animation
-    
-    return () => {
-      if (interval.current) {
-        clearInterval(interval.current)
-      }
-    }
-  }, [text, currentWordIndex, mounted])
-  
-  // Return static text during SSR to prevent hydration mismatch
-  if (!mounted) {
-    return <span>{text}</span>
-  }
-  
-  return <span>{display}</span>
-}
+
 
 function HomeStats() {
   const [stats, setStats] = useState({

@@ -243,20 +243,12 @@ export default function AuthCallbackPage() {
             performRedirect("/dashboard/operator");
           }
         } else {
-          // For regular clients, check if onboarding is complete
-          if (!profile.contract_accepted_at && !profile.is_demo_client) {
-            console.log("🔄 Redirecting client to onboarding");
-            toast.info("Complete your setup", {
-              description: "Please accept the terms and complete your profile.",
-            });
-            performRedirect("/onboarding");
-          } else {
-            console.log("🔄 Redirecting client to client dashboard");
-            toast.success("Welcome to Client Dashboard", {
-              description: "You have successfully signed in.",
-            });
-            performRedirect("/dashboard/client");
-          }
+          // For regular clients, redirect directly to client dashboard
+          console.log("🔄 Redirecting client to client dashboard");
+          toast.success("Welcome to Client Dashboard", {
+            description: "You have successfully signed in.",
+          });
+          performRedirect("/dashboard/client");
         }
       }
     };

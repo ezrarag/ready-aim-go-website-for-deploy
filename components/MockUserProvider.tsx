@@ -1,12 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase, getProfileByEmail } from "@/lib/supabase/client";
 
-interface MockUser {
-  id: string;
-  email: string;
-  name: string;
-}
-
 interface Project {
   id: string;
   client_id: string;
@@ -36,7 +30,6 @@ interface ActivityItem {
 }
 
 interface MockUserContextType {
-  mockUserId: string;
   userData: {
     name: string;
     email: string;
@@ -44,94 +37,123 @@ interface MockUserContextType {
     stats: Stats;
     activity: ActivityItem[];
   } | null;
-  toggleUser: () => void;
-  users: MockUser[];
-  currentUser: MockUser;
   loading: boolean;
+  error: string | null;
 }
 
-const users: MockUser[] = [
-  { id: "user-1", email: "ezra.haugabrooks@gmail.com", name: "Ezra Haugabrooks" },
-  { id: "user-2", email: "ezra@readyaimgo.com", name: "ReadyAimGo" },
-];
+const CLIENT_EMAIL = "ezra.haugabrooks@gmail.com";
+const CLIENT_NAME = "Ezra Haugabrooks";
 
 const MockUserContext = createContext<MockUserContextType | null>(null);
 
 export function MockUserProvider({ children }: { children: React.ReactNode }) {
-  const [mockUserId, setMockUserId] = useState<string>(users[0].id);
   const [userData, setUserData] = useState<MockUserContextType["userData"]>(null);
   const [loading, setLoading] = useState(true);
-
-  const currentUser = users.find((u) => u.id === mockUserId)!;
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      // Get profile by email
-      const profile = await getProfileByEmail(currentUser.email);
-      if (!profile) {
-        setUserData(null);
-        setLoading(false);
-        return;
-      }
-      // Fetch projects for this user (client_id = profile.id)
-      const { data: projects, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("client_id", profile.id)
-        .order("created_at", { ascending: false });
-      if (error) {
-        setUserData(null);
-        setLoading(false);
-        return;
-      }
-      // Fetch activity feed for this user (join with projects.title)
-      let activity: ActivityItem[] = [];
+      setError(null);
+      
       try {
-        const { data: activityData, error: activityError } = await supabase
-          .from("client_activity")
-          .select("*, projects:title")
+        console.log("🔍 Fetching profile for:", CLIENT_EMAIL);
+        
+        // Get profile by email
+        const profile = await getProfileByEmail(CLIENT_EMAIL);
+        if (!profile) {
+          console.log("❌ No profile found for:", CLIENT_EMAIL);
+          setError("Profile not found. Please ensure the user exists in the database.");
+          setLoading(false);
+          return;
+        }
+        
+        console.log("✅ Profile found:", profile);
+        
+        // Fetch projects for this user (client_id = profile.id)
+        console.log("🔍 Fetching projects for client_id:", profile.id);
+        const { data: projects, error: projectsError } = await supabase
+          .from("projects")
+          .select("*")
           .eq("client_id", profile.id)
           .order("created_at", { ascending: false });
-        if (!activityError && activityData) {
-          activity = activityData.map((item: any) => ({
-            ...item,
-            project_title: item.projects?.title || undefined,
-          }));
+          
+        if (projectsError) {
+          console.error("❌ Error fetching projects:", projectsError);
+          setError("Failed to load projects. Please check your database connection.");
+          setLoading(false);
+          return;
         }
-      } catch (e) {
-        activity = [];
-      }
-      // Derive stats
-      const activeProjects = projects.filter((p: Project) => p.status === "active").length;
-      const completedProjects = projects.filter((p: Project) => p.status === "completed").length;
-      const totalSpent = projects
-        .filter((p: Project) => p.status === "completed")
-        .reduce((sum: number, p: Project) => sum + (p.budget || 0), 0);
-      const averageRating = 4.8; // Mocked for now
-      setUserData({
-        name: profile.full_name || currentUser.name,
-        email: profile.email,
-        projects,
-        stats: {
+        
+        console.log("✅ Projects loaded:", projects?.length || 0, "projects");
+        
+        // Fetch activity feed for this user (join with projects.title)
+        let activity: ActivityItem[] = [];
+        try {
+          console.log("🔍 Fetching activity for client_id:", profile.id);
+          const { data: activityData, error: activityError } = await supabase
+            .from("client_activity")
+            .select("*, projects:title")
+            .eq("client_id", profile.id)
+            .order("created_at", { ascending: false });
+            
+          if (!activityError && activityData) {
+            activity = activityData.map((item: any) => ({
+              ...item,
+              project_title: item.projects?.title || undefined,
+            }));
+            console.log("✅ Activity loaded:", activity.length, "items");
+          } else if (activityError) {
+            console.warn("⚠️ Activity fetch error (non-critical):", activityError);
+          }
+        } catch (e) {
+          console.warn("⚠️ Activity fetch failed (non-critical):", e);
+          activity = [];
+        }
+        
+        // Derive stats from real project data
+        const activeProjects = projects.filter((p: Project) => p.status === "active" || p.status === "in-progress").length;
+        const completedProjects = projects.filter((p: Project) => p.status === "completed").length;
+        const totalSpent = projects
+          .filter((p: Project) => p.status === "completed")
+          .reduce((sum: number, p: Project) => sum + (p.budget || 0), 0);
+        const averageRating = 4.8; // Mocked for now - will be replaced with real ratings
+        
+        console.log("📊 Stats calculated:", {
           activeProjects,
           completedProjects,
           totalSpent,
-          averageRating,
-        },
-        activity,
-      });
-      setLoading(false);
+          averageRating
+        });
+        
+        setUserData({
+          name: profile.full_name || CLIENT_NAME,
+          email: profile.email,
+          projects,
+          stats: {
+            activeProjects,
+            completedProjects,
+            totalSpent,
+            averageRating,
+          },
+          activity,
+        });
+        
+        console.log("✅ User data set successfully");
+        
+      } catch (error) {
+        console.error("❌ Error in fetchData:", error);
+        setError("Failed to load user data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
+    
     fetchData();
-  }, [mockUserId]);
-
-  const toggleUser = () => {
-    setMockUserId((prev) => (prev === users[0].id ? users[1].id : users[0].id));
-  };
+  }, []);
 
   return (
-    <MockUserContext.Provider value={{ mockUserId, userData, toggleUser, users, currentUser, loading }}>
+    <MockUserContext.Provider value={{ userData, loading, error }}>
       {children}
     </MockUserContext.Provider>
   );

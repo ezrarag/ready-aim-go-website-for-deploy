@@ -15,11 +15,11 @@ export default function SignupPage() {
     setLoading(true)
     // Store intended role in localStorage
     localStorage.setItem("intendedRole", role)
-    // Trigger Google OAuth with redirect to /onboarding
+    // Trigger Google OAuth with redirect to auth callback
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/onboarding`
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     })
     setLoading(false)

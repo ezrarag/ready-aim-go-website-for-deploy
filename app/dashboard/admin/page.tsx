@@ -830,20 +830,20 @@ export default function AdminDashboard() {
   const selectedClientData = clients.find(c => c.id === selectedClient);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-neutral-900">
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b px-6 py-4">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-neutral-800 border-b border-neutral-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Shield className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+            <Shield className="h-6 w-6 text-orange-500" />
+            <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-neutral-400">
               <Users className="inline h-4 w-4 mr-1" />
               {clients.length} clients
             </span>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button variant="outline" onClick={handleLogout} className="border-neutral-600 text-neutral-300 hover:bg-neutral-700">
               Logout
             </Button>
           </div>
@@ -851,24 +851,24 @@ export default function AdminDashboard() {
       </div>
 
       {/* Sidebar: Client List */}
-      <aside className="fixed left-0 top-16 h-full w-72 bg-white border-r p-4 overflow-y-auto">
-        <h2 className="text-lg font-bold mb-4">Clients</h2>
+      <aside className="fixed left-0 top-16 h-full w-72 bg-neutral-800 border-r border-neutral-700 p-4 overflow-y-auto">
+        <h2 className="text-lg font-bold mb-4 text-white">Clients</h2>
         
                 {/* Action Buttons */}
                 <div className="flex gap-2 mb-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="outline" className="w-full">
+                      <Button size="sm" variant="outline" className="w-full border-neutral-600 text-neutral-300 hover:bg-neutral-700">
                         <MoreHorizontal className="h-4 w-4 mr-2" />
                         Actions
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56">
-                      <DropdownMenuItem onClick={handleImportPortfolioClients}>
+                    <DropdownMenuContent className="w-56 bg-neutral-800 border-neutral-700">
+                      <DropdownMenuItem onClick={handleImportPortfolioClients} className="text-neutral-300 hover:bg-neutral-700">
                         <Import className="h-4 w-4 mr-2" />
                         Import Demo Data
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleSyncData} disabled={syncingData}>
+                      <DropdownMenuItem onClick={handleSyncData} disabled={syncingData} className="text-neutral-300 hover:bg-neutral-700">
                         {syncingData ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -881,8 +881,8 @@ export default function AdminDashboard() {
                           </>
                         )}
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setShowAddClientModal(true)}>
+                      <DropdownMenuSeparator className="bg-neutral-700" />
+                      <DropdownMenuItem onClick={() => setShowAddClientModal(true)} className="text-neutral-300 hover:bg-neutral-700">
                         <Plus className="h-4 w-4 mr-2" />
                         Add New Client
                       </DropdownMenuItem>
@@ -989,14 +989,18 @@ export default function AdminDashboard() {
           placeholder="Filter clients..."
           value={clientFilter}
           onChange={e => setClientFilter(e.target.value)}
-          className="mb-4"
+          className="mb-4 bg-neutral-700 border-neutral-600 text-neutral-300 placeholder-neutral-400"
         />
         <div className="space-y-2">
           {filteredClients.map((client) => (
             <div key={client.id} className="space-y-2">
               <Button
                 variant={selectedClient === client.id ? "default" : "outline"}
-                className="w-full text-left justify-start"
+                className={`w-full text-left justify-start ${
+                  selectedClient === client.id 
+                    ? "bg-orange-500 hover:bg-orange-600" 
+                    : "border-neutral-600 text-neutral-300 hover:bg-neutral-700"
+                }`}
                 onClick={() => setSelectedClient(client.id)}
               >
                 {client.company_name || client.contact_name || client.contact_email || client.id}
@@ -1004,7 +1008,7 @@ export default function AdminDashboard() {
               <Button
                 size="sm"
                 variant="secondary"
-                className="w-full"
+                className="w-full bg-neutral-700 hover:bg-neutral-600 text-neutral-300"
                 onClick={() => handleSyncGithub(client.id)}
                 disabled={syncing === client.id}
               >
@@ -1028,11 +1032,11 @@ export default function AdminDashboard() {
       {/* Main Panel: Client Details & Analytics */}
       <main className="ml-72 pt-16 flex-1 p-8">
         {!selectedClient ? (
-          <Card className="p-8">
+          <Card className="p-8 bg-neutral-800 border-neutral-700">
             <div className="text-center">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Client</h3>
-              <p className="text-gray-600">Choose a client from the sidebar to view their details and analytics.</p>
+              <Users className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Select a Client</h3>
+              <p className="text-neutral-400">Choose a client from the sidebar to view their details and analytics.</p>
             </div>
           </Card>
         ) : (
@@ -1040,14 +1044,14 @@ export default function AdminDashboard() {
             {/* Client Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-white">
                   {selectedClientData?.company_name || selectedClientData?.contact_name}
                 </h2>
-                <p className="text-gray-600">{selectedClientData?.contact_email}</p>
+                <p className="text-neutral-400">{selectedClientData?.contact_email}</p>
               </div>
               <div className="flex gap-2">
                 {selectedClientData?.website_url && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" asChild className="border-neutral-600 text-neutral-300 hover:bg-neutral-700">
                     <a href={selectedClientData.website_url} target="_blank" rel="noopener noreferrer">
                       <Globe className="h-4 w-4 mr-2" />
                       Website

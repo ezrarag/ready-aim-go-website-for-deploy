@@ -113,7 +113,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
             }}
             className="w-6 h-6 flex items-center justify-center"
           >
-            {/* Hamburger to X animation */}
+            {/* Hamburger to X animation with three lines */}
             <motion.svg
               width="24"
               height="24"
@@ -121,24 +121,37 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
+              {/* Top line */}
               <motion.rect
                 x="4"
-                y="7"
+                y="6"
                 width="16"
                 height="2"
                 rx="1"
                 fill="black"
-                animate={menuOpen ? { rotate: 45, y: 9 } : { rotate: 0, y: 0 }}
+                animate={menuOpen ? { rotate: 45, y: 8, x: 4 } : { rotate: 0, y: 0, x: 4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               />
+              {/* Middle line */}
               <motion.rect
                 x="4"
-                y="15"
+                y="11"
                 width="16"
                 height="2"
                 rx="1"
                 fill="black"
-                animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }}
+                animate={menuOpen ? { opacity: 0, scale: 0 } : { opacity: 1, scale: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              />
+              {/* Bottom line */}
+              <motion.rect
+                x="4"
+                y="16"
+                width="16"
+                height="2"
+                rx="1"
+                fill="black"
+                animate={menuOpen ? { rotate: -45, y: 4, x: 4 } : { rotate: 0, y: 0, x: 4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               />
             </motion.svg>
@@ -157,17 +170,6 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               style={{ width: dropdownWidth, right: 0 }}
               className="absolute top-[calc(100%+16px)] right-0 bg-[#F7F5F4] rounded-3xl shadow-2xl p-8 z-50 flex flex-col gap-6 border border-gray-100"
             >
-              {/* Top row: X and I'm interested */}
-              <div className="flex items-center justify-between mb-2">
-                <button
-                  className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-2xl font-bold border-none shadow"
-                  aria-label="Close menu"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  ×
-                </button>
-                <AnimatedInterestedButton onClick={onInterested} />
-              </div>
               {/* Solutions */}
               <div>
                 <div className="text-lg text-[#8B8892] font-medium mb-2">Solutions</div>
@@ -194,13 +196,13 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
                   <a href="/platform/features" className="font-bold text-black text-lg py-1">Platform Features</a>
                 </div>
               </div>
-              {/* Bottom row: Contact and language selector */}
+              {/* Bottom row: Contact and combined language selector */}
               <div className="flex items-center justify-between mt-4 gap-2">
                 <button className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">Contact</button>
-                <div className="flex gap-2">
-                  <button className="w-14 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">fr</button>
-                  <button className="w-14 h-12 rounded-2xl bg-black text-white font-semibold text-base shadow border border-transparent">en</button>
-                </div>
+                <button className="w-28 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent flex items-center justify-center">
+                  <span className="bg-black text-white px-2 py-1 rounded mr-1">fr</span>
+                  <span className="px-2 py-1 rounded">en</span>
+                </button>
               </div>
             </motion.div>
           )}

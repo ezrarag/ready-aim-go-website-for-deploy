@@ -21,7 +21,7 @@ export default function LoginPage() {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const redirectTo = searchParams.get('redirect') || '/dashboard'
+        const redirectTo = searchParams.get('redirect') || '/dashboard/client'
         router.push(redirectTo)
       }
     }
@@ -31,7 +31,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      const redirectTo = searchParams.get('redirect') || '/dashboard'
+      const redirectTo = searchParams.get('redirect') || '/dashboard/client'
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
