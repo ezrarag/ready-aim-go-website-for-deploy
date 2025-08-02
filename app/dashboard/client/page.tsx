@@ -44,6 +44,10 @@ import {
   Share,
   X,
   Truck,
+  Smartphone,
+  Building2,
+  Scale,
+  Zap,
 } from "lucide-react"
 import { NewProjectModal } from "@/components/new-project-modal"
 import { RolesManager } from "@/components/roles-manager"
@@ -60,9 +64,14 @@ import { useClientProjects } from "@/hooks/use-client-projects";
 import { useClientData } from "@/hooks/use-client-data";
 import { useCommissionRate } from "@/hooks/use-commission-rate";
 import { useRevenueData } from "@/hooks/use-revenue-data";
+import { useActivityLog } from "@/hooks/use-activity-log";
+import { useMissions } from "@/hooks/use-missions";
+import { useMarketplace } from "@/hooks/use-marketplace";
+import { NewMissionModal } from "@/components/new-mission-modal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { CommissionRateModal } from "@/components/commission-rate-modal";
 import { WebsiteCardModal } from "@/components/website-card-modal";
+import { toast } from "sonner";
 
 function ClientDashboardContent() {
   const { session, loading, error } = useUserWithRole();
@@ -72,11 +81,36 @@ function ClientDashboardContent() {
   const { website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(session?.user?.id);
   const { commissionRate, loading: commissionLoading, error: commissionError, updateCommissionRate } = useCommissionRate(session?.user?.id);
   const { revenueData, loading: revenueLoading, error: revenueError } = useRevenueData(session?.user?.id);
+  const { activities: activityLog, loading: activityLoading, error: activityError } = useActivityLog(session?.user?.id);
+  const { missions, stats: missionStats, loading: missionsLoading, error: missionsError, createMission } = useMissions(session?.user?.id);
+  const { 
+    listings: marketplaceListings, 
+    categories: marketplaceCategories, 
+    myListings, 
+    bookmarks, 
+    userAccess: marketplaceAccess, 
+    loading: marketplaceLoading, 
+    error: marketplaceError,
+    createListing,
+    updateListing,
+    deleteListing,
+    toggleBookmark,
+    recordInteraction
+  } = useMarketplace(session?.user?.id);
   const [activeSection, setActiveSection] = useState("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showNewMissionModal, setShowNewMissionModal] = useState(false);
   const [showNewOperatorModal, setShowNewOperatorModal] = useState(false);
+  const [showMissionDropdown, setShowMissionDropdown] = useState(false);
+  const [selectedMissionCategory, setSelectedMissionCategory] = useState<string | null>(null);
+  
+  // Marketplace State
+  const [showAddListingModal, setShowAddListingModal] = useState(false);
+  const [showListingDetailModal, setShowListingDetailModal] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<any>(null);
+  const [marketplaceSearch, setMarketplaceSearch] = useState("");
+  const [marketplaceFilter, setMarketplaceFilter] = useState("all");
   const [todos, setTodos] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [editingTodo, setEditingTodo] = useState<string | null>(null);
@@ -127,6 +161,10 @@ function ClientDashboardContent() {
 
   // Commission Rate Modal State
   const [showCommissionModal, setShowCommissionModal] = useState(false);
+  
+  // Integration Panel State
+  const [financesEnabled, setFinancesEnabled] = useState(false);
+  const [chatbotEnabled, setChatbotEnabled] = useState(false);
 
   // Dynamic business assets data - will be fetched from Supabase
   const [businessAssets, setBusinessAssets] = useState([
@@ -327,250 +365,503 @@ function ClientDashboardContent() {
   const renderOverview = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
       {/* Agent Allocation */}
-      <Card className="bg-neutral-800 border-neutral-700">
+      <Card className={`bg-neutral-800 border-neutral-700 ${!financesEnabled ? 'opacity-50 blur-sm' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">AGENT ALLOCATION</CardTitle>
+          <CardTitle className={`font-mono text-sm tracking-wider ${financesEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
+            AGENT ALLOCATION
+            {!financesEnabled && <span className="text-xs text-neutral-600 ml-2">(LOCKED)</span>}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">{stats.activeProjects}</div>
-              <div className="text-xs text-neutral-400 font-mono">ACTIVE FIELD</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">{stats.completedProjects}</div>
-              <div className="text-xs text-neutral-400 font-mono">COMPLETED</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">{Math.round(stats.averageRating * 100)}</div>
-              <div className="text-xs text-neutral-400 font-mono">SUCCESS RATE</div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {recentProjects.map((project, index) => (
-              <div key={project.id} className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${project.status === 'completed' ? 'bg-green-500' : project.status === 'in-progress' ? 'bg-blue-500' : 'bg-neutral-500'}`}></div>
-                <span className="text-sm text-neutral-300 font-mono">{project.title}</span>
+          {financesEnabled ? (
+            <>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-1">{stats.activeProjects}</div>
+                  <div className="text-xs text-neutral-400 font-mono">ACTIVE FIELD</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-1">{stats.completedProjects}</div>
+                  <div className="text-xs text-neutral-400 font-mono">COMPLETED</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-1">{Math.round(stats.averageRating * 100)}</div>
+                  <div className="text-xs text-neutral-400 font-mono">SUCCESS RATE</div>
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                {recentProjects.map((project, index) => (
+                  <div key={project.id} className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${project.status === 'completed' ? 'bg-green-500' : project.status === 'in-progress' ? 'bg-blue-500' : 'bg-neutral-500'}`}></div>
+                    <span className="text-sm text-neutral-300 font-mono">{project.title}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-neutral-600 mx-auto mb-4" />
+              <p className="text-neutral-500 font-mono text-sm">Agent allocation is locked</p>
+              <p className="text-neutral-600 text-xs mt-2">Enable payment integration to access agent management</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Activity Log */}
-      <Card className="bg-neutral-800 border-neutral-700">
+      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
         <CardHeader>
           <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">ACTIVITY LOG</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="h-[320px] overflow-y-auto">
           <div className="relative">
             <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-orange-500"></div>
             <div className="space-y-4 ml-6">
-              {enhancedActivity.slice(0, 6).map((item, index) => (
-                <div key={item.id} className="relative">
-                  <div className="text-xs text-neutral-500 font-mono">
-                    {new Date(item.created_at).toLocaleDateString('en-GB')} {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  <div className="text-sm text-neutral-300">
-                    <span className="text-orange-500 font-mono">
-                      {item.action.includes('Revenue') ? '💰' : 
-                       item.action.includes('Commission') ? '📈' : 
-                       item.action.includes('Payment') ? '💳' : 'Agent'} {item.action}
-                    </span>
-                    {item.details && (
-                      <span>: <span className="font-semibold">{item.details}</span></span>
-                    )}
-                    {item.project_title && !item.details && (
-                      <span> completed mission in <span className="font-semibold">{item.project_title}</span></span>
-                    )}
-                  </div>
+              {activityLoading ? (
+                <div className="text-center py-4">
+                  <div className="text-neutral-500 text-sm">Loading activity log...</div>
                 </div>
-              ))}
+              ) : activityError ? (
+                <div className="text-center py-4">
+                  <div className="text-red-500 text-sm">Error loading activity log</div>
+                </div>
+              ) : activityLog.length === 0 ? (
+                <div className="text-center py-4">
+                  <div className="text-neutral-500 text-sm">No recent activity</div>
+                </div>
+              ) : (
+                activityLog.slice(0, 6).map((item) => (
+                  <div key={item.id} className="relative">
+                    <div className="text-xs text-neutral-500 font-mono">
+                      {new Date(item.created_at).toLocaleDateString('en-GB')} {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div className="text-sm text-neutral-300">
+                      <span className="text-orange-500 font-mono">
+                        {item.type === 'payment' ? '💰' : 
+                         item.type === 'commission' ? '📈' : 
+                         item.type === 'project' ? '🎯' : 
+                         item.type === 'system' ? '⚙️' : 'Agent'} {item.title}
+                      </span>
+                      {item.description && (
+                        <span>: <span className="font-semibold">{item.description}</span></span>
+                      )}
+                      {item.amount && (
+                        <span className="text-green-500 ml-2">(${item.amount})</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Encrypted Chat Activity */}
-      <Card className="bg-neutral-800 border-neutral-700">
+      <Card className={`bg-neutral-800 border-neutral-700 h-[400px] ${!chatbotEnabled ? 'opacity-50 blur-sm' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">ENCRYPTED CHAT ACTIVITY</CardTitle>
+          <CardTitle className={`font-mono text-sm tracking-wider ${chatbotEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
+            ENCRYPTED CHAT ACTIVITY
+            {!chatbotEnabled && <span className="text-xs text-neutral-600 ml-2">(DISABLED)</span>}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-center mb-4">
-            <div className="w-16 h-16 border-2 border-orange-500 rounded-full mx-auto flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-orange-500" />
+        <CardContent className="h-[320px] overflow-y-auto">
+          {chatbotEnabled ? (
+            <>
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 border-2 border-orange-500 rounded-full mx-auto flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6 text-orange-500" />
+                </div>
+              </div>
+              <div className="space-y-2 text-xs font-mono">
+                <div className="text-neutral-500"># {new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC</div>
+                <div className="text-green-500">> [AGT:{session?.full_name?.replace(' ', '').toLowerCase() || 'agent'}] ::: INIT >></div>
+                <div className="text-neutral-400">^^^ loading secure channel</div>
+                <div className="text-blue-500">> CH#2 | {Math.random().toString().slice(2, 15)} ...xR3</div>
+                <div className="text-green-500">> KEY LOCKED</div>
+                <div className="text-neutral-300">> MSG >> "...mission override initiated ... awaiting delta node clearance"</div>
+                
+                {/* AI Assistant Messages */}
+                {revenueData.total_revenue > 0 && (
+                  <div className="text-blue-500 mt-4">
+                    > AI: You received ${revenueData.total_revenue} via Stripe on {new Date().toLocaleDateString()}
+                  </div>
+                )}
+                {commissionRate > 0 && (
+                  <div className="text-blue-500">
+                    > AI: Commission for {new Date().toLocaleDateString('en-US', { month: 'long' })}: ${(revenueData.total_revenue * commissionRate / 100).toFixed(2)}
+                  </div>
+                )}
+                {clientWebsite && (
+                  <div className="text-blue-500">
+                    > AI: Your site traffic is up 12% this month
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <MessageSquare className="h-12 w-12 text-neutral-600 mx-auto mb-4" />
+              <p className="text-neutral-500 font-mono text-sm">Chat activity is disabled</p>
+              <p className="text-neutral-600 text-xs mt-2">Enable the chatbot in the Integration Panel to access encrypted chat</p>
             </div>
-          </div>
-          <div className="space-y-2 text-xs font-mono">
-            <div className="text-neutral-500"># {new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC</div>
-            <div className="text-green-500">> [AGT:{session?.full_name?.replace(' ', '').toLowerCase() || 'agent'}] ::: INIT >></div>
-            <div className="text-neutral-400">^^^ loading secure channel</div>
-            <div className="text-blue-500">> CH#2 | {Math.random().toString().slice(2, 15)} ...xR3</div>
-            <div className="text-green-500">> KEY LOCKED</div>
-            <div className="text-neutral-300">> MSG >> "...mission override initiated ... awaiting delta node clearance"</div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Mission Activity Overview */}
-      <Card className="bg-neutral-800 border-neutral-700 cursor-pointer hover:border-orange-500/50 transition-colors" onClick={() => setActiveSection("operators")}>
+      
+
+      {/* Integration Panel */}
+      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
         <CardHeader>
-          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MISSION ACTIVITY OVERVIEW</CardTitle>
+          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">INTEGRATION PANEL</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="h-[320px] overflow-y-auto">
           <div className="space-y-4">
-            {/* Website Completion */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-400">Website Completion</span>
-                <span className="text-white font-mono">75%</span>
+            {/* Website Integration */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+              <div className="flex items-center gap-3">
+                <Globe className="w-5 h-5 text-blue-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Website</div>
+                  <div className="text-xs text-neutral-500">Site performance and analytics</div>
+                </div>
               </div>
-              <div className="h-8 bg-neutral-700 rounded-full overflow-hidden">
-                <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: '75%' }}></div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 w-24">
+                  <Progress value={75} className="h-2 bg-neutral-700" />
+                </div>
+                <span className="text-sm text-neutral-300 font-mono">75%</span>
               </div>
             </div>
-            
+
+            {/* Payment Integration */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-5 h-5 text-green-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Payment</div>
+                  <div className="text-xs text-neutral-500">Revenue tracking and processing</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div 
+                  className={`w-12 h-6 rounded-full transition-colors cursor-pointer ${
+                    financesEnabled ? 'bg-green-500' : 'bg-neutral-600'
+                  }`}
+                  onClick={handleFinancesToggle}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    financesEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Chatbot Integration */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-purple-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Chatbot</div>
+                  <div className="text-xs text-neutral-500">AI assistant and encrypted chat</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div 
+                  className={`w-12 h-6 rounded-full transition-colors cursor-pointer ${
+                    chatbotEnabled ? 'bg-green-500' : 'bg-neutral-600'
+                  }`}
+                  onClick={handleChatbotToggle}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    chatbotEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}></div>
+                </div>
+              </div>
+            </div>
+
             {/* Agent Allocation */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-400">Agent Allocation</span>
-                <span className="text-white font-mono">3/5</span>
+            <div className={`flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 ${
+              !financesEnabled ? 'opacity-50 blur-sm' : ''
+            }`}>
+              <div className="flex items-center gap-3">
+                <Users className={`w-5 h-5 ${financesEnabled ? 'text-green-500' : 'text-neutral-500'}`} />
+                <div>
+                  <div className={`text-sm font-medium ${financesEnabled ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                    Agent Allocation
+                    {!financesEnabled && <span className="text-xs text-neutral-600 ml-2">(LOCKED)</span>}
+                  </div>
+                  <div className="text-xs text-neutral-500">Operator and agent management</div>
+                </div>
               </div>
-              <div className="h-8 bg-neutral-700 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 transition-all duration-300" style={{ width: '60%' }}></div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 w-24">
+                  <Progress value={financesEnabled ? 60 : 0} className="h-2 bg-neutral-700" />
+                </div>
+                <span className={`text-sm font-mono ${financesEnabled ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  {financesEnabled ? '3/5' : '0/0'}
+                </span>
               </div>
             </div>
-            
-            {/* Subscription Usage */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-400">Subscription Usage</span>
-                <span className="text-white font-mono">$35/$50</span>
-              </div>
-              <div className="h-8 bg-neutral-700 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: '70%' }}></div>
-              </div>
-            </div>
-            
+
             {/* Mission Objectives */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-400">Mission Objectives</span>
-                <span className="text-white font-mono">60%</span>
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+              <div className="flex items-center gap-3">
+                <Target className="w-5 h-5 text-orange-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Mission Objectives</div>
+                  <div className="text-xs text-neutral-500">Project goals and completion</div>
+                </div>
               </div>
-              <div className="h-8 bg-neutral-700 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: '60%' }}></div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 w-24">
+                  <Progress value={missionStats?.average_progress || 0} className="h-2 bg-neutral-700" />
+                </div>
+                <span className="text-sm text-neutral-300 font-mono">{Math.round(missionStats?.average_progress || 0)}%</span>
               </div>
             </div>
-          </div>
-          
-          <div className="mt-4 text-xs text-neutral-400 font-mono text-center">
-            Click to view detailed operations
           </div>
         </CardContent>
       </Card>
 
-      {/* Mission Information */}
-      <Card className="bg-neutral-800 border-neutral-700">
+      {/* Missions Card */}
+      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
         <CardHeader>
-          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MISSION INFORMATION</CardTitle>
+          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MISSIONS</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs text-neutral-400 font-mono mb-2">SUCCESSFUL MISSIONS</div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-neutral-300">High Risk Mission {stats.activeProjects}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-neutral-300">Medium Risk Mission {stats.completedProjects}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-neutral-300">Low Risk Mission {Math.round(stats.averageRating * 100)}</span>
-                </div>
+        <CardContent className="h-[320px] overflow-y-auto">
+          {/* Website Revenue Display */}
+          <div className="mb-6 p-4 bg-neutral-900 rounded border border-neutral-700">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-500" />
+                <span className="text-sm font-medium text-neutral-300">Website Revenue</span>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-500 font-mono">${revenueData.total_revenue || 0}</div>
+                <div className="text-xs text-neutral-500">Total to date</div>
               </div>
             </div>
-            <div>
-              <div className="text-xs text-neutral-400 font-mono mb-2">FAILED MISSIONS</div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-sm text-neutral-300">High Risk Mission 0</span>
+            <div className="text-xs text-neutral-400">
+              Current website: {clientWebsite?.name || 'No website configured'}
+            </div>
+          </div>
+
+          {/* Mission Categories */}
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-neutral-300 mb-3">Available Mission Types:</div>
+            
+            {/* Website Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-blue-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Globe className="w-5 h-5 text-blue-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Website</div>
+                  <div className="text-xs text-neutral-500">Build or improve websites</div>
                 </div>
               </div>
+              <Button 
+                size="sm" 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+
+            {/* App Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-purple-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Smartphone className="w-5 h-5 text-purple-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">App</div>
+                  <div className="text-xs text-neutral-500">Mobile and web applications</div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+
+            {/* Business Plan Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-green-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-green-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Business Plan</div>
+                  <div className="text-xs text-neutral-500">Strategic planning and analysis</div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+
+            {/* Real Estate Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-orange-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Building2 className="w-5 h-5 text-orange-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Real Estate</div>
+                  <div className="text-xs text-neutral-500">Property and investment planning</div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+
+            {/* Transportation Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-red-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Truck className="w-5 h-5 text-red-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Transportation</div>
+                  <div className="text-xs text-neutral-500">Logistics and mobility solutions</div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+
+            {/* Legal Filing Mission */}
+            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-yellow-500/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Scale className="w-5 h-5 text-yellow-500" />
+                <div>
+                  <div className="text-sm font-medium text-neutral-300">Legal Filing</div>
+                  <div className="text-xs text-neutral-500">Compliance and documentation</div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                onClick={() => setShowNewMissionModal(true)}
+              >
+                Start Mission
+              </Button>
+            </div>
+          </div>
+
+          {/* AI Assessment Button */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-purple-900/50 to-blue-900/50 rounded border border-purple-500/30">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                <Zap className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-neutral-300">AI Business Assessment</div>
+                <div className="text-xs text-neutral-500">Automated analysis and planning</div>
+              </div>
+            </div>
+            <Button 
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+              onClick={() => {
+                // TODO: Implement AI assessment modal
+                toast.info("AI Assessment feature coming soon!");
+              }}
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              Start AI Assessment
+            </Button>
+            <div className="text-xs text-neutral-400 mt-2">
+              Analyzes your website, proposes business plan, and requests current plan upload
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Encrypted Chat Activity Center */}
-      <Card className="bg-neutral-800 border-neutral-700">
+      <Card className={`bg-neutral-800 border-neutral-700 h-[400px] ${!chatbotEnabled ? 'opacity-50' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">ENCRYPTED CHAT ACTIVITY CENTER</CardTitle>
+          <CardTitle className={`font-mono text-sm tracking-wider ${chatbotEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
+            ENCRYPTED CHAT ACTIVITY CENTER
+            {!chatbotEnabled && <span className="text-xs text-neutral-600 ml-2">(DISABLED)</span>}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Chat Window */}
-            <div className="h-64 bg-neutral-900 border border-neutral-700 rounded-lg p-4 overflow-y-auto">
-              <div className="space-y-3">
-                {chatHistory.map((message) => (
-                  <div key={message.id} className="flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      message.type === 'ai' ? 'bg-green-500' :
-                      message.type === 'system' ? 'bg-orange-500' :
-                      message.type === 'legal' ? 'bg-blue-500' :
-                      message.type === 'user' ? 'bg-purple-500' : 'bg-neutral-500'
-                    }`}></div>
-                    <div className="flex-1">
-                      <div className="text-xs text-neutral-400 font-mono">{message.sender}</div>
-                      <div className="text-sm text-neutral-300 bg-neutral-800 p-2 rounded">
-                        {message.content}
+        <CardContent className="h-[320px] overflow-y-auto">
+          {chatbotEnabled ? (
+            <div className="space-y-4">
+              {/* Chat Window */}
+              <div className="h-64 bg-neutral-900 border border-neutral-700 rounded-lg p-4 overflow-y-auto">
+                <div className="space-y-3">
+                  {chatHistory.map((message) => (
+                    <div key={message.id} className="flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-2 ${
+                        message.type === 'ai' ? 'bg-green-500' :
+                        message.type === 'system' ? 'bg-orange-500' :
+                        message.type === 'legal' ? 'bg-blue-500' :
+                        message.type === 'user' ? 'bg-purple-500' : 'bg-neutral-500'
+                      }`}></div>
+                      <div className="flex-1">
+                        <div className="text-xs text-neutral-400 font-mono">{message.sender}</div>
+                        <div className="text-sm text-neutral-300 bg-neutral-800 p-2 rounded">
+                          {message.content}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+              
+              {/* Chat Input */}
+              <form onSubmit={handleChatSubmit} className="flex gap-2">
+                <Input 
+                  placeholder="Type your message..." 
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  className="flex-1 bg-neutral-700 border-neutral-600 text-neutral-300 placeholder-neutral-400"
+                />
+                <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </form>
+              
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
+                >
+                  <Globe className="h-4 w-4 mr-2" />
+                  Analyze Website
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Legal Review
+                </Button>
               </div>
             </div>
-            
-            {/* Chat Input */}
-            <form onSubmit={handleChatSubmit} className="flex gap-2">
-              <Input 
-                placeholder="Type your message..." 
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                className="flex-1 bg-neutral-700 border-neutral-600 text-neutral-300 placeholder-neutral-400"
-              />
-              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white">
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-            </form>
-            
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
-                onClick={() => setActiveSection("operators")}
-              >
-                <Globe className="h-4 w-4 mr-2" />
-                Analyze Website
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Legal Check
-              </Button>
+          ) : (
+            <div className="text-center py-8">
+              <MessageSquare className="h-12 w-12 text-neutral-600 mx-auto mb-4" />
+              <p className="text-neutral-500 font-mono text-sm">Chatbot integration is disabled</p>
+              <p className="text-neutral-600 text-xs mt-2">Enable the chatbot in the Integration Panel to access encrypted chat</p>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -599,20 +890,501 @@ function ClientDashboardContent() {
                 Filter
               </Button>
             </div>
-            <Button onClick={() => setShowNewMissionModal(true)} className="bg-orange-600 hover:bg-orange-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Mission
-            </Button>
+            <div className="relative">
+              <Button 
+                onClick={() => setShowMissionDropdown(!showMissionDropdown)}
+                onMouseEnter={() => setShowMissionDropdown(true)}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Mission
+              </Button>
+              
+              {/* Mission Category Dropdown */}
+              {showMissionDropdown && (
+                <div 
+                  className="absolute right-0 top-full mt-2 w-64 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl z-50"
+                  onMouseLeave={() => setShowMissionDropdown(false)}
+                >
+                  <div className="p-2">
+                    <div className="text-xs text-neutral-500 font-mono mb-2 px-2">SELECT MISSION TYPE:</div>
+                    
+                    {/* Website Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('website');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <Globe className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">Website</div>
+                        <div className="text-xs text-neutral-500">Build or improve websites</div>
+                      </div>
+                    </button>
+
+                    {/* App Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('app');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <Smartphone className="w-5 h-5 text-purple-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">App</div>
+                        <div className="text-xs text-neutral-500">Mobile and web applications</div>
+                      </div>
+                    </button>
+
+                    {/* Business Plan Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('business_plan');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <FileText className="w-5 h-5 text-green-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">Business Plan</div>
+                        <div className="text-xs text-neutral-500">Strategic planning and analysis</div>
+                      </div>
+                    </button>
+
+                    {/* Real Estate Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('real_estate');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <Building2 className="w-5 h-5 text-orange-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">Real Estate</div>
+                        <div className="text-xs text-neutral-500">Property and investment planning</div>
+                      </div>
+                    </button>
+
+                    {/* Transportation Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('transportation');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <Truck className="w-5 h-5 text-red-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">Transportation</div>
+                        <div className="text-xs text-neutral-500">Logistics and mobility solutions</div>
+                      </div>
+                    </button>
+
+                    {/* Legal Filing Mission */}
+                    <button
+                      onClick={() => {
+                        setSelectedMissionCategory('legal_filing');
+                        setShowMissionDropdown(false);
+                        setShowNewMissionModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-neutral-800 rounded transition-colors"
+                    >
+                      <Scale className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <div className="text-sm font-medium text-neutral-300">Legal Filing</div>
+                        <div className="text-xs text-neutral-500">Compliance and documentation</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="text-center py-12 text-neutral-500">
-            <Clock className="h-12 w-12 mx-auto mb-4" />
-            <p className="font-mono">Mission management interface would be implemented here</p>
-          </div>
+          {/* Missions List */}
+          {missionsLoading ? (
+            <div className="text-center py-12 text-neutral-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+              <p className="font-mono">Loading missions...</p>
+            </div>
+          ) : missionsError ? (
+            <div className="text-center py-12 text-red-500">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4" />
+              <p className="font-mono">Error loading missions</p>
+            </div>
+          ) : missions.length === 0 ? (
+            <div className="text-center py-12 text-neutral-500">
+              <Target className="h-12 w-12 mx-auto mb-4" />
+              <p className="font-mono">No missions yet</p>
+              <p className="text-sm text-neutral-600 mt-2">Create your first mission to get started</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {missions.map((mission) => (
+                <Card
+                  key={mission.id}
+                  className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        {mission.category === 'website' && <Globe className="w-5 h-5 text-blue-500" />}
+                        {mission.category === 'app' && <Smartphone className="w-5 h-5 text-purple-500" />}
+                        {mission.category === 'business_plan' && <FileText className="w-5 h-5 text-green-500" />}
+                        {mission.category === 'real_estate' && <Building2 className="w-5 h-5 text-orange-500" />}
+                        {mission.category === 'transportation' && <Truck className="w-5 h-5 text-red-500" />}
+                        {mission.category === 'legal_filing' && <Scale className="w-5 h-5 text-yellow-500" />}
+                        <div>
+                          <CardTitle className="text-sm font-bold text-white tracking-wider">{mission.title}</CardTitle>
+                          <p className="text-xs text-neutral-400 font-mono">{mission.category.replace('_', ' ').toUpperCase()}</p>
+                        </div>
+                      </div>
+                      <Badge className={
+                        mission.status === 'completed' ? 'bg-green-600' :
+                        mission.status === 'in_progress' ? 'bg-blue-600' :
+                        mission.status === 'pending' ? 'bg-yellow-600' :
+                        'bg-red-600'
+                      }>
+                        {mission.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{mission.description}</p>
+                    
+                    <div className="space-y-2">
+                      {mission.budget && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-neutral-400">Budget:</span>
+                          <span className="text-green-500 font-mono">${mission.budget}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-neutral-400">Progress:</span>
+                        <span className="text-orange-500 font-mono">{mission.progress_percentage}%</span>
+                      </div>
+                      
+                      <div className="w-full bg-neutral-800 rounded-full h-2">
+                        <div
+                          className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${mission.progress_percentage}%` }}
+                        ></div>
+                      </div>
+                      
+                      {mission.due_date && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-neutral-400">Due:</span>
+                          <span className="text-neutral-300 font-mono">{new Date(mission.due_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
+
+  const renderMarketplace = () => {
+    // Check marketplace access
+    if (marketplaceAccess === 'none') {
+      return (
+        <div className="p-6">
+          <Card className="bg-neutral-800 border-neutral-700">
+            <CardHeader>
+              <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MARKETPLACE</CardTitle>
+              <CardDescription className="text-neutral-400">Access restricted</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-neutral-500">
+                <Shield className="h-12 w-12 mx-auto mb-4" />
+                <p className="font-mono">Marketplace access not available</p>
+                <p className="text-sm text-neutral-600 mt-2">Contact support to enable marketplace features</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // Filter listings based on search and category
+    const filteredListings = marketplaceListings.filter(listing => {
+      const matchesSearch = listing.title.toLowerCase().includes(marketplaceSearch.toLowerCase()) ||
+                           listing.description.toLowerCase().includes(marketplaceSearch.toLowerCase());
+      const matchesFilter = marketplaceFilter === "all" || 
+                           listing.category_id === marketplaceFilter ||
+                           marketplaceCategories.find(cat => cat.id === listing.category_id)?.name.toLowerCase().includes(marketplaceFilter.toLowerCase());
+      return matchesSearch && matchesFilter;
+    });
+
+    return (
+      <div className="p-6 space-y-6">
+        {/* My Listings Section */}
+        <Card className="bg-neutral-800 border-neutral-700">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MY LISTINGS</CardTitle>
+                <CardDescription className="text-neutral-400">Manage your product and service offerings</CardDescription>
+              </div>
+              <Button 
+                onClick={() => setShowAddListingModal(true)}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Product/Service
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {marketplaceLoading ? (
+              <div className="text-center py-8 text-neutral-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                <p className="font-mono">Loading your listings...</p>
+              </div>
+            ) : marketplaceError ? (
+              <div className="text-center py-8 text-red-500">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4" />
+                <p className="font-mono">Error loading listings</p>
+              </div>
+            ) : myListings.length === 0 ? (
+              <div className="text-center py-8 text-neutral-500">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4" />
+                <p className="font-mono">No listings yet</p>
+                <p className="text-sm text-neutral-600 mt-2">Add your first product or service to start selling</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myListings.map((listing) => {
+                  const category = marketplaceCategories.find(cat => cat.id === listing.category_id);
+                  return (
+                    <Card
+                      key={listing.id}
+                      className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-neutral-700 rounded-lg flex items-center justify-center">
+                              {listing.images?.[0] ? (
+                                <img src={listing.images[0]} alt={listing.title} className="w-8 h-8 rounded" />
+                              ) : (
+                                <TrendingUp className="w-6 h-6 text-neutral-400" />
+                              )}
+                            </div>
+                            <div>
+                              <CardTitle className="text-sm font-bold text-white tracking-wider">{listing.title}</CardTitle>
+                              <p className="text-xs text-neutral-400 font-mono">{category?.name || 'Uncategorized'}</p>
+                            </div>
+                          </div>
+                          <Badge className={listing.is_active ? 'bg-green-600' : 'bg-yellow-600'}>
+                            {listing.is_active ? 'ACTIVE' : 'DRAFT'}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{listing.description}</p>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Price:</span>
+                            <span className="text-green-500 font-mono">${listing.price}</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Rating:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-yellow-500">★</span>
+                              <span className="text-neutral-300 font-mono">{listing.rating.toFixed(1)}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Views:</span>
+                            <span className="text-neutral-300 font-mono">{listing.views_count}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-3">
+                          <Button size="sm" variant="outline" className="flex-1 bg-neutral-800 border-neutral-600 text-neutral-300 hover:bg-neutral-700">
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1 bg-neutral-800 border-neutral-600 text-neutral-300 hover:bg-neutral-700">
+                            {listing.is_active ? 'Pause' : 'Activate'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Browse Listings Section */}
+        <Card className="bg-neutral-800 border-neutral-700">
+          <CardHeader>
+            <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">BROWSE LISTINGS</CardTitle>
+            <CardDescription className="text-neutral-400">Discover products and services from other clients</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search listings..."
+                  value={marketplaceSearch}
+                  onChange={(e) => setMarketplaceSearch(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-neutral-700 border border-neutral-600 rounded text-neutral-300 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full"
+                />
+              </div>
+              <Select value={marketplaceFilter} onValueChange={setMarketplaceFilter}>
+                <SelectTrigger className="bg-neutral-700 border-neutral-600 text-neutral-300">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent className="bg-neutral-800 border-neutral-700">
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="web design">Web Design</SelectItem>
+                  <SelectItem value="graphic design">Graphic Design</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="development">Development</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Listings Grid */}
+            {marketplaceLoading ? (
+              <div className="text-center py-8 text-neutral-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                <p className="font-mono">Loading listings...</p>
+              </div>
+            ) : marketplaceError ? (
+              <div className="text-center py-8 text-red-500">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4" />
+                <p className="font-mono">Error loading listings</p>
+              </div>
+            ) : filteredListings.length === 0 ? (
+              <div className="text-center py-8 text-neutral-500">
+                <Search className="h-12 w-12 mx-auto mb-4" />
+                <p className="font-mono">No listings found</p>
+                <p className="text-sm text-neutral-600 mt-2">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredListings.map((listing) => {
+                  const category = marketplaceCategories.find(cat => cat.id === listing.category_id);
+                  const isBookmarked = bookmarks.some(bookmark => bookmark.listing_id === listing.id);
+                  
+                  return (
+                    <Card
+                      key={listing.id}
+                      className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedListing(listing);
+                        setShowListingDetailModal(true);
+                        recordInteraction(listing.id, 'view');
+                      }}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-neutral-700 rounded-lg flex items-center justify-center">
+                              {listing.images?.[0] ? (
+                                <img src={listing.images[0]} alt={listing.title} className="w-8 h-8 rounded" />
+                              ) : (
+                                <TrendingUp className="w-6 h-6 text-neutral-400" />
+                              )}
+                            </div>
+                            <div>
+                              <CardTitle className="text-sm font-bold text-white tracking-wider">{listing.title}</CardTitle>
+                              <p className="text-xs text-neutral-400 font-mono">{category?.name || 'Uncategorized'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {listing.verified && (
+                              <Badge className="bg-blue-600">
+                                VERIFIED
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="p-1 h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookmark(listing.id);
+                              }}
+                            >
+                              {isBookmarked ? (
+                                <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                              ) : (
+                                <Star className="w-4 h-4 text-neutral-400" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{listing.description}</p>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Price:</span>
+                            <span className="text-green-500 font-mono">${listing.price}</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Rating:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-yellow-500">★</span>
+                              <span className="text-neutral-300 font-mono">{listing.rating.toFixed(1)}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-400">Views:</span>
+                            <span className="text-neutral-300 font-mono">{listing.views_count}</span>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          size="sm" 
+                          className="w-full mt-3 bg-orange-600 hover:bg-orange-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            recordInteraction(listing.id, 'inquiry');
+                          }}
+                        >
+                          Learn More
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   const renderTodos = () => (
     <div className="p-6 space-y-6">
@@ -2128,6 +2900,35 @@ function ClientDashboardContent() {
     }
   };
 
+  // Integration Panel Handlers
+  const handleFinancesToggle = () => {
+    if (!financesEnabled) {
+      setShowPaymentModal(true);
+    } else {
+      setFinancesEnabled(false);
+    }
+  };
+
+  const handleChatbotToggle = () => {
+    setChatbotEnabled(!chatbotEnabled);
+  };
+
+  const handleIntegrationPayment = async () => {
+    setPaymentLoading(true);
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Enable finances after successful payment
+      setFinancesEnabled(true);
+      setShowPaymentModal(false);
+      setPaymentLoading(false);
+    } catch (error) {
+      console.error('Payment error:', error);
+      setPaymentLoading(false);
+    }
+  };
+
               // Update website name dynamically when clientWebsite changes
             useEffect(() => {
               if (!websiteLoading && clientWebsite) {
@@ -2575,22 +3376,7 @@ function ClientDashboardContent() {
           {activeSection === "projects" && renderProjects()}
           {activeSection === "roles" && renderAgentNetwork()}
           {activeSection === "operators" && renderOperators()}
-          {activeSection === "marketplace" && (
-            <div className="p-6">
-              <Card className="bg-neutral-800 border-neutral-700">
-                <CardHeader>
-                  <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MARKETPLACE</CardTitle>
-                  <CardDescription className="text-neutral-400">Discover and purchase creative services</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12 text-neutral-500">
-                    <TrendingUp className="h-12 w-12 mx-auto mb-4" />
-                    <p className="font-mono">Marketplace interface would be implemented here</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {activeSection === "marketplace" && renderMarketplace()}
           {activeSection === "financial" && renderFinancialDashboard()}
         </div>
       </div>
@@ -2598,14 +3384,21 @@ function ClientDashboardContent() {
       {/* New Project Modal */}
       <NewProjectModal open={showNewProjectModal} onOpenChange={setShowNewProjectModal} />
       {/* New Mission Modal */}
-      <NewMissionModal open={showNewMissionModal} onClose={() => setShowNewMissionModal(false)} />
+      <NewMissionModal 
+        open={showNewMissionModal} 
+        onClose={() => {
+          setShowNewMissionModal(false);
+          setSelectedMissionCategory(null);
+        }}
+        preSelectedCategory={selectedMissionCategory}
+      />
       {/* Create New Operator Modal */}
       <CreateNewOperatorModal open={showNewOperatorModal} onClose={() => setShowNewOperatorModal(false)} />
       {/* Subscription Payment Modal */}
       <SubscriptionPaymentModal 
         open={showPaymentModal} 
         onClose={() => setShowPaymentModal(false)}
-        onPayment={handleSubscriptionPayment}
+        onPayment={financesEnabled ? handleIntegrationPayment : handleSubscriptionPayment}
         loading={paymentLoading}
       />
       
@@ -2645,6 +3438,22 @@ function ClientDashboardContent() {
           }
         }}
         clientPlan={clientPlan}
+      />
+      
+      {/* New Mission Modal */}
+      <NewMissionModal
+        open={showNewMissionModal}
+        onClose={() => {
+          setShowNewMissionModal(false);
+          setSelectedMissionCategory(null);
+        }}
+        preSelectedCategory={selectedMissionCategory}
+        onMissionCreated={() => {
+          // Refresh mission stats
+          if (missionStats) {
+            // The hook will automatically refresh
+          }
+        }}
       />
     </div>
   );

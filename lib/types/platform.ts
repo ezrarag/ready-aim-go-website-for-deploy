@@ -90,14 +90,55 @@ export interface OperationFeedback {
 
 export interface MarketplaceItem {
   id: string
-  clientId: string
+  client_id: string
   title: string
   description: string
   price: number
-  category: string
+  category_id: string
   images: string[]
-  isActive: boolean
-  sales: number
+  tags: string[]
+  is_active: boolean
+  verified: boolean
   rating: number
-  reviews: number
+  reviews_count: number
+  views_count: number
+  created_at: string
+  updated_at: string
 }
+
+export interface MarketplaceCategory {
+  id: string
+  name: string
+  description: string
+  slug: string
+  created_at: string
+}
+
+export interface MarketplaceInteraction {
+  id: string
+  listing_id: string
+  user_id: string
+  interaction_type: 'view' | 'inquiry' | 'bookmark'
+  created_at: string
+}
+
+export interface MarketplaceBookmark {
+  id: string
+  listing_id: string
+  user_id: string
+  created_at: string
+}
+
+export interface MarketplaceTransaction {
+  id: string
+  listing_id: string
+  buyer_id: string
+  seller_id: string
+  amount: number
+  status: 'pending' | 'completed' | 'cancelled' | 'refunded'
+  stripe_payment_intent_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export type MarketplaceAccess = 'none' | 'view_only' | 'listing_only' | 'full_access'
