@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { supabase } from "@/lib/supabase/client"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+import { toast } from "sonner"
 
 export default function OnboardingPage() {
   const router = useRouter()

@@ -39,7 +39,7 @@ function ProjectGrid({ projects, onSelect }: { projects: Project[]; onSelect: (p
       {projects.map((project: Project) => (
         <div
           key={project.id}
-          className="relative rounded-2xl overflow-hidden shadow-lg bg-white cursor-pointer group transition-transform"
+          className="relative rounded-2xl overflow-hidden shadow-lg bg-white cursor-pointer group transition-transform hover:scale-105"
           onClick={() => onSelect(project)}
         >
           <img
@@ -70,7 +70,7 @@ function ProjectGrid({ projects, onSelect }: { projects: Project[]; onSelect: (p
             </a>
             <button className="text-white text-2xl">🔖</button>
           </div>
-          <div className="w-full h-[320px]" />
+          <div className="w-full h-[400px]" />
         </div>
       ))}
     </div>

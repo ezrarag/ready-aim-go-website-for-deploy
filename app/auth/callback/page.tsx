@@ -130,6 +130,7 @@ export default function AuthCallbackPage() {
         if (profileError.code === 'PGRST116') {
           console.log("➕ Creating new admin profile");
           try {
+            // Create profile entry
             const { error: insertError } = await supabase
               .from("profiles")
               .insert({
@@ -141,6 +142,24 @@ export default function AuthCallbackPage() {
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               });
+
+            // Also create client entry for admin users
+            if (!insertError) {
+              const { error: clientInsertError } = await supabase
+                .from("clients")
+                .insert({
+                  id: user.id,
+                  company_name: user.user_metadata?.full_name || 'Admin Company',
+                  contact_name: user.user_metadata?.full_name || user.email,
+                  contact_email: user.email,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+
+              if (clientInsertError && clientInsertError.code !== '23505') { // Ignore duplicate key errors
+                console.error("❌ Error creating client entry:", clientInsertError);
+              }
+            }
 
             console.log("📝 Insert result:", insertError);
 

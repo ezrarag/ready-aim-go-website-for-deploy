@@ -72,6 +72,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDe
 import { CommissionRateModal } from "@/components/commission-rate-modal";
 import { WebsiteCardModal } from "@/components/website-card-modal";
 import { toast } from "sonner";
+import { FirstTimeUserPopup } from "@/components/first-time-user-popup"
 
 function ClientDashboardContent() {
   const { session, loading, error } = useUserWithRole();
@@ -104,6 +105,11 @@ function ClientDashboardContent() {
   const [showNewOperatorModal, setShowNewOperatorModal] = useState(false);
   const [showMissionDropdown, setShowMissionDropdown] = useState(false);
   const [selectedMissionCategory, setSelectedMissionCategory] = useState<string | null>(null);
+  
+  // First-time user popup state
+  const [showFirstTimePopup, setShowFirstTimePopup] = useState(false);
+  const [userBusinessAssets, setUserBusinessAssets] = useState<any[]>([]);
+  const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
   
   // Marketplace State
   const [showAddListingModal, setShowAddListingModal] = useState(false);
@@ -274,6 +280,146 @@ function ClientDashboardContent() {
     }
     fetchTodos();
   }, [session?.user, statusFilter]);
+
+  useEffect(() => {
+    // Check if user has completed setup and populate business assets
+    const checkFirstTimeUser = async () => {
+      if (session?.user?.id) {
+        try {
+          // Get profile data
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('has_completed_setup, business_assets')
+            .eq('id', session.user.id)
+            .single();
+          
+          // Get existing client data (websites, etc.)
+          let { data: clientData, error: clientError } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          console.log('Client data:', clientData);
+          console.log('Client error:', clientError);
+          
+          // If client doesn't exist, create one
+          if (clientError && clientError.code === 'PGRST116') {
+            console.log('Creating client entry for user:', session.user.id);
+            const { error: createClientError } = await supabase
+              .from('clients')
+              .insert({
+                id: session.user.id,
+                company_name: session.user.user_metadata?.full_name || 'My Company',
+                contact_name: session.user.user_metadata?.full_name || session.user.email,
+                contact_email: session.user.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            
+            if (createClientError) {
+              console.error('Error creating client entry:', createClientError);
+            } else {
+              console.log('Client entry created successfully');
+              // Re-fetch client data
+              const { data: newClientData } = await supabase
+                .from('clients')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (newClientData) {
+                clientData = newClientData;
+              }
+            }
+          }
+          
+          // Initialize business assets with existing data
+          const initialBusinessAssets = [
+            {
+              type: 'business_plan',
+              name: 'Business Plan',
+              value: '',
+              status: 'not_started' as const,
+              description: 'Upload your business plan document for AI analysis',
+              icon: 'FileText',
+              color: 'text-red-500'
+            },
+            {
+              type: 'website',
+              name: 'Business Website',
+              value: clientData?.website_url || '',
+              status: clientData?.website_url ? 'completed' as const : 'not_started' as const,
+              description: 'Enter your business website URL',
+              icon: 'Globe',
+              color: 'text-orange-500'
+            },
+            {
+              type: 'app',
+              name: 'Business App',
+              value: clientData?.app_url || '',
+              status: clientData?.app_url ? 'completed' as const : 'not_started' as const,
+              description: 'Provide a link to your business app',
+              icon: 'Smartphone',
+              color: 'text-blue-500'
+            },
+            {
+              type: 'real_estate',
+              name: 'Real Estate Portal',
+              value: '',
+              status: 'not_started' as const,
+              description: 'Connect your real estate listings or portal',
+              icon: 'Building2',
+              color: 'text-green-500'
+            },
+            {
+              type: 'transportation',
+              name: 'Transportation Network',
+              value: '',
+              status: 'not_started' as const,
+              description: 'Link your transportation or logistics network',
+              icon: 'Truck',
+              color: 'text-purple-500'
+            },
+            {
+              type: 'legal_filing',
+              name: 'Legal Filing System',
+              value: '',
+              status: 'not_started' as const,
+              description: 'Connect your legal documents and filing system',
+              icon: 'Scale',
+              color: 'text-yellow-500'
+            }
+          ];
+          
+          // If user has existing business assets from profile, use those
+          if (profile?.business_assets && profile.business_assets.length > 0) {
+            setUserBusinessAssets(profile.business_assets);
+            setHasCompletedSetup(true);
+          } else {
+            // Use the initialized assets with existing data
+            console.log('Initial business assets:', initialBusinessAssets);
+            setUserBusinessAssets(initialBusinessAssets);
+            
+            // Check if any assets are completed
+            const hasAnyCompleted = initialBusinessAssets.some(asset => asset.status === 'completed');
+            console.log('Has any completed assets:', hasAnyCompleted);
+            if (hasAnyCompleted) {
+              setHasCompletedSetup(true);
+            } else if (!profile?.has_completed_setup) {
+              setShowFirstTimePopup(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking user setup status:', error);
+          // Show popup for new users
+          setShowFirstTimePopup(true);
+        }
+      }
+    };
+    
+    checkFirstTimeUser();
+  }, [session?.user?.id]);
 
   const handleEdit = (todo: any) => {
     setEditingTodo(todo.id);
@@ -3141,7 +3287,7 @@ function ClientDashboardContent() {
             {!asset.is_active && (
               <>
                 {/* Large Icon Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-lg">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-lg z-10">
                   <div className="text-center">
                     {asset.type === 'website' && <Globe className="w-24 h-24 text-orange-500/60 mx-auto mb-4" />}
                     {asset.type === 'app' && <Monitor className="w-24 h-24 text-blue-500/60 mx-auto mb-4" />}
@@ -3154,7 +3300,7 @@ function ClientDashboardContent() {
                 </div>
                 
                 {/* Hover Button */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
                     New Mission
@@ -3196,46 +3342,84 @@ function ClientDashboardContent() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-neutral-400">REVENUE HEALTH</span>
-                <span className={`text-sm font-bold font-mono ${asset.revenue > 0 ? 'text-green-500' : 'text-neutral-400'}`}>
-                  ${asset.revenue.toLocaleString()}
-                </span>
-              </div>
-              <Progress value={asset.revenue_health} className="h-2" />
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <div className="text-neutral-400 mb-1">REVENUE</div>
-                  <div className="text-white font-mono">${asset.revenue}</div>
-                </div>
-                <div>
-                  <div className="text-neutral-400 mb-1">FOOT TRAFFIC</div>
-                  <div className="text-white font-mono">{asset.foot_traffic.toLocaleString()}</div>
-                </div>
-              </div>
-
-              {clientPlan.mode === "revenue_share" && asset.ownership && asset.is_active && (
-                <div className="border-t border-neutral-700 pt-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-400">NETWORK OWNERSHIP</span>
-                    <span className="text-orange-500 font-mono">{asset.ownership}</span>
+              {/* Only show content for active assets */}
+              {asset.is_active && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-neutral-400">REVENUE HEALTH</span>
+                    <span className={`text-sm font-bold font-mono ${asset.revenue > 0 ? 'text-green-500' : 'text-neutral-400'}`}>
+                      ${asset.revenue.toLocaleString()}
+                    </span>
                   </div>
-                </div>
-              )}
+                  <Progress value={asset.revenue_health} className="h-2" />
 
-              <div className="w-full bg-neutral-800 rounded-full h-1">
-                <div
-                  className="bg-green-500 h-1 rounded-full transition-all duration-300"
-                  style={{ width: `${asset.revenue_health}%` }}
-                ></div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <div className="text-neutral-400 mb-1">REVENUE</div>
+                      <div className="text-white font-mono">${asset.revenue}</div>
+                    </div>
+                    <div>
+                      <div className="text-neutral-400 mb-1">FOOT TRAFFIC</div>
+                      <div className="text-white font-mono">{asset.foot_traffic.toLocaleString()}</div>
+                    </div>
+                  </div>
+
+                  {clientPlan.mode === "revenue_share" && asset.ownership && (
+                    <div className="border-t border-neutral-700 pt-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-neutral-400">NETWORK OWNERSHIP</span>
+                        <span className="text-orange-500 font-mono">{asset.ownership}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="w-full bg-neutral-800 rounded-full h-1">
+                    <div
+                      className="bg-green-500 h-1 rounded-full transition-all duration-300"
+                      style={{ width: `${asset.revenue_health}%` }}
+                    ></div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
     </div>
   );
+
+
+
+  const handleFirstTimeSetupComplete = async (assets: any[]) => {
+    try {
+      // Save business assets to database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          has_completed_setup: true,
+          business_assets: assets,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', session?.user?.id);
+      
+      if (error) throw error;
+      
+      setUserBusinessAssets(assets);
+      setHasCompletedSetup(true);
+      setShowFirstTimePopup(false);
+      
+      toast.success('Business profile setup complete!');
+    } catch (error) {
+      console.error('Error saving business assets:', error);
+      toast.error('Failed to save setup. Please try again.');
+    }
+  };
+
+  const getChecklistProgress = () => {
+    const completed = userBusinessAssets.filter(asset => asset.status === 'completed').length;
+    const total = userBusinessAssets.length;
+    return { completed, total, percentage: total > 0 ? (completed / total) * 100 : 0 };
+  };
 
   return (
     <div className="flex h-screen bg-neutral-900">
@@ -3295,15 +3479,60 @@ function ClientDashboardContent() {
 
           {!sidebarCollapsed && (
             <div className="mt-8 p-4 bg-neutral-800 border border-neutral-700 rounded">
-              <div className="flex items-center gap-2 mb-2">
+              {/* Business Assets Checklist */}
+              <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-white font-mono">SYSTEM ONLINE</span>
+                <span className="text-xs text-white font-mono">BUSINESS CHECKLIST</span>
               </div>
-              <div className="text-xs text-neutral-500 font-mono">
-                <div>UPTIME: 72:14:33</div>
-                <div>AGENTS: {stats.activeProjects} ACTIVE</div>
-                <div>MISSIONS: {stats.completedProjects} ONGOING</div>
-              </div>
+              
+              {hasCompletedSetup ? (
+                <div className="space-y-3">
+                  <div className="text-xs text-neutral-500 font-mono">
+                    <div>PROGRESS: {getChecklistProgress().completed}/{getChecklistProgress().total}</div>
+                    <div>COMPLETION: {Math.round(getChecklistProgress().percentage)}%</div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {userBusinessAssets.map((asset, index) => (
+                      <div key={asset.type} className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                          asset.status === 'completed' ? 'bg-green-500' : 'bg-neutral-500'
+                        }`}></div>
+                        <span className={`text-xs font-mono ${
+                          asset.status === 'completed' ? 'text-green-400' : 'text-neutral-400'
+                        }`}>
+                          {asset.name.toUpperCase()}
+                        </span>
+                        {asset.status === 'completed' && asset.value && (
+                          <span className="text-xs text-neutral-500 font-mono ml-2">
+                            ({asset.value.length > 20 ? asset.value.substring(0, 20) + '...' : asset.value})
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="pt-2 border-t border-neutral-700">
+                    <button
+                      onClick={() => setShowFirstTimePopup(true)}
+                      className="text-xs text-orange-500 hover:text-orange-400 font-mono"
+                    >
+                      EDIT ASSETS
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-neutral-500 font-mono">
+                  <div>SETUP REQUIRED</div>
+                  <div>CLICK TO CONFIGURE</div>
+                  <button
+                    onClick={() => setShowFirstTimePopup(true)}
+                    className="text-orange-500 hover:text-orange-400 mt-2"
+                  >
+                    START SETUP
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -3388,9 +3617,15 @@ function ClientDashboardContent() {
         open={showNewMissionModal} 
         onClose={() => {
           setShowNewMissionModal(false);
-          setSelectedMissionCategory(null);
         }}
-        preSelectedCategory={selectedMissionCategory}
+        onSubmit={async (missionData) => {
+          try {
+            await createMission(missionData);
+            toast.success("Mission created successfully!");
+          } catch (error) {
+            toast.error("Failed to create mission");
+          }
+        }}
       />
       {/* Create New Operator Modal */}
       <CreateNewOperatorModal open={showNewOperatorModal} onClose={() => setShowNewOperatorModal(false)} />
@@ -3454,6 +3689,14 @@ function ClientDashboardContent() {
             // The hook will automatically refresh
           }
         }}
+      />
+
+      {/* First Time User Popup */}
+      <FirstTimeUserPopup
+        open={showFirstTimePopup}
+        onClose={() => setShowFirstTimePopup(false)}
+        onComplete={handleFirstTimeSetupComplete}
+        initialAssets={userBusinessAssets}
       />
     </div>
   );
