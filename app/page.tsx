@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowRight, Star, Users, Briefcase, TrendingUp, CheckCircle, Zap, Shield, Globe, Play, User, ChevronLeft } from "lucide-react"
+import { ArrowRight, Star, Users, Briefcase, TrendingUp, CheckCircle, Zap, Shield, Globe, Play, User, ChevronLeft, MapPin } from "lucide-react"
 import StickyFloatingHeader from "@/components/ui/sticky-floating-header"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -486,7 +486,7 @@ function ProjectMap({ projects, onSelect }: { projects: Project[]; onSelect: (pr
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
                 <div className="bg-white text-gray-900 text-sm rounded-lg px-4 py-3 shadow-xl border border-gray-200 whitespace-nowrap">
                   <div className="font-semibold text-purple-600">{location.city}</div>
-                  <div className="text-gray-600">{location.projectCount} active projects</div>
+                  <div className="text-gray-600">{location.projectCount} projects</div>
                   <div className="text-xs text-gray-500 mt-1">{location.country}</div>
                 </div>
                 <div className="w-3 h-3 bg-white border-r border-b border-gray-200 rotate-45 absolute top-full left-1/2 -translate-x-1/2 -mt-1.5"></div>
@@ -516,20 +516,7 @@ function ProjectMap({ projects, onSelect }: { projects: Project[]; onSelect: (pr
           </div>
         </div>
         
-        {/* Location Stats - Google Maps Style */}
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg border border-gray-200">
-          <div className="text-sm text-gray-700">
-            <div className="font-semibold mb-1">Active Projects</div>
-            <div className="grid grid-cols-2 gap-3">
-              {projectLocations.slice(0, 4).map((location) => (
-                <div key={location.id} className="text-center">
-                  <div className="text-lg font-bold text-purple-600">{location.projectCount}</div>
-                  <div className="text-xs text-gray-600">{location.city}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   );
@@ -798,7 +785,11 @@ export default function HomePage() {
   const [operatorTypeModal, setOperatorTypeModal] = useState<OperatorType | null>(null)
   const [operatorModalOpen, setOperatorModalOpen] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
+  const [showProjectMapModal, setShowProjectMapModal] = useState(false)
+  const [showProjectsModal, setShowProjectsModal] = useState(false)
+  const [currentProjectIndex, setCurrentProjectIndex] = useState(0)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
+  const [showScreensaver, setShowScreensaver] = useState(false)
   const router = useRouter()
 
   // Handler for login modal
@@ -869,6 +860,66 @@ export default function HomePage() {
     checkAuthAndOnboarding()
   }, [router])
 
+  // Screensaver functionality
+  useEffect(() => {
+    let currentTimer: NodeJS.Timeout | null = null
+
+    const startScreensaverTimer = () => {
+      if (currentTimer) clearTimeout(currentTimer)
+      currentTimer = setTimeout(() => {
+        setShowScreensaver(true)
+      }, 30000) // 30 seconds of inactivity
+    }
+
+    const resetScreensaverTimer = () => {
+      if (showScreensaver) {
+        setShowScreensaver(false)
+      }
+      startScreensaverTimer()
+    }
+
+    // Start initial timer
+    startScreensaverTimer()
+
+    // Event listeners for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+    events.forEach(event => {
+      document.addEventListener(event, resetScreensaverTimer, true)
+    })
+
+    return () => {
+      if (currentTimer) clearTimeout(currentTimer)
+      events.forEach(event => {
+        document.removeEventListener(event, resetScreensaverTimer, true)
+      })
+    }
+  }, [showScreensaver]) // Only depend on showScreensaver state
+
+  // Keyboard navigation for projects gallery
+  useEffect(() => {
+    if (!showProjectsModal) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault()
+          setCurrentProjectIndex((prev) => (prev - 1 + projects.length) % projects.length)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          setCurrentProjectIndex((prev) => (prev + 1) % projects.length)
+          break
+        case 'Escape':
+          e.preventDefault()
+          setShowProjectsModal(false)
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showProjectsModal, projects.length])
+
   useEffect(() => {
     const fetchProjects = async () => {
       setLoading(true)
@@ -902,12 +953,12 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100 relative">
+    <div className="min-h-screen bg-white">
       <StickyFloatingHeader pageTitle="Home" onInterested={handleLogin} />
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 pb-8 z-10">
-        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700 border-0">
-          <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[400px] p-0' : 'px-8 py-24 lg:py-32 min-h-[400px]' } flex items-center justify-center`}>
+      <section className="min-h-screen flex items-center justify-center px-4 py-8 sm:py-12 md:py-16">
+        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700 border-0 max-w-6xl w-full mx-4">
+          <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[300px] sm:min-h-[400px] p-0' : 'px-4 sm:px-6 md:px-8 py-16 sm:py-20 md:py-24 lg:py-32 min-h-[300px] sm:min-h-[400px]' } flex items-center justify-center`}>
             <AnimatePresence>
               {showDemo ? (
                 <motion.div
@@ -947,17 +998,17 @@ export default function HomePage() {
             {!showDemo && (
               <div className="max-w-4xl w-full">
                 {/* Static text without animations */}
-                <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                   READY
                   <br />
                   <span className="text-indigo-600">AIM</span>
                   <br />
                   GO
                 </h1>
-                <p className="text-xl text-gray-700 mb-8 max-w-2xl leading-relaxed">
+                <p className="text-lg sm:text-xl text-gray-700 mb-6 sm:mb-8 max-w-2xl leading-relaxed">
                   Full Stack Virtual Asset Management
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                   <Button
                     size="lg"
                     className="bg-black text-white hover:bg-gray-900 rounded-full px-8 py-4 text-lg font-semibold"
@@ -966,6 +1017,17 @@ export default function HomePage() {
                     <Play className="mr-2 h-5 w-5" />
                     <span className="text-white">Watch Demo</span>
                   </Button>
+                  <button 
+                    onClick={() => {
+                      setCurrentProjectIndex(0)
+                      setShowProjectsModal(true)
+                    }}
+                    className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
+                  >
+                    <span className="border-b-2 border-gray-300 hover:border-gray-600 transition-colors">
+                      View Projects
+                    </span>
+                  </button>
                 </div>
                 {/* Stats */}
                 <HomeStats />
@@ -978,64 +1040,7 @@ export default function HomePage() {
         </Card>
       </section>
 
-      {/* Recent Projects Card Section */}
-      {projects.length > 0 && (
-        <section className="py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-5xl mx-auto">
-            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-xl border-0 overflow-hidden">
-              <div className="p-8 lg:p-12">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                  {/* Left Section - Text Content */}
-                  <div className="space-y-6 flex flex-col justify-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Briefcase className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">
-                        Recent Projects
-                      </h2>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <p className="text-lg font-semibold text-gray-900">
-                        See what our operators have been building
-                      </p>
-                      <p className="text-gray-600 leading-relaxed">
-                        Discover the latest projects completed by our talented operators. From web applications to mobile apps, each project showcases our commitment to quality and innovation.
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <Link href="/dashboard/client">
-                        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                          View All Projects
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                  
-                  {/* Right Section - Project Carousel */}
-                  <div className="relative -m-8 lg:-m-12">
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden h-full">
-                      <ProjectCarousel projects={projects.slice(0, 6)} onSelect={setProjectModal} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </section>
-      )}
-      
-      {/* Project Locations Map Card */}
-      <section className="px-4 sm:px-6 lg:px-8 -mt-8 mb-16">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white rounded-2xl shadow-xl border-0 overflow-hidden">
-            <ProjectMap projects={projects} onSelect={setProjectModal} />
-          </Card>
-        </div>
-      </section>
+
 
       {/* Login Modal */}
       <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
@@ -1046,6 +1051,229 @@ export default function HomePage() {
         open={!!projectModal} 
         onClose={() => setProjectModal(null)} 
       />
+
+      {/* Projects Photo Gallery Lightbox Modal */}
+      <Dialog open={showProjectsModal} onOpenChange={setShowProjectsModal}>
+        <DialogContent className="w-full h-screen max-w-none p-0 bg-black">
+          <DialogTitle className="sr-only">Projects Gallery</DialogTitle>
+          <div className="relative w-full h-full">
+            {/* Gallery Navigation - Always visible but subtle, enhanced on hover */}
+            <div className="absolute inset-0 group">
+              {/* Previous Button */}
+              <button
+                onClick={() => setCurrentProjectIndex((prev) => (prev - 1 + projects.length) % projects.length)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/70 text-white rounded-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-200 hover:bg-black hover:scale-110"
+                aria-label="Previous project"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              
+              {/* Next Button */}
+              <button
+                onClick={() => setCurrentProjectIndex((prev) => (prev + 1) % projects.length)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/70 text-white rounded-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-200 hover:bg-black hover:scale-110"
+                aria-label="Next project"
+              >
+                <ArrowRight className="h-6 w-6" />
+              </button>
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setShowProjectsModal(false)}
+                className="absolute top-4 right-4 z-20 w-10 h-10 bg-black/70 text-white rounded-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-200 hover:bg-black hover:scale-110"
+                aria-label="Close gallery"
+              >
+                ×
+              </button>
+              
+              {/* Project Counter */}
+              <div className="absolute top-4 left-4 z-20 bg-black/70 text-white px-3 py-1 rounded-full text-sm opacity-60 group-hover:opacity-100 transition-all duration-200">
+                {currentProjectIndex + 1} / {projects.length}
+              </div>
+              
+              {/* Project Title and Description */}
+              <div className="absolute bottom-4 left-4 z-20 bg-black/70 text-white px-4 py-3 rounded-lg opacity-60 group-hover:opacity-100 transition-all duration-200 max-w-md">
+                <h3 className="font-semibold text-lg mb-2">{projects[currentProjectIndex]?.title}</h3>
+                {projects[currentProjectIndex]?.description && (
+                  <p className="text-sm text-gray-300 line-clamp-2 mb-3">
+                    {projects[currentProjectIndex].description}
+                  </p>
+                )}
+                
+                {/* Website URL Display */}
+                {projects[currentProjectIndex]?.liveUrl && (
+                  <div className="flex items-center gap-2 text-blue-300 text-sm">
+                    <Globe className="h-4 w-4" />
+                    <span className="truncate">
+                      {projects[currentProjectIndex].liveUrl?.replace(/^https?:\/\//, '')}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Live Site Link */}
+              {projects[currentProjectIndex]?.liveUrl && (
+                <div className="absolute bottom-4 right-4 z-20 opacity-60 group-hover:opacity-100 transition-all duration-200">
+                  <a
+                    href={projects[currentProjectIndex].liveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white text-black px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center gap-2"
+                  >
+                    <Globe className="h-4 w-4" />
+                    Visit Live Site →
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            {/* Main Project Image */}
+            <div className="w-full h-full flex items-center justify-center">
+              {projects.length > 0 ? (
+                <div className="relative w-full h-full">
+                  {projects[currentProjectIndex]?.liveUrl ? (
+                    <img
+                      src={`https://api.microlink.io/?url=${encodeURIComponent(projects[currentProjectIndex].liveUrl)}&screenshot=true&meta=false&embed=screenshot.url&colorScheme=light`}
+                      alt={projects[currentProjectIndex].title}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder.jpg';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Briefcase className="h-24 w-24 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-400 text-xl">{projects[currentProjectIndex]?.title}</p>
+                        <p className="text-gray-500 text-sm">No preview available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center text-white">
+                  <Briefcase className="h-24 w-24 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 text-xl">No projects available</p>
+                  <p className="text-gray-400 text-sm">Check back later for new projects</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Dots Navigation - Always visible but subtle */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+              {projects.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentProjectIndex(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    index === currentProjectIndex 
+                      ? 'bg-white scale-125' 
+                      : 'bg-white/30 hover:bg-white/50'
+                  }`}
+                  aria-label={`Go to project ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Project Map Lightbox Modal */}
+      <Dialog open={showProjectMapModal} onOpenChange={setShowProjectMapModal}>
+        <DialogContent className="max-w-7xl w-full h-[90vh] p-0">
+          <DialogTitle className="sr-only">Project Locations Map</DialogTitle>
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Project Locations</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowProjectMapModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </Button>
+            </div>
+            
+            {/* Map Content */}
+            <div className="flex-1 p-6">
+              <ProjectMap projects={projects} onSelect={setProjectModal} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Screensaver */}
+      <AnimatePresence>
+        {showScreensaver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+            onClick={() => setShowScreensaver(false)}
+          >
+            <div className="relative">
+              {/* AIM Text with Animation */}
+              <motion.div
+                animate={{
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="text-8xl sm:text-9xl md:text-[12rem] lg:text-[15rem] font-bold text-indigo-600"
+              >
+                AIM
+              </motion.div>
+              
+              {/* Arrow Animation */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ 
+                  opacity: [0, 1, 0],
+                  scale: [0, 1.2, 0],
+                  rotate: [0, 180, 360]
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1
+                }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <ArrowRight className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl text-white" />
+              </motion.div>
+              
+              {/* Click to wake message */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 2
+                }}
+                className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/60 text-sm sm:text-base"
+              >
+                Click anywhere to wake
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
