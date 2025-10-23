@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
 import { 
   MarketplaceItem, 
   MarketplaceCategory, 

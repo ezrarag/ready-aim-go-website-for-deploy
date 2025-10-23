@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
 
 export function useCommissionRate(clientId: string | undefined) {
   const [commissionRate, setCommissionRate] = useState<number>(10.0);

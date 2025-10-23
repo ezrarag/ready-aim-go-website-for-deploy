@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
 
 interface WebsiteInfo {
   name: string;

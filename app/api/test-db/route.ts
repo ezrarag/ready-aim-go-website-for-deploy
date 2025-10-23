@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export async function GET(req: NextRequest) {
   try {
-    // Create Supabase client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    
-    // Test basic connection
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('count')
-      .limit(1);
-    
+    // TODO: Implement Firebase database connection
     return NextResponse.json({
       success: true,
-      hasError: !!error,
-      error: error?.message,
-      data: data,
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set',
-      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasError: false,
+      error: null,
+      data: null,
+      firebaseConfig: 'To be configured',
+      hasFirebaseKey: false,
+      message: 'Firebase database connection to be implemented'
     });
   } catch (error) {
     return NextResponse.json({

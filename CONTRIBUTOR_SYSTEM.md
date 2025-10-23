@@ -2,28 +2,28 @@
 
 ## Overview
 
-This system allows you to mark users as contributors and attribute them to projects. Contributors can then display their work on personal websites by fetching data from your agency's Supabase database.
+This system allows you to mark users as contributors and attribute them to projects. Contributors can then display their work on personal websites by fetching data from your agency's Firebase database.
 
 ## Database Schema
 
-### Tables
+### Collections
 
 1. **profiles** (existing)
    - Added `is_contributor` boolean field
    - Marks users who can be attributed to projects
 
 2. **project_contributors** (new)
-   - Junction table linking projects to contributors
+   - Junction collection linking projects to contributors
    - Tracks role, contribution percentage, and display order
 
 3. **contributor_projects** (view)
    - Convenient view for fetching contributor data
-   - Joins all necessary tables
+   - Joins all necessary collections
 
 ### Functions
 
 - `get_projects_by_contributor(contributor_email)` - Get all projects for a contributor
-- `get_contributors_by_project(project_uuid)` - Get all contributors for a project
+- `get_contributors_by_project(project_id)` - Get all contributors for a project
 
 ## API Endpoints
 
@@ -45,35 +45,28 @@ Returns all contributors for a specific project.
 
 ### 1. Mark a User as Contributor
 
-```sql
--- In Supabase SQL editor
-UPDATE profiles 
-SET is_contributor = TRUE 
-WHERE email = 'ezra@example.com';
+```javascript
+// In Firebase console or via admin SDK
+const userRef = db.collection('profiles').doc('user-id');
+await userRef.update({ is_contributor: true });
 ```
 
 ### 2. Add Contributor to Project
 
-```sql
--- In Supabase SQL editor
-INSERT INTO project_contributors (
-  project_id, 
-  contributor_id, 
-  role, 
-  contribution_percentage, 
-  attribution_order
-) VALUES (
-  'project-uuid',
-  'contributor-profile-uuid',
-  'developer',
-  80,
-  1
-);
+```javascript
+// In Firebase console or via admin SDK
+await db.collection('project_contributors').add({
+  project_id: 'project-uuid',
+  contributor_id: 'contributor-profile-uuid',
+  role: 'developer',
+  contribution_percentage: 80,
+  attribution_order: 1
+});
 ```
 
 ### 3. Use on Personal Website
 
-#### Option A: Same Supabase Project
+#### Option A: Same Firebase Project
 ```tsx
 import { ContributorPortfolio } from '@/components/contributor-portfolio';
 
@@ -95,8 +88,11 @@ function MyPortfolio() {
   return (
     <ContributorPortfolio 
       contributorEmail="ezra@example.com"
-      supabaseUrl="https://your-agency.supabase.co"
-      supabaseKey="your-anon-key"
+      firebaseConfig={{
+        apiKey: "your-api-key",
+        authDomain: "your-project.firebaseapp.com",
+        projectId: "your-project-id"
+      }}
       title="My Work"
     />
   );
@@ -111,8 +107,7 @@ import { useContributorProjects } from '@/hooks/use-contributor-projects';
 function MyComponent() {
   const { projects, loading, error } = useContributorProjects(
     'ezra@example.com',
-    'https://your-agency.supabase.co',
-    'your-anon-key'
+    firebaseConfig
   );
 
   if (loading) return <div>Loading...</div>;
@@ -134,7 +129,7 @@ function MyComponent() {
 
 ## Security
 
-### RLS Policies
+### Security Rules
 
 - **Public Read Access**: Anyone can read contributor data (for portfolio display)
 - **Authenticated Write Access**: Only project owners and contributors can modify data
@@ -142,56 +137,64 @@ function MyComponent() {
 ### Cross-Project Access
 
 When using the cross-project approach:
-1. Use only the **anon key** (never service role key)
-2. Set up RLS policies to allow public read access
+1. Use only the **public API key** (never admin SDK keys)
+2. Set up security rules to allow public read access
 3. Only expose data you want to be public
 
 ## Setup Instructions
 
 ### 1. Run Database Migration
 
-Execute the SQL in `database/add-contributor-role.sql` in your Supabase SQL editor.
+Execute the migration script in `database/add-contributor-role.js` in your Firebase console.
 
 ### 2. Mark Users as Contributors
 
-```sql
-UPDATE profiles 
-SET is_contributor = TRUE 
-WHERE email IN ('ezra@example.com', 'other@example.com');
+```javascript
+const batch = db.batch();
+const profilesRef = db.collection('profiles');
+const emails = ['ezra@example.com', 'other@example.com'];
+
+emails.forEach(email => {
+  const profileQuery = profilesRef.where('email', '==', email);
+  profileQuery.get().then(snapshot => {
+    snapshot.forEach(doc => {
+      batch.update(doc.ref, { is_contributor: true });
+    });
+  });
+});
+
+await batch.commit();
 ```
 
 ### 3. Add Contributors to Projects
 
-Use the dashboard interface or run SQL:
+Use the dashboard interface or run JavaScript:
 
-```sql
-INSERT INTO project_contributors (
-  project_id, 
-  contributor_id, 
-  role, 
-  contribution_percentage, 
-  attribution_order
-) 
-SELECT 
-  p.id as project_id,
-  prof.id as contributor_id,
-  'developer' as role,
-  80 as contribution_percentage,
-  1 as attribution_order
-FROM projects p
-CROSS JOIN profiles prof
-WHERE p.title = 'Ezra Hauga Brooks Website'
-AND prof.email = 'ezra@example.com';
+```javascript
+const projectRef = db.collection('projects').where('title', '==', 'Ezra Hauga Brooks Website');
+const contributorRef = db.collection('profiles').where('email', '==', 'ezra@example.com');
+
+const [projectSnapshot, contributorSnapshot] = await Promise.all([
+  projectRef.get(),
+  contributorRef.get()
+]);
+
+const project = projectSnapshot.docs[0];
+const contributor = contributorSnapshot.docs[0];
+
+await db.collection('project_contributors').add({
+  project_id: project.id,
+  contributor_id: contributor.id,
+  role: 'developer',
+  contribution_percentage: 80,
+  attribution_order: 1
+});
 ```
 
 ### 4. Test the API
 
 ```bash
-curl "https://your-project.supabase.co/rest/v1/rpc/get_projects_by_contributor" \
-  -H "apikey: your-anon-key" \
-  -H "Authorization: Bearer your-anon-key" \
-  -H "Content-Type: application/json" \
-  -d '{"contributor_email": "ezra@example.com"}'
+curl "https://your-project.firebaseapp.com/api/contributors/ezra@example.com/projects"
 ```
 
 ## Dashboard Integration
@@ -202,23 +205,21 @@ The `ProjectContributorsManager` component can be added to project detail pages 
 
 ### Common Issues
 
-1. **No projects returned**: Check that the user is marked as `is_contributor = TRUE`
-2. **Permission denied**: Ensure RLS policies are set up correctly
-3. **Cross-project not working**: Verify the anon key and URL are correct
+1. **No projects returned**: Check that the user is marked as `is_contributor = true`
+2. **Permission denied**: Ensure security rules are set up correctly
+3. **Cross-project not working**: Verify the Firebase config and API key are correct
 
 ### Debug Queries
 
-```sql
--- Check if user is contributor
-SELECT * FROM profiles WHERE email = 'ezra@example.com';
+```javascript
+// Check if user is contributor
+const profileQuery = db.collection('profiles').where('email', '==', 'ezra@example.com');
+const profileSnapshot = await profileQuery.get();
+console.log(profileSnapshot.docs[0]?.data());
 
--- Check project contributors
-SELECT * FROM project_contributors pc
-JOIN profiles p ON pc.contributor_id = p.id
-JOIN projects pr ON pc.project_id = pr.id
-WHERE p.email = 'ezra@example.com';
-
--- Check the view
-SELECT * FROM contributor_projects 
-WHERE contributor_id = (SELECT id FROM profiles WHERE email = 'ezra@example.com');
+// Check project contributors
+const contributorsQuery = db.collection('project_contributors')
+  .where('contributor_id', '==', contributorId);
+const contributorsSnapshot = await contributorsQuery.get();
+console.log(contributorsSnapshot.docs.map(doc => doc.data()));
 ``` 

@@ -4,19 +4,19 @@
 
 1. **Hydration Mismatch**: Fixed server/client rendering differences in React components
 2. **Missing Database Tables**: Created the missing `profiles`, `projects`, and `testimonials` tables
-3. **Supabase API Errors**: Fixed 400/500 errors by ensuring proper table structure and RLS policies
+3. **Database API Errors**: Fixed 400/500 errors by ensuring proper table structure and policies
 
 ## Quick Fix Steps
 
 ### 1. Run Database Setup
 
-Execute the database setup script in your Supabase SQL editor:
+Execute the database setup script in your Firebase console:
 
 ```sql
 -- Copy and paste the contents of database/setup-database.sql
 ```
 
-This will create all necessary tables and fix the database structure.
+This will create all necessary collections and fix the database structure.
 
 ### 2. Code Changes Made
 
@@ -42,17 +42,17 @@ The following components have been fixed to prevent hydration mismatches:
 - Proper error handling for database queries
 
 #### Database Structure
-- Created `profiles` table with proper RLS policies
-- Created `projects` table with sample data
-- Created `testimonials` table with sample data
-- Added proper foreign key relationships
+- Created `profiles` collection with proper security rules
+- Created `projects` collection with sample data
+- Created `testimonials` collection with sample data
+- Added proper document relationships
 
 ## Verification
 
 After running the database setup:
 
 1. The homepage should load without hydration errors
-2. Supabase API calls should return 200 status codes
+2. Firebase API calls should return 200 status codes
 3. Sample projects and testimonials should display
 4. User authentication should work properly
 
@@ -60,38 +60,38 @@ After running the database setup:
 
 If you still see errors:
 
-1. **Check Supabase Console**: Ensure the SQL script ran successfully
+1. **Check Firebase Console**: Ensure the database setup ran successfully
 2. **Clear Browser Cache**: Hard refresh the page (Ctrl+F5)
 3. **Check Network Tab**: Verify API calls are returning 200 status codes
 4. **Check Console**: Look for any remaining JavaScript errors
 
-## Database Tables Created
+## Database Collections Created
 
 ### profiles
-- `id` (UUID, Primary Key)
-- `full_name` (TEXT)
-- `email` (TEXT, Unique)
-- `role` (TEXT: 'client', 'operator', 'admin')
-- `contract_accepted_at` (TIMESTAMP)
-- `stripe_customer_id` (TEXT)
-- `is_demo_client` (BOOLEAN)
+- `id` (String, Document ID)
+- `full_name` (String)
+- `email` (String, Unique)
+- `role` (String: 'client', 'operator', 'admin')
+- `contract_accepted_at` (Timestamp)
+- `stripe_customer_id` (String)
+- `is_demo_client` (Boolean)
 
 ### projects
-- `id` (UUID, Primary Key)
-- `title` (TEXT)
-- `description` (TEXT)
-- `live_url` (TEXT)
-- `image_url` (TEXT)
-- `tags` (TEXT[])
-- `status` (TEXT: 'open', 'in-progress', 'completed', 'cancelled')
-- `budget` (DECIMAL)
-- `operator_id` (UUID, Foreign Key)
-- `client_id` (UUID, Foreign Key)
+- `id` (String, Document ID)
+- `title` (String)
+- `description` (String)
+- `live_url` (String)
+- `image_url` (String)
+- `tags` (Array)
+- `status` (String: 'open', 'in-progress', 'completed', 'cancelled')
+- `budget` (Number)
+- `operator_id` (String, Reference)
+- `client_id` (String, Reference)
 
 ### testimonials
-- `id` (UUID, Primary Key)
-- `name` (TEXT)
-- `avatar` (TEXT)
-- `rating` (INTEGER)
-- `text` (TEXT)
-- `featured` (BOOLEAN) 
+- `id` (String, Document ID)
+- `name` (String)
+- `avatar` (String)
+- `rating` (Number)
+- `text` (String)
+- `featured` (Boolean) 

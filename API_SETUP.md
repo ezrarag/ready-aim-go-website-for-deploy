@@ -38,25 +38,25 @@ This error occurs because the GitHub token is either missing, invalid, or expire
 
 ---
 
-## 🔧 **Supabase Edge Functions Setup**
+## 🔧 **Firebase Cloud Functions Setup**
 
-### **Error**: `FunctionsFetchError: Failed to send a request to the Edge Function`
-This error occurs because the Edge Function is not deployed or not accessible.
+### **Error**: `FunctionsFetchError: Failed to send a request to the Cloud Function`
+This error occurs because the Cloud Function is not deployed or not accessible.
 
 ### **Solution**:
 
-1. **Deploy the Edge Function** (if not already done):
+1. **Deploy the Cloud Function** (if not already done):
    ```bash
-   # In your Supabase dashboard, go to Edge Functions
+   # In your Firebase console, go to Functions
    # Deploy the revenue-metrics function
    ```
 
-2. **Check Edge Function Status**:
-   - Go to your Supabase dashboard
-   - Navigate to Edge Functions
+2. **Check Cloud Function Status**:
+   - Go to your Firebase console
+   - Navigate to Functions
    - Ensure `revenue-metrics` is deployed and active
 
-3. **Alternative**: The system will automatically fall back to mock data if the Edge Function is unavailable.
+3. **Alternative**: The system will automatically fall back to mock data if the Cloud Function is unavailable.
 
 ---
 
@@ -104,9 +104,10 @@ NEXT_PUBLIC_GITHUB_TOKEN=ghp_your_github_token_here
 NEXT_PUBLIC_SLACK_TOKEN=xoxb_your_slack_bot_token_here
 NEXT_PUBLIC_SLACK_DEFAULT_CHANNEL=#client-missions
 
-# Existing Supabase and Stripe configs...
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Existing Firebase and Stripe configs...
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
 STRIPE_SECRET_KEY=your_stripe_secret_key
 ```
 
@@ -127,8 +128,8 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 4. Check your Slack channels for the messages
 
 ### **Revenue Data**:
-1. The system will automatically fall back to mock data if the Edge Function fails
-2. No configuration needed - it will work with or without the Edge Function
+1. The system will automatically fall back to mock data if the Cloud Function fails
+2. No configuration needed - it will work with or without the Cloud Function
 
 ---
 
@@ -146,10 +147,10 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 - ✅ Check that the bot has the required permissions
 - ✅ Verify the channel name format (#channel-name)
 
-### **Edge Function Errors**:
+### **Cloud Function Errors**:
 - ✅ The system will automatically use fallback data
 - ✅ No action required - the dashboard will still work
-- ✅ Check Supabase dashboard for Edge Function status
+- ✅ Check Firebase console for Cloud Function status
 
 ---
 
@@ -159,7 +160,7 @@ After adding the tokens:
 
 - **GitHub Integration**: ✅ **LIVE** - Will fetch real TODO.me files
 - **Slack Integration**: ✅ **LIVE** - Will send real messages to Slack
-- **Revenue Data**: ✅ **FALLBACK** - Uses mock data when Edge Function unavailable
+- **Revenue Data**: ✅ **FALLBACK** - Uses mock data when Cloud Function unavailable
 - **Error Handling**: ✅ **ROBUST** - Graceful fallbacks for all services
 
 The system is designed to work with or without these tokens, providing a smooth experience in all scenarios! 🚀 
