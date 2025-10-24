@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { OpenAI } from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 async function fetchAndExtract(url: string) {
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!res.ok) throw new Error('Failed to fetch URL');
@@ -28,7 +26,23 @@ export async function POST(req: NextRequest) {
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'Missing or invalid url' }, { status: 400 });
     }
+    
     const scraped = await fetchAndExtract(url);
+
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({
+        scraped,
+        ai: {
+          error: 'OpenAI API key not configured',
+          business_type: 'Unknown',
+          suggested_roles: [],
+          predicted_workstreams: []
+        }
+      });
+    }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const systemPrompt = `You are a business analyst. Given this website content, identify the business type and recommend up to 3 job tasks and the roles required to support this business digitally and physically. Return structured JSON like:\n{ business_type: string, suggested_roles: string[], predicted_workstreams: string[] }`;
 

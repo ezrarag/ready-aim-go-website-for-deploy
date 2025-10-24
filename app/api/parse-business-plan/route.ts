@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
     const { text, fileName } = await request.json();
@@ -12,6 +8,21 @@ export async function POST(request: NextRequest) {
     if (!text) {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 });
     }
+
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({
+        success: false,
+        error: 'OpenAI API key not configured',
+        roles: {},
+        fileName,
+        extractedAt: new Date().toISOString()
+      });
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     // Extract roles from business plan using OpenAI
     const completion = await openai.chat.completions.create({

@@ -111,7 +111,7 @@ export default function OperatorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* Alert Banner */}
       <div className="bg-green-900/20 border-b border-green-800/30 px-6 py-3">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -128,13 +128,13 @@ export default function OperatorDashboard() {
       </div>
 
       {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-900/50">
+      <div className="border-b border-gray-200 bg-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
-                  <Zap className="h-4 w-4 text-black" />
+                  <Zap className="h-4 w-4 text-gray-600" />
                 </div>
                 <span className="text-sm text-gray-400">John's workspace</span>
                 <Badge variant="outline" className="border-gray-600 text-gray-400">
@@ -149,7 +149,7 @@ export default function OperatorDashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-900">
                 Feedback
               </Button>
               <NotificationBell />
@@ -170,24 +170,24 @@ export default function OperatorDashboard() {
         {/* Project Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
-            <h1 className="text-3xl font-bold text-white">readyaimgo-operator-hub</h1>
+            <h1 className="text-3xl font-bold text-gray-900">readyaimgo-operator-hub</h1>
             <Badge variant="outline" className="border-gray-600 text-gray-400">
               OPERATOR
             </Badge>
           </div>
           <div className="flex items-center space-x-8">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">{stats.activeProjects}</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.activeProjects}</div>
               <div className="text-sm text-gray-400">Active Projects</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">{stats.completedProjects}</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.completedProjects}</div>
               <div className="text-sm text-gray-400">Completed</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center space-x-1">
                 <Star className="h-5 w-5 text-yellow-400 fill-current" />
-                <div className="text-2xl font-bold text-white">{stats.averageRating}</div>
+                <div className="text-2xl font-bold text-gray-900">{stats.averageRating}</div>
               </div>
               <div className="text-sm text-gray-400">Rating</div>
             </div>
@@ -201,10 +201,10 @@ export default function OperatorDashboard() {
         {/* Time Range Selector */}
         <div className="flex items-center space-x-4 mb-8">
           <Select defaultValue="24h">
-            <SelectTrigger className="w-40 bg-gray-900 border-gray-700 text-white">
+            <SelectTrigger className="w-40 bg-white border-gray-200 text-gray-900">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-gray-900 border-gray-700">
+            <SelectContent className="bg-white border-gray-200">
               <SelectItem value="1h">Last hour</SelectItem>
               <SelectItem value="24h">Last 24 hours</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
@@ -216,12 +216,12 @@ export default function OperatorDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card className="bg-gray-900 border-gray-800">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-400">Active Projects</p>
-                  <p className="text-3xl font-bold text-white">{stats.activeProjects}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.activeProjects}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
                   <Briefcase className="h-6 w-6 text-blue-400" />
@@ -230,12 +230,12 @@ export default function OperatorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-400">Completed</p>
-                  <p className="text-3xl font-bold text-white">{stats.completedProjects}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.completedProjects}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-500/10 rounded-lg flex items-center justify-center">
                   <CheckCircle className="h-6 w-6 text-green-400" />
@@ -244,12 +244,12 @@ export default function OperatorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-400">Total Earnings</p>
-                  <p className="text-3xl font-bold text-white">${stats.totalEarnings.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-gray-900">${stats.totalEarnings.toLocaleString()}</p>
                 </div>
                 <div className="w-12 h-12 bg-yellow-500/10 rounded-lg flex items-center justify-center">
                   <DollarSign className="h-6 w-6 text-yellow-400" />
@@ -258,12 +258,12 @@ export default function OperatorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-400">Rating</p>
-                  <p className="text-3xl font-bold text-white">{stats.averageRating}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.averageRating}</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
                   <Star className="h-6 w-6 text-orange-400" />
@@ -272,12 +272,12 @@ export default function OperatorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-400">Response Rate</p>
-                  <p className="text-3xl font-bold text-white">{stats.responseRate}%</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.responseRate}%</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center">
                   <TrendingUp className="h-6 w-6 text-purple-400" />
@@ -289,17 +289,17 @@ export default function OperatorDashboard() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-gray-900 border-gray-800">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white">
+          <TabsList className="grid w-full grid-cols-4 bg-white border-gray-200">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="gigs" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white">
+            <TabsTrigger value="gigs" className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900">
               Available Gigs
             </TabsTrigger>
-            <TabsTrigger value="projects" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white">
+            <TabsTrigger value="projects" className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900">
               My Projects
             </TabsTrigger>
-            <TabsTrigger value="profile" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white">
+            <TabsTrigger value="profile" className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900">
               Profile
             </TabsTrigger>
           </TabsList>
@@ -307,9 +307,9 @@ export default function OperatorDashboard() {
           <TabsContent value="overview" className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Available Gigs Preview */}
-              <Card className="bg-gray-900 border-gray-800">
+              <Card className="bg-white border-gray-200">
                 <CardHeader>
-                  <CardTitle className="text-white">New Opportunities</CardTitle>
+                  <CardTitle className="text-gray-900">New Opportunities</CardTitle>
                   <CardDescription className="text-gray-400">Latest gigs matching your skills</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -317,10 +317,10 @@ export default function OperatorDashboard() {
                     {availableGigs.slice(0, 3).map((gig) => (
                       <div
                         key={gig.id}
-                        className="p-4 border border-gray-800 rounded-lg bg-gray-800/50 hover:bg-gray-800 cursor-pointer transition-colors"
+                        className="p-4 border border-gray-200 rounded-lg bg-gray-800/50 hover:bg-gray-800 cursor-pointer transition-colors"
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-white">{gig.title}</h4>
+                          <h4 className="font-medium text-gray-900">{gig.title}</h4>
                           <Badge className={getTypeColor(gig.type)}>{gig.type}</Badge>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">{gig.client}</p>
@@ -341,17 +341,17 @@ export default function OperatorDashboard() {
               </Card>
 
               {/* Active Projects */}
-              <Card className="bg-gray-900 border-gray-800">
+              <Card className="bg-white border-gray-200">
                 <CardHeader>
-                  <CardTitle className="text-white">Active Projects</CardTitle>
+                  <CardTitle className="text-gray-900">Active Projects</CardTitle>
                   <CardDescription className="text-gray-400">Your current work in progress</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {activeProjects.map((project) => (
-                      <div key={project.id} className="p-4 border border-gray-800 rounded-lg bg-gray-800/50">
+                      <div key={project.id} className="p-4 border border-gray-200 rounded-lg bg-gray-800/50">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-white">{project.title}</h4>
+                          <h4 className="font-medium text-gray-900">{project.title}</h4>
                           <Badge
                             className={
                               project.status === "review"
@@ -376,7 +376,7 @@ export default function OperatorDashboard() {
                             <span className="text-sm text-gray-500">{project.progress}% complete</span>
                             <span className="text-sm text-gray-500">Due {project.deadline}</span>
                           </div>
-                          <span className="text-lg font-semibold text-white">${project.budget}</span>
+                          <span className="text-lg font-semibold text-gray-900">${project.budget}</span>
                         </div>
                       </div>
                     ))}
@@ -386,9 +386,9 @@ export default function OperatorDashboard() {
             </div>
 
             {/* Recent Activity */}
-            <Card className="bg-gray-900 border-gray-800">
+            <Card className="bg-white border-gray-200">
               <CardHeader>
-                <CardTitle className="text-white">Recent Activity</CardTitle>
+                <CardTitle className="text-gray-900">Recent Activity</CardTitle>
                 <CardDescription className="text-gray-400">Latest updates and notifications</CardDescription>
               </CardHeader>
               <CardContent>
@@ -397,7 +397,7 @@ export default function OperatorDashboard() {
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-300">
-                        You received a 5-star review from <span className="font-medium text-white">Tech Startup</span>{" "}
+                        You received a 5-star review from <span className="font-medium text-gray-900">Tech Startup</span>{" "}
                         for Brand Identity Package
                       </p>
                       <p className="text-xs text-gray-500">1 hour ago</p>
@@ -407,7 +407,7 @@ export default function OperatorDashboard() {
                     <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-300">
-                        New message from <span className="font-medium text-white">E-commerce Store</span> about Product
+                        New message from <span className="font-medium text-gray-900">E-commerce Store</span> about Product
                         Photography project
                       </p>
                       <p className="text-xs text-gray-500">3 hours ago</p>
@@ -417,7 +417,7 @@ export default function OperatorDashboard() {
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-300">
-                        New gig posted: <span className="font-medium text-white">Music Album Cover Design</span> - $800
+                        New gig posted: <span className="font-medium text-gray-900">Music Album Cover Design</span> - $800
                         budget
                       </p>
                       <p className="text-xs text-gray-500">5 hours ago</p>
@@ -429,9 +429,9 @@ export default function OperatorDashboard() {
           </TabsContent>
 
           <TabsContent value="gigs">
-            <Card className="bg-gray-900 border-gray-800">
+            <Card className="bg-white border-gray-200">
               <CardHeader>
-                <CardTitle className="text-white">Available Gigs</CardTitle>
+                <CardTitle className="text-gray-900">Available Gigs</CardTitle>
                 <CardDescription className="text-gray-400">Browse and apply for new opportunities</CardDescription>
               </CardHeader>
               <CardContent>
@@ -442,13 +442,13 @@ export default function OperatorDashboard() {
                       <input
                         type="text"
                         placeholder="Search gigs..."
-                        className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+                        className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                       />
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
+                      className="bg-gray-800 border-gray-200 text-gray-300 hover:bg-gray-700"
                     >
                       <Filter className="h-4 w-4 mr-2" />
                       Filter
@@ -460,12 +460,12 @@ export default function OperatorDashboard() {
                   {availableGigs.map((gig) => (
                     <div
                       key={gig.id}
-                      className="p-6 border border-gray-800 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors"
+                      className="p-6 border border-gray-200 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors"
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-white">{gig.title}</h3>
+                            <h3 className="text-lg font-semibold text-gray-900">{gig.title}</h3>
                             <Badge className={getTypeColor(gig.type)}>{gig.type}</Badge>
                           </div>
                           <p className="text-gray-400 mb-2">{gig.client}</p>
@@ -490,7 +490,7 @@ export default function OperatorDashboard() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
+                                className="bg-gray-800 border-gray-200 text-gray-300 hover:bg-gray-700"
                               >
                                 <MessageSquare className="h-4 w-4 mr-2" />
                                 Message
@@ -510,9 +510,9 @@ export default function OperatorDashboard() {
           </TabsContent>
 
           <TabsContent value="projects">
-            <Card className="bg-gray-900 border-gray-800">
+            <Card className="bg-white border-gray-200">
               <CardHeader>
-                <CardTitle className="text-white">My Projects</CardTitle>
+                <CardTitle className="text-gray-900">My Projects</CardTitle>
                 <CardDescription className="text-gray-400">
                   Track and manage your active and completed projects
                 </CardDescription>
@@ -527,9 +527,9 @@ export default function OperatorDashboard() {
           </TabsContent>
 
           <TabsContent value="profile">
-            <Card className="bg-gray-900 border-gray-800">
+            <Card className="bg-white border-gray-200">
               <CardHeader>
-                <CardTitle className="text-white">Operator Profile</CardTitle>
+                <CardTitle className="text-gray-900">Operator Profile</CardTitle>
                 <CardDescription className="text-gray-400">Manage your profile, skills, and portfolio</CardDescription>
               </CardHeader>
               <CardContent>

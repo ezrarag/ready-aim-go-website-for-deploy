@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { supabase } from '@/lib/supabase/client'
+// TODO: Implement Firebase database operations
 
 // Check if required environment variables are set
 if (!process.env.STRIPE_SECRET_KEY) {

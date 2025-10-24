@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+// TODO: Implement Firebase authentication
 import { toast } from "sonner";
 import { Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -178,7 +178,7 @@ export default function AuthCallbackPage() {
                   toast.success("Welcome to Admin Dashboard", {
                     description: "You have successfully signed in.",
                   });
-                  performRedirect("/dashboard/admin");
+                  performRedirect("/dashboard");
                 }
                 return;
               }
@@ -200,7 +200,7 @@ export default function AuthCallbackPage() {
               toast.success("Welcome to Admin Dashboard", {
                 description: "Your admin account has been created successfully.",
               });
-              performRedirect("/dashboard/admin");
+              performRedirect("/dashboard");
             }
             return;
           } catch (createError) {
@@ -222,7 +222,7 @@ export default function AuthCallbackPage() {
             toast.success("Welcome to Admin Dashboard", {
               description: "You have successfully signed in.",
             });
-            performRedirect("/dashboard/admin");
+            performRedirect("/dashboard");
           }
           return;
         }
@@ -245,7 +245,7 @@ export default function AuthCallbackPage() {
           toast.success("Welcome to Admin Dashboard", {
             description: "You have successfully signed in.",
           });
-          performRedirect("/dashboard/admin");
+          performRedirect("/dashboard");
         } else if (profile.role === "operator") {
           // For operators, check if onboarding is complete
           if (!profile.contract_accepted_at && !profile.is_demo_client) {

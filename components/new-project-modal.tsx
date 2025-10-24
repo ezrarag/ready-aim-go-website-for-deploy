@@ -27,7 +27,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
+// TODO: Implement Firebase database operations
 import { useNotifications } from "@/contexts/notification-context"
 
 interface NewProjectModalProps {

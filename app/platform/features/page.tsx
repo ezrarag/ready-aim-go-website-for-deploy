@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Users, Briefcase, Globe, Zap, TrendingUp, Shield, User } from "lucide-react";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase/client";
+// TODO: Implement Firebase database operations
 import { motion, AnimatePresence } from "framer-motion";
 
 const platformFeatures = [

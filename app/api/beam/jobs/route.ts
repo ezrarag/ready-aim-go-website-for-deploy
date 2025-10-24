@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase/admin"
+// TODO: Implement Firebase database operations
 
 export async function GET(req: NextRequest) {
   try {

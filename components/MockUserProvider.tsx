@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase, getProfileByEmail } from "@/lib/supabase/client";
+// TODO: Implement Firebase authentication
 
 interface Project {
   id: string;

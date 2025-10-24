@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Loader2, Shield } from "lucide-react"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase/client"
+// TODO: Implement Firebase authentication
 
 export default function LoginPage() {
   const router = useRouter()

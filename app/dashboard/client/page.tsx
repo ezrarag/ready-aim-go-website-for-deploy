@@ -51,7 +51,7 @@ import {
 } from "lucide-react"
 import { NewProjectModal } from "@/components/new-project-modal"
 import { RolesManager } from "@/components/roles-manager"
-import { supabase } from "@/lib/supabase/client";
+// TODO: Implement Firebase database operations
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
@@ -511,7 +511,7 @@ function ClientDashboardContent() {
   const renderOverview = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
       {/* Agent Allocation */}
-      <Card className={`bg-neutral-800 border-neutral-700 ${!financesEnabled ? 'opacity-50 blur-sm' : ''}`}>
+      <Card className={`bg-neutral-800 border-gray-200 ${!financesEnabled ? 'opacity-50 blur-sm' : ''}`}>
         <CardHeader>
           <CardTitle className={`font-mono text-sm tracking-wider ${financesEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
             AGENT ALLOCATION
@@ -555,7 +555,7 @@ function ClientDashboardContent() {
       </Card>
 
       {/* Activity Log */}
-      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
+      <Card className="bg-neutral-800 border-gray-200 h-[400px]">
         <CardHeader>
           <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">ACTIVITY LOG</CardTitle>
         </CardHeader>
@@ -604,7 +604,7 @@ function ClientDashboardContent() {
       </Card>
 
       {/* Encrypted Chat Activity */}
-      <Card className={`bg-neutral-800 border-neutral-700 h-[400px] ${!chatbotEnabled ? 'opacity-50 blur-sm' : ''}`}>
+      <Card className={`bg-neutral-800 border-gray-200 h-[400px] ${!chatbotEnabled ? 'opacity-50 blur-sm' : ''}`}>
         <CardHeader>
           <CardTitle className={`font-mono text-sm tracking-wider ${chatbotEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
             ENCRYPTED CHAT ACTIVITY
@@ -658,14 +658,14 @@ function ClientDashboardContent() {
       
 
       {/* Integration Panel */}
-      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
+      <Card className="bg-neutral-800 border-gray-200 h-[400px]">
         <CardHeader>
           <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">INTEGRATION PANEL</CardTitle>
         </CardHeader>
         <CardContent className="h-[320px] overflow-y-auto">
           <div className="space-y-4">
             {/* Website Integration */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
               <div className="flex items-center gap-3">
                 <Globe className="w-5 h-5 text-blue-500" />
                 <div>
@@ -682,7 +682,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Payment Integration */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
               <div className="flex items-center gap-3">
                 <CreditCard className="w-5 h-5 text-green-500" />
                 <div>
@@ -705,7 +705,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Chatbot Integration */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-purple-500" />
                 <div>
@@ -728,7 +728,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Agent Allocation */}
-            <div className={`flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 ${
+            <div className={`flex items-center justify-between p-3 bg-white rounded border border-gray-200 ${
               !financesEnabled ? 'opacity-50 blur-sm' : ''
             }`}>
               <div className="flex items-center gap-3">
@@ -752,7 +752,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Mission Objectives */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
               <div className="flex items-center gap-3">
                 <Target className="w-5 h-5 text-orange-500" />
                 <div>
@@ -772,13 +772,13 @@ function ClientDashboardContent() {
       </Card>
 
       {/* Missions Card */}
-      <Card className="bg-neutral-800 border-neutral-700 h-[400px]">
+      <Card className="bg-neutral-800 border-gray-200 h-[400px]">
         <CardHeader>
           <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MISSIONS</CardTitle>
         </CardHeader>
         <CardContent className="h-[320px] overflow-y-auto">
           {/* Website Revenue Display */}
-          <div className="mb-6 p-4 bg-neutral-900 rounded border border-neutral-700">
+          <div className="mb-6 p-4 bg-white rounded border border-gray-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-blue-500" />
@@ -799,7 +799,7 @@ function ClientDashboardContent() {
             <div className="text-sm font-medium text-neutral-300 mb-3">Available Mission Types:</div>
             
             {/* Website Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-blue-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-blue-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Globe className="w-5 h-5 text-blue-500" />
                 <div>
@@ -817,7 +817,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* App Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-purple-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-purple-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Smartphone className="w-5 h-5 text-purple-500" />
                 <div>
@@ -835,7 +835,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Business Plan Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-green-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-green-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <FileText className="w-5 h-5 text-green-500" />
                 <div>
@@ -853,7 +853,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Real Estate Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-orange-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-orange-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Building2 className="w-5 h-5 text-orange-500" />
                 <div>
@@ -871,7 +871,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Transportation Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-red-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-red-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Truck className="w-5 h-5 text-red-500" />
                 <div>
@@ -889,7 +889,7 @@ function ClientDashboardContent() {
             </div>
 
             {/* Legal Filing Mission */}
-            <div className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-neutral-700 hover:border-yellow-500/50 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-yellow-500/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Scale className="w-5 h-5 text-yellow-500" />
                 <div>
@@ -936,7 +936,7 @@ function ClientDashboardContent() {
       </Card>
 
       {/* Encrypted Chat Activity Center */}
-      <Card className={`bg-neutral-800 border-neutral-700 h-[400px] ${!chatbotEnabled ? 'opacity-50' : ''}`}>
+      <Card className={`bg-neutral-800 border-gray-200 h-[400px] ${!chatbotEnabled ? 'opacity-50' : ''}`}>
         <CardHeader>
           <CardTitle className={`font-mono text-sm tracking-wider ${chatbotEnabled ? 'text-orange-500' : 'text-neutral-500'}`}>
             ENCRYPTED CHAT ACTIVITY CENTER
@@ -947,7 +947,7 @@ function ClientDashboardContent() {
           {chatbotEnabled ? (
             <div className="space-y-4">
               {/* Chat Window */}
-              <div className="h-64 bg-neutral-900 border border-neutral-700 rounded-lg p-4 overflow-y-auto">
+              <div className="h-64 bg-white border border-gray-200 rounded-lg p-4 overflow-y-auto">
                 <div className="space-y-3">
                   {chatHistory.map((message) => (
                     <div key={message.id} className="flex items-start gap-3">
@@ -1015,7 +1015,7 @@ function ClientDashboardContent() {
 
   const renderProjects = () => (
     <div className="p-6">
-      <Card className="bg-neutral-800 border-neutral-700">
+      <Card className="bg-neutral-800 border-gray-200">
         <CardHeader>
           <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MISSION CONTROL</CardTitle>
           <CardDescription className="text-neutral-400">Manage and track all your tactical operations</CardDescription>
@@ -1049,7 +1049,7 @@ function ClientDashboardContent() {
               {/* Mission Category Dropdown */}
               {showMissionDropdown && (
                 <div 
-                  className="absolute right-0 top-full mt-2 w-64 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl z-50"
+                  className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50"
                   onMouseLeave={() => setShowMissionDropdown(false)}
                 >
                   <div className="p-2">
@@ -1178,7 +1178,7 @@ function ClientDashboardContent() {
               {missions.map((mission) => (
                 <Card
                   key={mission.id}
-                  className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                  className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -1249,7 +1249,7 @@ function ClientDashboardContent() {
     if (marketplaceAccess === 'none') {
       return (
         <div className="p-6">
-          <Card className="bg-neutral-800 border-neutral-700">
+          <Card className="bg-neutral-800 border-gray-200">
             <CardHeader>
               <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MARKETPLACE</CardTitle>
               <CardDescription className="text-neutral-400">Access restricted</CardDescription>
@@ -1279,7 +1279,7 @@ function ClientDashboardContent() {
     return (
       <div className="p-6 space-y-6">
         {/* My Listings Section */}
-        <Card className="bg-neutral-800 border-neutral-700">
+        <Card className="bg-neutral-800 border-gray-200">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -1319,7 +1319,7 @@ function ClientDashboardContent() {
                   return (
                     <Card
                       key={listing.id}
-                      className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                      className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
@@ -1382,7 +1382,7 @@ function ClientDashboardContent() {
         </Card>
 
         {/* Browse Listings Section */}
-        <Card className="bg-neutral-800 border-neutral-700">
+        <Card className="bg-neutral-800 border-gray-200">
           <CardHeader>
             <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">BROWSE LISTINGS</CardTitle>
             <CardDescription className="text-neutral-400">Discover products and services from other clients</CardDescription>
@@ -1404,7 +1404,7 @@ function ClientDashboardContent() {
                 <SelectTrigger className="bg-neutral-700 border-neutral-600 text-neutral-300">
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
-                <SelectContent className="bg-neutral-800 border-neutral-700">
+                <SelectContent className="bg-neutral-800 border-gray-200">
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="web design">Web Design</SelectItem>
                   <SelectItem value="graphic design">Graphic Design</SelectItem>
@@ -1441,7 +1441,7 @@ function ClientDashboardContent() {
                   return (
                     <Card
                       key={listing.id}
-                      className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                      className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
                       onClick={() => {
                         setSelectedListing(listing);
                         setShowListingDetailModal(true);
@@ -1548,7 +1548,7 @@ function ClientDashboardContent() {
 
       {/* System Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1560,7 +1560,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1572,7 +1572,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1584,7 +1584,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1603,7 +1603,7 @@ function ClientDashboardContent() {
         {businessAssets.map((asset) => (
           <Card
             key={asset.id}
-            className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+            className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
           >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -1682,7 +1682,7 @@ function ClientDashboardContent() {
         {payments.map((payment) => (
           <Card
             key={payment.id}
-            className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+            className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
           >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -1769,7 +1769,7 @@ function ClientDashboardContent() {
         ))}
 
         {/* Commission System */}
-        <Card className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer">
+        <Card className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer">
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -1862,7 +1862,7 @@ function ClientDashboardContent() {
 
       {/* Search and Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <Card className="lg:col-span-1 bg-neutral-900 border-neutral-700">
+        <Card className="lg:col-span-1 bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -1874,7 +1874,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1886,7 +1886,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1898,7 +1898,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1912,7 +1912,7 @@ function ClientDashboardContent() {
       </div>
 
       {/* Agent List */}
-      <Card className="bg-neutral-900 border-neutral-700">
+      <Card className="bg-white border-gray-200">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-neutral-300 tracking-wider">AGENT ROSTER</CardTitle>
         </CardHeader>
@@ -1920,7 +1920,7 @@ function ClientDashboardContent() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-neutral-700">
+                <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">AGENT ID</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">CODENAME</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">STATUS</th>
@@ -1991,7 +1991,7 @@ function ClientDashboardContent() {
                   <tr
                     key={agent.id}
                     className={`border-b border-neutral-800 hover:bg-neutral-700 transition-colors cursor-pointer ${
-                      index % 2 === 0 ? "bg-neutral-900" : "bg-neutral-850"
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
                     }`}
                   >
                     <td className="py-3 px-4 text-sm text-white font-mono">{agent.id}</td>
@@ -2216,7 +2216,7 @@ function ClientDashboardContent() {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-neutral-900 border-neutral-700">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2228,7 +2228,7 @@ function ClientDashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="bg-neutral-900 border-neutral-700">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2240,7 +2240,7 @@ function ClientDashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="bg-neutral-900 border-neutral-700">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2252,7 +2252,7 @@ function ClientDashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="bg-neutral-900 border-neutral-700">
+          <Card className="bg-white border-gray-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2270,7 +2270,7 @@ function ClientDashboardContent() {
           {operations.map((operation) => (
             <Card
               key={operation.id}
-              className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+              className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
               onClick={() => setSelectedOperation(operation)}
             >
               <CardHeader className="pb-3">
@@ -2324,8 +2324,8 @@ function ClientDashboardContent() {
 
         {/* Operation Detail Modal */}
         {selectedOperation && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <Card className="bg-neutral-900 border-neutral-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center p-4 z-50">
+            <Card className="bg-white border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-xl font-bold text-white tracking-wider">{selectedOperation.name}</CardTitle>
@@ -2413,17 +2413,17 @@ function ClientDashboardContent() {
                   <p className="text-sm text-neutral-300">{selectedOperation.description}</p>
                 </div>
 
-                <div className="flex gap-2 pt-4 border-t border-neutral-700">
+                <div className="flex gap-2 pt-4 border-t border-gray-200">
                   <Button className="bg-orange-500 hover:bg-orange-600 text-white">Update Status</Button>
                   <Button
                     variant="outline"
-                    className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
+                    className="border-gray-200 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
                   >
                     View Reports
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
+                    className="border-gray-200 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
                   >
                     Assign Agents
                   </Button>
@@ -2532,7 +2532,7 @@ function ClientDashboardContent() {
             {filteredOperators.map((operator) => (
               <Card
                 key={operator.id}
-                className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+                className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -2625,7 +2625,7 @@ function ClientDashboardContent() {
 
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-2xl bg-[#222222] border-neutral-700 text-white">
+        <DialogContent className="sm:max-w-2xl bg-[#222222] border-gray-200 text-white">
           <DialogHeader className="text-center">
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -2756,7 +2756,7 @@ function ClientDashboardContent() {
 
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="bg-neutral-900 border-neutral-700 text-white max-w-md">
+        <DialogContent className="bg-white border-gray-200 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
               <CreditCard className="w-6 h-6 text-orange-500" />
@@ -2831,7 +2831,7 @@ function ClientDashboardContent() {
               </div>
             </div>
 
-            <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-4">
+            <div className="bg-neutral-800 border border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-neutral-400">Monthly Subscription</span>
                 <span className="text-lg font-bold text-white">$50.00</span>
@@ -2899,7 +2899,7 @@ function ClientDashboardContent() {
 
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md bg-neutral-800 border-neutral-700 text-white">
+        <DialogContent className="sm:max-w-md bg-neutral-800 border-gray-200 text-white">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-white">Create New Operator</DialogTitle>
             <DialogDescription className="text-neutral-400">
@@ -3096,7 +3096,7 @@ function ClientDashboardContent() {
   // Show error state
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-900">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
           <div className="text-red-500 text-lg font-mono mb-4">ERROR LOADING DASHBOARD</div>
           <div className="text-neutral-400 text-sm font-mono">{error}</div>
@@ -3108,7 +3108,7 @@ function ClientDashboardContent() {
   // Only render dashboard after data is loaded (client-only)
   if (loading || statsLoading || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-900">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-neutral-400 text-lg font-mono">INITIALIZING DASHBOARD...</div>
       </div>
     );
@@ -3140,7 +3140,7 @@ function ClientDashboardContent() {
 
       {/* Financial Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -3152,7 +3152,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -3174,7 +3174,7 @@ function ClientDashboardContent() {
         </Card>
 
         <Card 
-          className="bg-neutral-900 border-neutral-700 hover:border-orange-500/50 transition-colors cursor-pointer"
+          className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
           onClick={() => clientPlan.mode === "revenue_share" && setShowCommissionModal(true)}
         >
           <CardContent className="p-4">
@@ -3197,7 +3197,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className={`${clientPlan.mode === "subscription" ? "bg-neutral-900 border-neutral-700" : "bg-neutral-900/50 border-neutral-700/50 backdrop-blur-sm"} transition-all duration-300`}>
+        <Card className={`${clientPlan.mode === "subscription" ? "bg-white border-gray-200" : "bg-white/50 border-gray-200/50 backdrop-blur-sm"} transition-all duration-300`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -3221,7 +3221,7 @@ function ClientDashboardContent() {
 
       {/* Revenue Share Threshold Progress (only in rev share mode and when client has revenue) */}
       {clientPlan.mode === "revenue_share" && revenueData.has_revenue && (
-        <Card className="bg-neutral-900 border-neutral-700">
+        <Card className="bg-white border-gray-200">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -3246,7 +3246,7 @@ function ClientDashboardContent() {
       
       {/* Blurred placeholder when no revenue yet */}
       {clientPlan.mode === "revenue_share" && !revenueData.has_revenue && (
-        <Card className="bg-neutral-900/30 border-neutral-700/30 backdrop-blur-sm opacity-60">
+        <Card className="bg-white/30 border-gray-200/30 backdrop-blur-sm opacity-60">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -3273,8 +3273,8 @@ function ClientDashboardContent() {
               key={asset.id}
               className={`${
                 asset.is_active 
-                  ? "bg-neutral-900 border-neutral-700 hover:border-orange-500/50" 
-                  : "bg-neutral-900/30 border-neutral-700/30 backdrop-blur-sm opacity-60 hover:opacity-80"
+                  ? "bg-white border-gray-200 hover:border-orange-500/50" 
+                  : "bg-white/30 border-gray-200/30 backdrop-blur-sm opacity-60 hover:opacity-80"
               } transition-all duration-300 cursor-pointer relative group`}
               onClick={() => {
                 if (asset.is_active && asset.type === 'website') {
@@ -3287,7 +3287,7 @@ function ClientDashboardContent() {
             {!asset.is_active && (
               <>
                 {/* Large Icon Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-lg z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-md rounded-lg z-10">
                   <div className="text-center">
                     {asset.type === 'website' && <Globe className="w-24 h-24 text-orange-500/60 mx-auto mb-4" />}
                     {asset.type === 'app' && <Monitor className="w-24 h-24 text-blue-500/60 mx-auto mb-4" />}
@@ -3300,7 +3300,7 @@ function ClientDashboardContent() {
                 </div>
                 
                 {/* Hover Button */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
                     New Mission
@@ -3365,7 +3365,7 @@ function ClientDashboardContent() {
                   </div>
 
                   {clientPlan.mode === "revenue_share" && asset.ownership && (
-                    <div className="border-t border-neutral-700 pt-3">
+                    <div className="border-t border-gray-200 pt-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-neutral-400">NETWORK OWNERSHIP</span>
                         <span className="text-orange-500 font-mono">{asset.ownership}</span>
@@ -3422,10 +3422,10 @@ function ClientDashboardContent() {
   };
 
   return (
-    <div className="flex h-screen bg-neutral-900">
+    <div className="flex h-screen bg-white">
       {/* Sidebar */}
       <div
-        className={`${sidebarCollapsed ? "w-16" : "w-70"} bg-neutral-900 border-r border-neutral-700 transition-all duration-300 fixed md:relative z-50 md:z-auto h-full md:h-auto ${!sidebarCollapsed ? "md:block" : ""}`}
+        className={`${sidebarCollapsed ? "w-16" : "w-70"} bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative z-50 md:z-auto h-full md:h-auto ${!sidebarCollapsed ? "md:block" : ""}`}
       >
         <div className="p-4">
           <div className="flex items-center justify-between mb-8">
@@ -3478,7 +3478,7 @@ function ClientDashboardContent() {
           </nav>
 
           {!sidebarCollapsed && (
-            <div className="mt-8 p-4 bg-neutral-800 border border-neutral-700 rounded">
+            <div className="mt-8 p-4 bg-neutral-800 border border-gray-200 rounded">
               {/* Business Assets Checklist */}
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -3512,7 +3512,7 @@ function ClientDashboardContent() {
                     ))}
                   </div>
                   
-                  <div className="pt-2 border-t border-neutral-700">
+                  <div className="pt-2 border-t border-gray-200">
                     <button
                       onClick={() => setShowFirstTimePopup(true)}
                       className="text-xs text-orange-500 hover:text-orange-400 font-mono"
@@ -3540,13 +3540,13 @@ function ClientDashboardContent() {
 
       {/* Mobile Overlay */}
       {!sidebarCollapsed && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarCollapsed(true)} />
+        <div className="fixed inset-0 bg-gray-900/50 z-40 md:hidden" onClick={() => setSidebarCollapsed(true)} />
       )}
 
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
         {/* Top Toolbar */}
-        <div className="h-16 bg-neutral-800 border-b border-neutral-700 flex items-center justify-between px-6">
+        <div className="h-16 bg-neutral-800 border-b border-gray-200 flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
             <div className="text-sm text-neutral-400 font-mono">
               TACTICAL COMMAND / <span className="text-orange-500">{session?.full_name?.toUpperCase() || session?.email?.toUpperCase() || 'AGENT'}</span>
@@ -3572,7 +3572,7 @@ function ClientDashboardContent() {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-neutral-800 border-neutral-700">
+              <DropdownMenuContent align="end" className="bg-neutral-800 border-gray-200">
                 <DropdownMenuItem className="text-neutral-300 hover:bg-neutral-700">
                   <User className="h-4 w-4 mr-2" />
                   Profile Settings

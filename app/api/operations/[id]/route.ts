@@ -1,7 +1,8 @@
-import { createClient } from "@supabase/supabase-js"
+// TODO: Implement Firebase database operations
 import { type NextRequest, NextResponse } from "next/server"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// TODO: Implement Firebase database operations
+// const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {

@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { supabase } from "@/lib/supabase/client"
+// TODO: Implement Firebase database operations
 import { pushService } from "@/lib/push-notifications"
 
 export interface NotificationPreferences {

@@ -11,9 +11,10 @@ import StickyFloatingHeader from "@/components/ui/sticky-floating-header"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { supabase } from "@/lib/supabase/client"
+// TODO: Implement Firebase database operations
 import { useRouter } from "next/navigation"
 import { GoogleMaps } from "@/components/google-maps";
+import { PulseFeed } from "@/components/pulse-feed";
 
 // Operator Types Data
 
@@ -706,17 +707,10 @@ function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent('/dashboard')}`
-        }
-      })
-      
-      if (error) {
-        throw error
-      }
-      
+      // TODO: Implement Firebase Google authentication
+      console.log('Firebase Google authentication not yet implemented');
+      // For now, just redirect to login page
+      router.push('/login');
       onClose()
     } catch (error: any) {
       console.error("Google sign-in error:", error)
@@ -795,17 +789,11 @@ export default function HomePage() {
   // Handler for login modal
   const handleLogin = useCallback(async () => {
     try {
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        // User not logged in, open login modal
-        setLoginModalOpen(true)
-        return
-      }
-
-      // User is logged in, redirect directly to client dashboard
-      router.push('/dashboard/client')
+      // TODO: Implement Firebase authentication
+      console.log('Firebase authentication not yet implemented');
+      // For now, just open login modal
+      setLoginModalOpen(true)
+      return
     } catch (error) {
       console.error('Error checking user status:', error)
       // Fallback to login modal if there's an error
@@ -835,24 +823,9 @@ export default function HomePage() {
   useEffect(() => {
     async function checkAuthAndOnboarding() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          // Check if user has completed onboarding
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('contract_accepted_at, is_demo_client')
-            .eq('id', user.id)
-            .single()
-          
-          if (profile && (profile.contract_accepted_at || profile.is_demo_client)) {
-            // User has completed onboarding, redirect to dashboard
-            router.replace('/dashboard/client')
-          } else {
-            // User needs to complete onboarding
-            router.replace('/onboarding')
-          }
-        }
+        // TODO: Implement Firebase authentication
+        console.log('Firebase authentication not yet implemented');
+        // For now, skip auth check
       } catch (error) {
         console.error('Error checking auth status:', error)
       }
@@ -924,25 +897,106 @@ export default function HomePage() {
     const fetchProjects = async () => {
       setLoading(true)
       try {
-        const { data, error } = await supabase.from("projects").select("*")
-        if (error) {
-          console.error('Error fetching projects:', error)
-          setProjects([])
-        } else {
-          // If tags is a comma-separated string, convert to array
-          const normalized = (data || []).map((p: any) => ({
-            ...p,
-            liveUrl: p.live_url, // ✅ key fix
-            imageUrl: p.image_url,
-            createdAt: p.created_at,
-            tags: Array.isArray(p.tags)
-              ? p.tags
-              : typeof p.tags === "string"
-              ? p.tags.split(",").map((t: string) => t.trim())
-              : [],
-          }))
-          setProjects(normalized)
+        // Try to fetch from GitHub API first
+        const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
+        const projects: any[] = [];
+
+        if (githubToken) {
+          try {
+            // Fetch repositories
+            const reposResponse = await fetch(
+              'https://api.github.com/users/readyaimgo/repos?sort=updated&per_page=6',
+              {
+                headers: {
+                  'Authorization': `token ${githubToken}`,
+                  'Accept': 'application/vnd.github.v3+json',
+                }
+              }
+            );
+
+            if (reposResponse.ok) {
+              const repos = await reposResponse.json();
+              
+              for (const repo of repos) {
+                // Only include repos with a homepage
+                if (repo.homepage) {
+                  const project = {
+                    id: repo.id.toString(),
+                    title: repo.name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    description: repo.description || 'A ReadyAimGo project',
+                    liveUrl: repo.homepage,
+                    imageUrl: `https://api.microlink.io/screenshot?url=${encodeURIComponent(repo.homepage)}&width=800&height=600`,
+                    createdAt: repo.updated_at,
+                    tags: repo.language ? [repo.language] : ['Web'],
+                    githubUrl: repo.html_url,
+                    language: repo.language,
+                    stars: repo.stargazers_count,
+                    forks: repo.forks_count
+                  };
+                  projects.push(project);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching GitHub repos:', error);
+          }
         }
+
+        // If no GitHub projects, try Vercel API
+        if (projects.length === 0) {
+          try {
+            const vercelResponse = await fetch('/api/pulse/vercel');
+            if (vercelResponse.ok) {
+              const vercelData = await vercelResponse.json();
+              
+              vercelData.events.forEach((event: any) => {
+                if (event.data.type === 'deployment' && event.data.state === 'READY') {
+                  const project = {
+                    id: event.data.uid,
+                    title: event.data.name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    description: `Deployed ${event.data.target} version`,
+                    liveUrl: event.data.url,
+                    imageUrl: `https://api.microlink.io/screenshot?url=${encodeURIComponent(event.data.url)}&width=800&height=600`,
+                    createdAt: new Date(event.data.created).toISOString(),
+                    tags: ['Deployment', event.data.target],
+                    vercelUrl: event.data.url,
+                    commitRef: event.data.commitRef,
+                    commitMessage: event.data.commitMessage
+                  };
+                  projects.push(project);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching Vercel deployments:', error);
+          }
+        }
+
+        // If still no projects, use fallback data
+        if (projects.length === 0) {
+          projects.push(
+            {
+              id: '1',
+              title: 'ReadyAimGo Platform',
+              description: 'The main ReadyAimGo platform connecting operators to business opportunities',
+              liveUrl: 'https://readyaimgo.com',
+              imageUrl: '/placeholder.jpg',
+              createdAt: new Date().toISOString(),
+              tags: ['Platform', 'React', 'Next.js']
+            },
+            {
+              id: '2',
+              title: 'BEAM Technology',
+              description: 'Advanced logistics and business management system',
+              liveUrl: '#',
+              imageUrl: '/placeholder.jpg',
+              createdAt: new Date().toISOString(),
+              tags: ['Technology', 'Logistics']
+            }
+          );
+        }
+
+        setProjects(projects);
       } catch (error) {
         console.error('Error fetching projects:', error)
         setProjects([])
@@ -1031,6 +1085,21 @@ export default function HomePage() {
                 </div>
                 {/* Stats */}
                 <HomeStats />
+                
+                {/* AI Pulse Feed */}
+                <div className="mt-8">
+                  <PulseFeed />
+                </div>
+                
+                {/* Client Portfolio Link */}
+                <div className="mt-6 text-center">
+                  <Button asChild variant="outline" className="bg-white hover:bg-gray-50">
+                    <Link href="/clients">
+                      <Users className="h-4 w-4 mr-2" />
+                      View Client Portfolio
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -1301,71 +1370,17 @@ function HomeStats() {
       try {
         setError(null);
         
-        // Projects Complete - Get count of completed projects
-        const { count: projectsComplete, error: projectsError } = await supabase
-          .from('projects')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'completed');
+        // TODO: Implement Firebase database operations
+        console.log('Firebase database operations not yet implemented');
         
-        if (projectsError) {
-          console.error('Error fetching completed projects:', projectsError);
-          // Use fallback data instead of throwing error
-          setStats({
-            projectsComplete: 42,
-            activeOperators: 15,
-            creatorValue: 125000,
-            loading: false,
-          });
-          return;
-        }
-        
-        // Active Operators - Get unique operators from projects
-        const { data: operatorIds, error: operatorsError } = await supabase
-          .from('projects')
-          .select('operator_id')
-          .not('operator_id', 'is', null);
-        
-        if (operatorsError) {
-          console.error('Error fetching operators:', operatorsError);
-          // Use fallback data instead of throwing error
-          setStats({
-            projectsComplete: projectsComplete || 42,
-            activeOperators: 15,
-            creatorValue: 125000,
-            loading: false,
-          });
-          return;
-        }
-        
-        const uniqueOperators = new Set((operatorIds || []).map(p => p.operator_id));
-        const activeOperators = uniqueOperators.size;
-        
-        // Creator Value - Sum of budgets from completed projects
-        const { data: completedProjects, error: budgetError } = await supabase
-          .from('projects')
-          .select('budget')
-          .eq('status', 'completed');
-        
-        if (budgetError) {
-          console.error('Error fetching project budgets:', budgetError);
-          // Use fallback data instead of throwing error
-          setStats({
-            projectsComplete: projectsComplete || 42,
-            activeOperators: activeOperators || 15,
-            creatorValue: 125000,
-            loading: false,
-          });
-          return;
-        }
-        
-        const creatorValue = (completedProjects || []).reduce((sum, p) => sum + (p.budget || 0), 0);
-        
+        // Use fallback data
         setStats({
-          projectsComplete: projectsComplete || 0,
-          activeOperators: activeOperators || 0,
-          creatorValue: creatorValue || 0,
+          projectsComplete: 42,
+          activeOperators: 15,
+          creatorValue: 125000,
           loading: false,
         });
+        return;
       } catch (error) {
         console.error('Error fetching stats:', error);
         // Use fallback data instead of showing error
@@ -1380,21 +1395,21 @@ function HomeStats() {
     
     fetchStats();
     
-    // Set up real-time subscription for live updates
-    const projectsSubscription = supabase
-      .channel('projects-stats')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'projects' }, 
-        () => {
-          // Refetch stats when projects change
-          fetchStats();
-        }
-      )
-      .subscribe();
+    // TODO: Implement Firebase real-time subscriptions
+    // const projectsSubscription = supabase
+    //   .channel('projects-stats')
+    //   .on('postgres_changes', 
+    //     { event: '*', schema: 'public', table: 'projects' }, 
+    //     () => {
+    //       // Refetch stats when projects change
+    //       fetchStats();
+    //     }
+    //   )
+    //   .subscribe();
     
-    return () => {
-      projectsSubscription.unsubscribe();
-    };
+    // return () => {
+    //   projectsSubscription.unsubscribe();
+    // };
   }, [mounted]);
   
   // Return static content during SSR to prevent hydration mismatch
@@ -1448,18 +1463,15 @@ function HomeTestimonials() {
     
     async function fetchTestimonials() {
       try {
-        // Try to fetch from Supabase
-        const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          setTestimonials(data);
-        } else {
-          // Fallback to static testimonials
-          setTestimonials([
-            { name: "Jane Doe", avatar: "/placeholder.svg", rating: 5, text: "ReadyAimGo made my project a breeze!" },
-            { name: "Sam Miller", avatar: "/placeholder.svg", rating: 5, text: "The operator network is top notch." },
-            { name: "Alex Lee", avatar: "/placeholder.svg", rating: 5, text: "I love the BEAM platform!" },
-          ]);
-        }
+        // TODO: Implement Firebase database operations
+        console.log('Firebase database operations not yet implemented');
+        
+        // Fallback to static testimonials
+        setTestimonials([
+          { name: "Jane Doe", avatar: "/placeholder.svg", rating: 5, text: "ReadyAimGo made my project a breeze!" },
+          { name: "Sam Miller", avatar: "/placeholder.svg", rating: 5, text: "The operator network is top notch." },
+          { name: "Alex Lee", avatar: "/placeholder.svg", rating: 5, text: "I love the BEAM platform!" },
+        ]);
       } catch (error) {
         console.error('Error fetching testimonials:', error);
         // Fallback to static testimonials

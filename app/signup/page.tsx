@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
+// TODO: Implement Firebase authentication
 import { useState } from "react"
 
 export default function SignupPage() {

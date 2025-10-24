@@ -1,9 +1,10 @@
 // NOTE: You may need to install @octokit/rest: pnpm add @octokit/rest
 import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
-import { createClient } from '@supabase/supabase-js';
+// TODO: Implement Firebase database operations
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+// TODO: Implement Firebase database operations
+// const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 async function fetchTodoMdFromGitHub(repo: string) {

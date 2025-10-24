@@ -5,7 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Percent, TrendingUp, TrendingDown, Save, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
+// TODO: Implement Firebase database operations
 
 interface CommissionRateModalProps {
   open: boolean;

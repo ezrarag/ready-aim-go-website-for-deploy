@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+// TODO: Implement Firebase database operations
 import { useState, useCallback } from 'react';
 
 interface StripeConfig {
