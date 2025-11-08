@@ -19,38 +19,29 @@ export default function LoginPage() {
   // Check if user is already authenticated
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const redirectTo = searchParams.get('redirect') || '/dashboard/client'
-        router.push(redirectTo)
+      // Redirect to client portal
+      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clients.readyaimgo.biz';
+      const redirectTo = searchParams.get('redirect') || clientPortalUrl;
+      if (redirectTo.startsWith('http')) {
+        window.location.href = redirectTo;
+      } else {
+        router.push(redirectTo);
       }
     }
-    checkAuth()
+    // Skip auth check for now - redirect directly to client portal
+    // checkAuth()
   }, [router, searchParams])
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      const redirectTo = searchParams.get('redirect') || '/dashboard/client'
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`
-        }
-      })
-      
-      if (error) {
-        throw error
-      }
-      
-      // On success, Supabase will redirect automatically
-      toast.success("Redirecting to Google...", {
-        description: "Please complete the sign-in process.",
-      })
+      // Redirect to client portal
+      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clients.readyaimgo.biz';
+      window.location.href = clientPortalUrl;
     } catch (error: any) {
-      console.error("Google sign-in error:", error)
-      toast.error("Google sign-in failed", {
-        description: error.message || "An error occurred during Google sign-in.",
+      console.error("Redirect error:", error)
+      toast.error("Redirect failed", {
+        description: error.message || "An error occurred during redirect.",
       })
       setIsGoogleLoading(false)
     }

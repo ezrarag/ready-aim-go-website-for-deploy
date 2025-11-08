@@ -71,6 +71,28 @@ export async function GET(req: NextRequest) {
       console.error('Calendar pulse error:', error);
     }
 
+    // Fetch from Zoho Mail
+    try {
+      const zohoMailResponse = await fetch(`${req.nextUrl.origin}/api/pulse/zoho-mail`);
+      if (zohoMailResponse.ok) {
+        const zohoMailData = await zohoMailResponse.json();
+        events.push(...zohoMailData.events || []);
+      }
+    } catch (error) {
+      console.error('Zoho Mail pulse error:', error);
+    }
+
+    // Fetch from Zoho Calendar
+    try {
+      const zohoCalendarResponse = await fetch(`${req.nextUrl.origin}/api/pulse/zoho-calendar`);
+      if (zohoCalendarResponse.ok) {
+        const zohoCalendarData = await zohoCalendarResponse.json();
+        events.push(...zohoCalendarData.events || []);
+      }
+    } catch (error) {
+      console.error('Zoho Calendar pulse error:', error);
+    }
+
     // Fetch from Slack
     try {
       const slackResponse = await fetch(`${req.nextUrl.origin}/api/pulse/slack`);
@@ -225,7 +247,7 @@ Format your response as JSON:
 }
 
 interface PulseEvent {
-  source: 'github' | 'gmail' | 'calendar' | 'slack' | 'vercel';
+  source: 'github' | 'gmail' | 'calendar' | 'slack' | 'vercel' | 'zoho-mail' | 'zoho-calendar';
   timestamp: string;
   data: any;
   project?: string;

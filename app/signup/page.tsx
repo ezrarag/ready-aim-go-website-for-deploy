@@ -13,15 +13,9 @@ export default function SignupPage() {
 
   const handleRoleClick = async (role: "client" | "operator") => {
     setLoading(true)
-    // Store intended role in localStorage
-    localStorage.setItem("intendedRole", role)
-    // Trigger Google OAuth with redirect to auth callback
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`
-      }
-    })
+    // Redirect to client portal
+    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clients.readyaimgo.biz';
+    window.location.href = clientPortalUrl;
     setLoading(false)
   }
 

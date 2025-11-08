@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **AI Pulse System** is ReadyAimGo's intelligence layer that automatically synthesizes data from multiple sources (GitHub, Vercel, Gmail, Google Calendar, Slack) and provides AI-powered insights directly in your dashboard.
+The **AI Pulse System** is ReadyAimGo's intelligence layer that automatically synthesizes data from multiple sources (GitHub, Vercel, Gmail, Google Calendar, Zoho Mail, Zoho Calendar, Slack) and provides AI-powered insights directly in your dashboard.
 
 ## 🏗️ Architecture
 
@@ -11,6 +11,8 @@ The **AI Pulse System** is ReadyAimGo's intelligence layer that automatically sy
 - **Vercel API** (`/api/pulse/vercel`) - Deployment status, build information  
 - **Gmail API** (`/api/pulse/gmail`) - Client emails, communication
 - **Google Calendar** (`/api/pulse/calendar`) - Meetings, deadlines
+- **Zoho Mail API** (`/api/pulse/zoho-mail`) - Zoho client emails, communication
+- **Zoho Calendar API** (`/api/pulse/zoho-calendar`) - Zoho meetings, deadlines
 - **Slack API** (`/api/pulse/slack`) - Team communication, project updates
 
 ### AI Processing Layer
@@ -38,6 +40,8 @@ The **AI Pulse System** is ReadyAimGo's intelligence layer that automatically sy
 - **Vercel**: Deployment status, build information, live URLs
 - **Gmail**: Client emails, unread messages, communication threads
 - **Google Calendar**: Upcoming meetings, deadlines, business events
+- **Zoho Mail**: Client emails from Zoho, unread messages, communication threads
+- **Zoho Calendar**: Upcoming meetings from Zoho, deadlines, business events
 - **Slack**: Team messages, project discussions, support requests
 
 ### ✅ Frontend Components
@@ -82,6 +86,8 @@ Returns AI-generated summary of all recent activity across all data sources.
 - `GET /api/pulse/vercel` - Vercel deployment information
 - `GET /api/pulse/gmail` - Gmail messages and threads
 - `GET /api/pulse/calendar` - Google Calendar events
+- `GET /api/pulse/zoho-mail` - Zoho Mail messages and threads
+- `GET /api/pulse/zoho-calendar` - Zoho Calendar events
 - `GET /api/pulse/slack` - Slack messages and channels
 
 ## 🔑 Environment Variables Required
@@ -102,6 +108,13 @@ GOOGLE_CLIENT_ID=your_google_client_id_here
 GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 GOOGLE_REFRESH_TOKEN=your_google_refresh_token_here
 
+# Zoho Integration (Mail & Calendar)
+ZOHO_CLIENT_ID=your_zoho_client_id_here
+ZOHO_CLIENT_SECRET=your_zoho_client_secret_here
+ZOHO_REFRESH_TOKEN=your_zoho_refresh_token_here
+ZOHO_ACCOUNT_ID=me
+ZOHO_CALENDAR_ID=primary
+
 # Slack Integration
 SLACK_BOT_TOKEN=xoxb-your_slack_bot_token_here
 ```
@@ -112,8 +125,8 @@ SLACK_BOT_TOKEN=xoxb-your_slack_bot_token_here
 The PulseFeed component automatically appears on your homepage and shows:
 - Recent commits from GitHub
 - New deployments from Vercel
-- Client emails from Gmail
-- Upcoming meetings from Calendar
+- Client emails from Gmail and Zoho Mail
+- Upcoming meetings from Google Calendar and Zoho Calendar
 - Team messages from Slack
 
 ### 2. Project Intelligence
@@ -141,8 +154,8 @@ AI determines urgency levels:
 ### Project Detection
 The system uses intelligent pattern matching to categorize events:
 - **Commit messages**: Extracts project names from commit patterns
-- **Email content**: Analyzes subject lines and content for client names
-- **Calendar events**: Identifies project-related meetings and deadlines
+- **Email content**: Analyzes subject lines and content for client names (Gmail & Zoho Mail)
+- **Calendar events**: Identifies project-related meetings and deadlines (Google Calendar & Zoho Calendar)
 - **Slack messages**: Categorizes by channel and message content
 
 ### AI Prompt Engineering

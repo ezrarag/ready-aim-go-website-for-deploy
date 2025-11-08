@@ -51,6 +51,9 @@ export default function SettingsPage() {
         { name: 'Google Client ID', key: 'GOOGLE_CLIENT_ID', endpoint: '/api/pulse/gmail', required: false },
         { name: 'Google Client Secret', key: 'GOOGLE_CLIENT_SECRET', endpoint: '/api/pulse/gmail', required: false },
         { name: 'Google Refresh Token', key: 'GOOGLE_REFRESH_TOKEN', endpoint: '/api/pulse/calendar', required: false },
+        { name: 'Zoho Client ID', key: 'ZOHO_CLIENT_ID', endpoint: '/api/pulse/zoho-mail', required: false },
+        { name: 'Zoho Client Secret', key: 'ZOHO_CLIENT_SECRET', endpoint: '/api/pulse/zoho-mail', required: false },
+        { name: 'Zoho Refresh Token', key: 'ZOHO_REFRESH_TOKEN', endpoint: '/api/pulse/zoho-calendar', required: false },
         { name: 'Slack Bot Token', key: 'SLACK_BOT_TOKEN', endpoint: '/api/pulse/slack', required: false },
         { name: 'Stripe Secret Key', key: 'STRIPE_SECRET_KEY', endpoint: '/api/pulse/stripe', required: false },
       ];
@@ -96,6 +99,9 @@ export default function SettingsPage() {
       'Google Client ID': 'Required for Gmail and Calendar integration',
       'Google Client Secret': 'Required for Gmail and Calendar integration',
       'Google Refresh Token': 'Required for Gmail and Calendar integration',
+      'Zoho Client ID': 'Required for Zoho Mail and Calendar integration',
+      'Zoho Client Secret': 'Required for Zoho Mail and Calendar integration',
+      'Zoho Refresh Token': 'Required for Zoho Mail and Calendar integration',
       'Slack Bot Token': 'Required for Slack message monitoring',
       'Stripe Secret Key': 'Required for financial insights and payment monitoring'
     };

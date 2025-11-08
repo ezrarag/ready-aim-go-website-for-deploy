@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,9 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  Activity
+  Activity,
+  Wallet,
+  BookOpen
 } from 'lucide-react';
 import { PulseFeed } from '@/components/pulse-feed';
 import DashboardLayout from '@/components/dashboard-layout';
@@ -38,7 +41,14 @@ interface RecentActivity {
   client?: string;
 }
 
+interface StripeBalance {
+  available: number;
+  pending: number;
+  currency: string;
+}
+
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
     activeProjects: 0,
@@ -48,7 +58,33 @@ export default function DashboardPage() {
     avgResponseTime: '0h'
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [stripeBalance, setStripeBalance] = useState<StripeBalance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Check if supabase is available (client-side)
+        if (typeof window !== 'undefined' && (window as any).supabase) {
+          const { data: { session }, error } = await (window as any).supabase.auth.getSession();
+          if (error || !session) {
+            router.push('/login?redirect=/dashboard');
+            return;
+          }
+        } else {
+          // For now, allow access but log warning
+          console.warn('Supabase client not available, skipping auth check');
+        }
+        setAuthChecked(true);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        router.push('/login?redirect=/dashboard');
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -93,6 +129,24 @@ export default function DashboardPage() {
         setRecentActivity(activities);
       }
 
+      // Fetch Stripe balance
+      try {
+        const stripeResponse = await fetch('/api/pulse/stripe');
+        if (stripeResponse.ok) {
+          const stripeData = await stripeResponse.json();
+          // Extract balance from Stripe data if available
+          if (stripeData.balance) {
+            setStripeBalance({
+              available: stripeData.balance.available || 0,
+              pending: stripeData.balance.pending || 0,
+              currency: stripeData.balance.currency || 'usd'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Stripe balance:', error);
+      }
+
       // Mock stats - in production, these would come from aggregated API data
       setStats({
         totalClients: 4,
@@ -109,6 +163,19 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  if (!authChecked) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Checking authentication...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -176,6 +243,74 @@ export default function DashboardPage() {
 
         {/* AI Pulse Feed */}
         <PulseFeed />
+
+        {/* Stripe Balance & BEAM Ledger */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Stripe Balance Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-green-600" />
+                Stripe Balance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stripeBalance ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Available</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${(stripeBalance.available / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Pending</p>
+                    <p className="text-xl font-semibold text-gray-700">
+                      ${(stripeBalance.pending / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <Button variant="outline" className="w-full" onClick={() => router.push('/dashboard/finance')}>
+                    View Finance Dashboard
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">Stripe not configured</p>
+                  <Button variant="outline" onClick={() => router.push('/dashboard/settings')}>
+                    Configure Stripe
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* BEAM Ledger Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-indigo-600" />
+                BEAM Ledger Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Active Operations</p>
+                  <p className="text-2xl font-bold text-gray-900">12</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending Tasks</p>
+                  <p className="text-xl font-semibold text-gray-700">{stats.pendingTasks}</p>
+                </div>
+                <Button variant="outline" className="w-full" asChild>
+                  <a href="https://beamthinktank.space" target="_blank" rel="noopener noreferrer">
+                    View BEAM Portal
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

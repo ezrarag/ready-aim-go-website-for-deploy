@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from "framer-motion"
 // TODO: Implement Firebase database operations
 import { useRouter } from "next/navigation"
 import { GoogleMaps } from "@/components/google-maps";
-import { PulseFeed } from "@/components/pulse-feed";
 
 // Operator Types Data
 
@@ -707,10 +706,8 @@ function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      // TODO: Implement Firebase Google authentication
-      console.log('Firebase Google authentication not yet implemented');
-      // For now, just redirect to login page
-      router.push('/login');
+      // Redirect to client portal
+      window.location.href = 'https://clients.readyaimgo.biz';
       onClose()
     } catch (error: any) {
       console.error("Google sign-in error:", error)
@@ -784,6 +781,8 @@ export default function HomePage() {
   const [currentProjectIndex, setCurrentProjectIndex] = useState(0)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   const [showScreensaver, setShowScreensaver] = useState(false)
+  const [videoPlaying, setVideoPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const router = useRouter()
 
   // Handler for login modal
@@ -807,6 +806,16 @@ export default function HomePage() {
   }, [])
   const handleHideDemo = useCallback(() => {
     setShowDemo(false)
+  }, [])
+
+  // Handler for background video play
+  const handleVideoPlay = useCallback(() => {
+    setVideoPlaying(true)
+    if (videoRef.current) {
+      videoRef.current.play().catch((error) => {
+        console.error('Error playing video:', error)
+      })
+    }
   }, [])
 
   const menuGroups = [
@@ -1008,11 +1017,104 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <StickyFloatingHeader pageTitle="Home" onInterested={handleLogin} />
+      <StickyFloatingHeader pageTitle="Home" onInterested={handleLogin} onVideoPlay={handleVideoPlay} />
       {/* Hero Section */}
-      <section className="min-h-screen flex items-center justify-center px-4 py-8 sm:py-12 md:py-16">
-        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-opacity duration-700 border-0 max-w-6xl w-full mx-4">
-          <div className={`relative w-full ${showDemo ? 'aspect-video min-h-[300px] sm:min-h-[400px] p-0' : 'px-4 sm:px-6 md:px-8 py-16 sm:py-20 md:py-24 lg:py-32 min-h-[300px] sm:min-h-[400px]' } flex items-center justify-center`}>
+      <section className="h-screen flex items-center justify-center px-4 py-8 sm:py-12 md:py-16 overflow-hidden relative">
+        <Card className={`rounded-2xl overflow-hidden shadow-2xl transition-all duration-700 border-0 max-w-6xl w-full mx-4 relative ${videoPlaying ? 'bg-white/10 backdrop-blur-md' : 'bg-white'}`}>
+          {/* Background Video */}
+          <div className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              loop
+              muted
+              playsInline
+              style={{ opacity: videoPlaying ? 1 : 0, transition: 'opacity 1s ease-in-out' }}
+            >
+              <source src="https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Freadyaimgo.biz-logospin.mp4?alt=media&token=7414473f-7dbd-4f53-8908-9a2fbf0804ed" type="video/mp4" />
+            </video>
+            {/* Splash Overlay Effects */}
+            {videoPlaying && (
+              <>
+                {/* Animated splashes */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20"
+                  animate={{
+                    opacity: [0.3, 0.6, 0.3],
+                    scale: [1, 1.1, 1],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                <motion.div
+                  className="absolute top-0 left-1/4 w-64 h-64 bg-indigo-400/30 rounded-full blur-3xl"
+                  animate={{
+                    x: [0, 100, 0],
+                    y: [0, 50, 0],
+                    scale: [1, 1.5, 1],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                <motion.div
+                  className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-400/30 rounded-full blur-3xl"
+                  animate={{
+                    x: [0, -100, 0],
+                    y: [0, -50, 0],
+                    scale: [1, 1.5, 1],
+                  }}
+                  transition={{
+                    duration: 5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 1,
+                  }}
+                />
+                <motion.div
+                  className="absolute top-1/2 right-0 w-48 h-48 bg-pink-400/30 rounded-full blur-3xl"
+                  animate={{
+                    x: [0, -80, 0],
+                    y: [0, 80, 0],
+                    scale: [1, 1.3, 1],
+                  }}
+                  transition={{
+                    duration: 3.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 0.5,
+                  }}
+                />
+                {/* Additional smaller splashes */}
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-32 h-32 bg-white/10 rounded-full blur-2xl"
+                    style={{
+                      left: `${20 + i * 15}%`,
+                      top: `${30 + (i % 2) * 40}%`,
+                    }}
+                    animate={{
+                      scale: [1, 1.8, 1],
+                      opacity: [0.2, 0.5, 0.2],
+                    }}
+                    transition={{
+                      duration: 2 + i * 0.5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: i * 0.3,
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+          <div className={`relative z-10 w-full ${showDemo ? 'aspect-video h-full p-0' : 'px-4 sm:px-6 md:px-8 py-8 sm:py-12 md:py-16 h-full' } flex items-center justify-center`}>
             <AnimatePresence>
               {showDemo ? (
                 <motion.div
@@ -1050,17 +1152,15 @@ export default function HomePage() {
               ) : null}
             </AnimatePresence>
             {!showDemo && (
-              <div className="max-w-4xl w-full">
+              <div className={`max-w-4xl w-full ${videoPlaying ? 'bg-white/80 backdrop-blur-sm rounded-2xl p-8 sm:p-12' : ''} transition-all duration-500`}>
                 {/* Static text without animations */}
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
-                  READY
+                <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight ${videoPlaying ? 'text-gray-900 drop-shadow-lg' : 'text-gray-900'}`}>
+                  Manage your brand,
                   <br />
-                  <span className="text-indigo-600">AIM</span>
-                  <br />
-                  GO
+                  <span className="text-indigo-600">automate your operations.</span>
                 </h1>
-                <p className="text-lg sm:text-xl text-gray-700 mb-6 sm:mb-8 max-w-2xl leading-relaxed">
-                  Full Stack Virtual Asset Management
+                <p className={`text-lg sm:text-xl mb-6 sm:mb-8 max-w-2xl leading-relaxed ${videoPlaying ? 'text-gray-800 drop-shadow-md' : 'text-gray-700'}`}>
+                  C-Suite-as-a-Service platform powered by AI Pulse
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                   <Button
@@ -1084,28 +1184,18 @@ export default function HomePage() {
                   </button>
                 </div>
                 {/* Stats */}
-                <HomeStats />
+                {/* <HomeStats /> */}
                 
-                {/* AI Pulse Feed */}
-                <div className="mt-8">
-                  <PulseFeed />
-                </div>
-                
-                {/* Client Portfolio Link */}
-                <div className="mt-6 text-center">
-                  <Button asChild variant="outline" className="bg-white hover:bg-gray-50">
-                    <Link href="/clients">
-                      <Users className="h-4 w-4 mr-2" />
-                      View Client Portfolio
-                    </Link>
-                  </Button>
+                {/* Marketing CTA */}
+                <div className="mt-8 flex flex-col sm:flex-row gap-4 items-center justify-center">
+                  {/* CTA removed - now in dropdown menu */}
                 </div>
               </div>
             )}
           </div>
 
           {/* Floating testimonials */}
-          <HomeTestimonials />
+          {/* <HomeTestimonials /> */}
         </Card>
       </section>
 

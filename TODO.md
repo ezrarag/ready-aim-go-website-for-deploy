@@ -230,6 +230,15 @@
 
 ### 🎯 **High Priority**
 
+#### **0. Email & Calendar Integrations**
+- [ ] **Outlook Integration** - Add Outlook Mail and Calendar API routes
+  - [ ] Create `/api/pulse/outlook-mail` route
+  - [ ] Create `/api/pulse/outlook-calendar` route
+  - [ ] Update main pulse route to include Outlook sources
+  - [ ] Add Outlook OAuth credentials to env.example
+  - [ ] Update settings page to show Outlook API key status
+  - [ ] Create OUTLOOK_SETUP.md documentation
+
 #### **1. Admin Dashboard Testing**
 - [ ] Test admin user authentication
 - [ ] Verify client creation functionality

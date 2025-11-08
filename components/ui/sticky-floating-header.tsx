@@ -7,6 +7,7 @@ interface StickyFloatingHeaderProps {
   pageTitle: string
   className?: string
   onInterested?: () => void
+  onVideoPlay?: () => void
 }
 
 // Animated button component that cycles between "I'm interested" and "Log in" with user icon
@@ -67,10 +68,23 @@ function AnimatedInterestedButton({ onClick }: { onClick?: () => void }) {
   )
 }
 
-export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className, onInterested }) => {
+export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className, onInterested, onVideoPlay }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const rightMenuRef = useRef<HTMLDivElement>(null)
   const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
+
+  const handleHomeClick = () => {
+    if (onVideoPlay) {
+      onVideoPlay()
+    }
+  }
+
+  const handleMenuClick = () => {
+    if (onVideoPlay) {
+      onVideoPlay()
+    }
+    setMenuOpen((open) => !open)
+  }
 
   useLayoutEffect(() => {
     if (rightMenuRef.current) {
@@ -87,12 +101,15 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
       style={{ background: "transparent" }}
     >
       {/* Left: Icon + Page Title */}
-      <div className="pointer-events-auto flex items-center gap-3 bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 min-w-[160px]">
+      <button
+        onClick={handleHomeClick}
+        className="pointer-events-auto flex items-center gap-3 bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 min-w-[160px] cursor-pointer hover:bg-[#F0EDEB] transition-colors"
+      >
         <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#C7BFFF]">
           <Zap className="h-5 w-5 text-black" />
         </span>
         <span className="font-bold text-black text-base">{pageTitle}</span>
-      </div>
+      </button>
       {/* Right: Hamburger + Dropdown */}
       <div
         className="pointer-events-auto flex items-center bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 gap-4 min-w-[260px] relative"
@@ -102,7 +119,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
         <button
           className="flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-transparent focus:outline-none"
           aria-label="Open menu"
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={handleMenuClick}
         >
           <motion.div
             initial={false}
@@ -174,31 +191,31 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               <div>
                 <div className="text-lg text-[#8B8892] font-medium mb-2">Solutions</div>
                 <div className="flex flex-col gap-1">
-                  <a href="#" className="font-bold text-black text-lg py-1">Multi-unit</a>
-                  <a href="#" className="font-bold text-black text-lg py-1">Public</a>
-                  <a href="#" className="font-bold text-black text-lg py-1">Business</a>
+                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Learn about the team</a>
+                  <a href="https://beamthinktank.space" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Learn about BEAM</a>
                 </div>
               </div>
               {/* Informations */}
               <div>
                 <div className="text-lg text-[#8B8892] font-medium mb-2">Informations</div>
                 <div className="flex flex-col gap-1">
-                  <a href="#" className="font-bold text-black text-lg py-1">Become a partner</a>
-                  <a href="#" className="font-bold text-black text-lg py-1">Blog</a>
-                  <a href="#" className="font-bold text-black text-lg py-1">Contact</a>
+                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Become a client</a>
+                  <a href="https://clients.readyaimgo.biz" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Client portal</a>
+                  <a href="/pricing" className="font-bold text-black text-lg py-1">View Pricing</a>
+                  <a href="/contact" className="font-bold text-black text-lg py-1">Contact</a>
                 </div>
               </div>
-              {/* Platform Overview */}
+              {/* ReadyAimGo */}
               <div>
-                <div className="text-lg text-[#8B8892] font-medium mb-2">Platform Overview</div>
+                <div className="text-lg text-[#8B8892] font-medium mb-2">ReadyAimGo</div>
                 <div className="flex flex-col gap-1">
-                  <a href="/platform/what-we-offer" className="font-bold text-black text-lg py-1">What We Offer</a>
-                  <a href="/platform/features" className="font-bold text-black text-lg py-1">Platform Features</a>
+                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Join the Team</a>
+                  <a href="/dashboard" className="font-bold text-black text-lg py-1">RAG Service Dashboard</a>
                 </div>
               </div>
               {/* Bottom row: Contact and combined language selector */}
               <div className="flex items-center justify-between mt-4 gap-2">
-                <button className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent">Contact</button>
+                <a href="/contact" className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent flex items-center justify-center">Contact</a>
                 <button className="w-28 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent flex items-center justify-center">
                   <span className="bg-black text-white px-2 py-1 rounded mr-1">fr</span>
                   <span className="px-2 py-1 rounded">en</span>
