@@ -191,7 +191,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               <div>
                 <div className="text-lg text-[#8B8892] font-medium mb-2">Solutions</div>
                 <div className="flex flex-col gap-1">
-                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Learn about the team</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Learn about the team</a>
                   <a href="https://beamthinktank.space" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Learn about BEAM</a>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               <div>
                 <div className="text-lg text-[#8B8892] font-medium mb-2">Informations</div>
                 <div className="flex flex-col gap-1">
-                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Become a client</a>
+                  <a href="#" className="font-bold text-black text-lg py-1">Become a client</a>
                   <a href="https://clients.readyaimgo.biz" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Client portal</a>
                   <a href="/pricing" className="font-bold text-black text-lg py-1">View Pricing</a>
                   <a href="/contact" className="font-bold text-black text-lg py-1">Contact</a>

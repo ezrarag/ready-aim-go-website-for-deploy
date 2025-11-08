@@ -785,19 +785,9 @@ export default function HomePage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const router = useRouter()
 
-  // Handler for login modal
+  // Handler for login - redirect directly to login page
   const handleLogin = useCallback(async () => {
-    try {
-      // TODO: Implement Firebase authentication
-      console.log('Firebase authentication not yet implemented');
-      // For now, just open login modal
-      setLoginModalOpen(true)
-      return
-    } catch (error) {
-      console.error('Error checking user status:', error)
-      // Fallback to login modal if there's an error
-      setLoginModalOpen(true)
-    }
+    router.push('/login')
   }, [router])
 
   // Handler for demo video
@@ -1201,9 +1191,6 @@ export default function HomePage() {
 
 
 
-      {/* Login Modal */}
-      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
-      
       {/* Project Modal */}
       <ProjectModal 
         project={projectModal} 
