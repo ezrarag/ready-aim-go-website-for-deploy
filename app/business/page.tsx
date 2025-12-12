@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Users, Trophy, Volume2, Wifi, Battery, Menu, MessageCircle, Mic, Video } from "lucide-react"
 
@@ -114,29 +115,49 @@ export default function BusinessPage() {
         <div className="flex-1 flex">
           {/* Left Navigation Menu */}
           <div className="flex flex-col justify-center pl-12 py-20">
-            <nav className="space-y-0">
+            <nav className="flex flex-col space-y-0">
               {/* Primary Menu Items */}
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveMenuItem(item.id)}
-                  className={`
-                    block text-left transition-all duration-300 py-2
-                    ${activeMenuItem === item.id
-                      ? 'text-white text-5xl font-bold tracking-wide'
-                      : 'text-white/70 text-5xl font-normal tracking-wide hover:text-white/90'
-                    }
-                  `}
-                  style={{
-                    textShadow: activeMenuItem === item.id 
-                      ? '0 0 15px rgba(255, 255, 255, 0.6), 0 0 30px rgba(59, 130, 246, 0.4), 0 0 45px rgba(59, 130, 246, 0.2)' 
-                      : 'none',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
+              {menuItems.map((item) => {
+                const isPlay = item.id === "PLAY"
+                const menuItemClassName = `
+                  block text-left transition-all duration-300 py-2 cursor-pointer w-full
+                  ${activeMenuItem === item.id
+                    ? 'text-white text-5xl font-bold tracking-wide'
+                    : 'text-white/70 text-5xl font-normal tracking-wide hover:text-white/90'
+                  }
+                `
+                const menuItemStyle = {
+                  textShadow: activeMenuItem === item.id 
+                    ? '0 0 15px rgba(255, 255, 255, 0.6), 0 0 30px rgba(59, 130, 246, 0.4), 0 0 45px rgba(59, 130, 246, 0.2)' 
+                    : 'none',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                }
+
+                if (isPlay) {
+                  return (
+                    <Link 
+                      key={item.id} 
+                      href="/" 
+                      onClick={() => setActiveMenuItem(item.id)}
+                      className={menuItemClassName}
+                      style={menuItemStyle}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                }
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveMenuItem(item.id)}
+                    className={menuItemClassName}
+                    style={menuItemStyle}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
 
               {/* Social Section */}
               <div className="mt-12 pt-8 border-t border-white/20">

@@ -41,6 +41,7 @@
     "@radix-ui/react-tooltip": "latest",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "@slack/web-api": "^7.9.3",
+    "@supabase/supabase-js": "^2.87.1",
     "autoprefixer": "^10.4.20",
     "cheerio": "^1.1.0",
     "class-variance-authority": "^0.7.1",

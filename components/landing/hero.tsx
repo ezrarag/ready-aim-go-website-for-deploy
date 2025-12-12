@@ -1,7 +1,5 @@
 "use client"
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { useState, useRef, useEffect } from "react"
 import { StoryOverlay } from "./story-overlay"
@@ -19,7 +17,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   // Get video URL based on current story
   const getVideoUrl = (story: string) => {
     const videoUrls: Record<string, string> = {
-      femileasing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing.mp4?alt=media&token=0021b7ee-9d1d-44af-8ddf-4fb707eae31a"
+      femileasing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing2.mp4?alt=media&token=c6e20116-3eda-47fd-9fa2-9a39f67d2214"
     }
     return videoUrls[story] || videoUrls.femileasing
   }

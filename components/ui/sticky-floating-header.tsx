@@ -164,4 +164,4 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
   )
 }
 
-export default StickyFloatingHeader 
+export default StickyFloatingHeader
