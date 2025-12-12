@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase-server'
+import { getAllPartners, getContributionsByPartnerSlug } from '@/lib/firestore'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -7,43 +7,23 @@ import { DollarSign, Users, ArrowRight } from 'lucide-react'
 
 async function checkAdmin() {
   try {
-    // For server components, we need to check admin status differently
-    // This is a simplified check - in production you'd want proper auth
-    const supabase = createServerClient()
-    
-    // Note: In a real implementation, you'd get the user from cookies/headers
-    // For now, we'll allow access but you should implement proper auth
-    // This is a placeholder that should be replaced with actual auth check
-    
-    return true // Placeholder - implement proper auth check
+    // Placeholder - implement proper Firebase Auth check
+    return true
   } catch (error) {
     return false
   }
 }
 
 async function getPartnersData() {
-  const supabase = createServerClient()
-  
-  // Get all partners with their contribution totals
-  const { data: partners, error: partnersError } = await supabase
-    .from('partners')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (partnersError || !partners) {
-    return []
-  }
+  const partners = await getAllPartners()
 
   // Get contribution totals for each partner
   const partnersWithStats = await Promise.all(
     partners.map(async (partner) => {
-      const { data: contributions, error: contribError } = await supabase
-        .from('contributions')
-        .select('amount_cents')
-        .eq('partner_slug', partner.slug)
+      const contributions = await getContributionsByPartnerSlug(partner.slug)
 
-      const totalCents = contributions?.reduce((sum, c) => sum + (c.amount_cents || 0), 0) || 0
-      const count = contributions?.length || 0
+      const totalCents = contributions.reduce((sum, c) => sum + (c.amountCents || 0), 0)
+      const count = contributions.length
 
       return {
         ...partner,

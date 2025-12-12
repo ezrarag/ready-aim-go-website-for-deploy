@@ -72,7 +72,7 @@ export default async function PartnerDetailsPage({
               </div>
               <div>
                 <div className="text-sm text-gray-500">Organization Type</div>
-                <div className="font-medium text-gray-900">{partner.org_type}</div>
+                <div className="font-medium text-gray-900">{partner.orgType}</div>
               </div>
               {partner.contactName && (
                 <div>
