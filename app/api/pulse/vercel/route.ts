@@ -25,9 +25,11 @@ interface PulseEvent {
 
 export async function GET(req: NextRequest) {
   try {
-    const vercelToken = process.env.VERCEL_TOKEN;
+    // Use VERCEL_ACCESS_TOKEN (server-only, never exposed to client)
+    const vercelToken = process.env.VERCEL_ACCESS_TOKEN || process.env.VERCEL_TOKEN;
     
     if (!vercelToken) {
+      console.log('Vercel token not configured - skipping Vercel deployments');
       return NextResponse.json({
         events: [],
         error: 'Vercel token not configured'
@@ -38,8 +40,16 @@ export async function GET(req: NextRequest) {
 
     // Fetch recent deployments
     try {
+      // Try to get team ID from env if available (for team accounts)
+      const teamId = process.env.VERCEL_TEAM_ID;
+      const deploymentsUrl = teamId 
+        ? `https://api.vercel.com/v6/deployments?teamId=${teamId}&limit=20`
+        : 'https://api.vercel.com/v6/deployments?limit=20';
+      
+      console.log(`[Vercel API] Fetching from: ${deploymentsUrl}`);
+      
       const deploymentsResponse = await fetch(
-        'https://api.vercel.com/v6/deployments?limit=20',
+        deploymentsUrl,
         {
           headers: {
             'Authorization': `Bearer ${vercelToken}`,
@@ -50,30 +60,70 @@ export async function GET(req: NextRequest) {
 
       if (deploymentsResponse.ok) {
         const data = await deploymentsResponse.json();
-        const deployments: VercelDeployment[] = data.deployments || [];
+        const deployments: any[] = data.deployments || [];
         
-        deployments.forEach(deployment => {
-          const projectName = extractProjectFromDeployment(deployment);
+        console.log(`[Vercel API] Found ${deployments.length} total deployments`);
+        console.log(`[Vercel API] Sample deployment structure:`, deployments[0] ? JSON.stringify(deployments[0], null, 2) : 'No deployments');
+        
+        // Vercel API v6 structure: deployments have 'url' field directly, or might be in 'alias' array
+        deployments.forEach((deployment: any) => {
+          // Check various possible URL fields
+          const deploymentUrl = deployment.url || 
+                               deployment.alias?.[0] || 
+                               (deployment.alias && Array.isArray(deployment.alias) ? deployment.alias[0] : null) ||
+                               `https://${deployment.name}.vercel.app`;
           
-          events.push({
-            source: 'vercel',
-            timestamp: new Date(deployment.created).toISOString(),
-            project: projectName || 'unknown',
-            data: {
-              type: 'deployment',
-              name: deployment.name,
-              url: deployment.url,
-              state: deployment.state,
-              target: deployment.target || 'preview',
-              commitRef: deployment.meta.githubCommitRef,
-              commitSha: deployment.meta.githubCommitSha,
-              commitMessage: deployment.meta.githubCommitMessage,
-              created: deployment.created,
-              readyAt: deployment.readyAt,
-              buildingAt: deployment.buildingAt
-            }
-          });
+          console.log(`[Vercel API] Deployment: ${deployment.name}, state: ${deployment.state}, url: ${deploymentUrl}`);
+          
+          // Only include READY deployments
+          if (deployment.state === 'READY') {
+            // Use the deployment URL (could be from url field, alias array, or constructed)
+            const finalUrl = deploymentUrl && deploymentUrl.startsWith('http') 
+              ? deploymentUrl 
+              : `https://${deployment.name}.vercel.app`;
+            
+            const projectName = extractProjectFromDeployment(deployment);
+            
+            events.push({
+              source: 'vercel',
+              timestamp: new Date(deployment.created || Date.now()).toISOString(),
+              project: projectName || 'unknown',
+              data: {
+                type: 'deployment',
+                uid: deployment.uid || deployment.id,
+                name: deployment.name,
+                url: finalUrl,
+                state: deployment.state,
+                target: deployment.target || deployment.production ? 'production' : 'preview',
+                commitRef: deployment.meta?.githubCommitRef || deployment.gitSource?.ref,
+                commitSha: deployment.meta?.githubCommitSha,
+                commitMessage: deployment.meta?.githubCommitMessage,
+                created: deployment.created || Date.now(),
+                readyAt: deployment.readyAt,
+                buildingAt: deployment.buildingAt
+              }
+            });
+          }
         });
+        
+        console.log(`[Vercel API] Found ${events.length} READY deployments after processing`);
+        console.log(`[Vercel API] Returning ${events.length} events`);
+      } else {
+        const errorText = await deploymentsResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        console.error(`[Vercel API] Error ${deploymentsResponse.status}: ${deploymentsResponse.statusText}`);
+        console.error(`[Vercel API] Error details:`, errorData);
+        
+        // If token is invalid, provide helpful error message
+        if (deploymentsResponse.status === 403 && errorData.error?.invalidToken) {
+          console.error(`[Vercel API] Token is invalid or expired. Please generate a new token at: https://vercel.com/account/tokens`);
+        }
       }
     } catch (error) {
       console.error('Error fetching Vercel deployments:', error);

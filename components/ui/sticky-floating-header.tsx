@@ -1,7 +1,10 @@
+"use client"
+
 import React, { useRef, useState, useLayoutEffect, useEffect } from "react"
-import { Zap, Menu as MenuIcon, User } from "lucide-react"
+import { Zap } from "lucide-react"
 import clsx from "clsx"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 
 interface StickyFloatingHeaderProps {
   pageTitle: string
@@ -10,68 +13,32 @@ interface StickyFloatingHeaderProps {
   onVideoPlay?: () => void
 }
 
-// Animated button component that cycles between "I'm interested" and "Log in" with user icon
-function AnimatedInterestedButton({ onClick }: { onClick?: () => void }) {
-  const [currentText, setCurrentText] = useState("I'm interested")
-  const [isAnimating, setIsAnimating] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    // Cycle between texts every 30 seconds
-    intervalRef.current = setInterval(() => {
-      setIsAnimating(true)
-      setTimeout(() => {
-        setCurrentText(prev => prev === "I'm interested" ? "Log in" : "I'm interested")
-        setIsAnimating(false)
-      }, 500) // Animation duration
-    }, 30000) // 30 seconds
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [])
-
-  return (
-    <button 
-      className="flex items-center justify-center px-6 h-12 rounded-2xl font-semibold text-base bg-black text-white shadow-md ml-2 min-w-[140px] transition-all duration-500" 
-      onClick={onClick}
-    >
-      <AnimatePresence mode="wait">
-        {currentText === "I'm interested" ? (
-          <motion.span
-            key="interested"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center"
-          >
-            I'm interested
-          </motion.span>
-        ) : (
-          <motion.span
-            key="login"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-2"
-          >
-            <User className="h-4 w-4" />
-            Log in
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </button>
-  )
-}
-
 export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ pageTitle, className, onInterested, onVideoPlay }) => {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const rightMenuRef = useRef<HTMLDivElement>(null)
   const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
+
+  // Check for user session
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Check if supabase is available (client-side)
+        if (typeof window !== 'undefined' && (window as any).supabase) {
+          const { data: { session }, error } = await (window as any).supabase.auth.getSession()
+          if (!error && session?.user) {
+            setUser(session.user)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking session:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    checkSession()
+  }, [])
 
   const handleHomeClick = () => {
     if (onVideoPlay) {
@@ -84,6 +51,14 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
       onVideoPlay()
     }
     setMenuOpen((open) => !open)
+  }
+
+  const handleSignIn = () => {
+    if (onInterested) {
+      onInterested()
+    } else {
+      window.location.href = '/login'
+    }
   }
 
   useLayoutEffect(() => {
@@ -100,127 +75,87 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
       )}
       style={{ background: "transparent" }}
     >
-      {/* Left: Icon + Page Title */}
-      <button
+      {/* Left: Icon + Page Title - Commented out for now */}
+      {/* <button
         onClick={handleHomeClick}
-        className="pointer-events-auto flex items-center gap-3 bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 min-w-[160px] cursor-pointer hover:bg-[#F0EDEB] transition-colors"
+        className="pointer-events-auto flex items-center gap-3 bg-black/60 backdrop-blur-sm border border-white/20 px-4 py-2 min-w-[160px] cursor-pointer hover:bg-black/80 transition-colors"
       >
-        <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#C7BFFF]">
-          <Zap className="h-5 w-5 text-black" />
+        <span className="inline-flex items-center justify-center w-8 h-8 bg-white/20">
+          <Zap className="h-4 w-4 text-white" />
         </span>
-        <span className="font-bold text-black text-base">{pageTitle}</span>
-      </button>
-      {/* Right: Hamburger + Dropdown */}
+        <span className="font-bold text-white text-sm">{pageTitle}</span>
+      </button> */}
+      
+      {/* Right: Overwatch-style header button - Far Right */}
       <div
-        className="pointer-events-auto flex items-center bg-[#F7F5F4] rounded-2xl shadow-lg px-4 py-3 gap-4 min-w-[260px] relative"
+        className="pointer-events-auto flex items-center gap-0 relative ml-auto"
         ref={rightMenuRef}
       >
-        {/* Hamburger Icon */}
-        <button
-          className="flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-transparent focus:outline-none"
-          aria-label="Open menu"
-          onClick={handleMenuClick}
-        >
-          <motion.div
-            initial={false}
-            animate={menuOpen ? "open" : "closed"}
-            variants={{
-              closed: { rotate: 0 },
-              open: { rotate: 90 },
-            }}
-            className="w-6 h-6 flex items-center justify-center"
+        {/* White Profile Button - Matches Screenshot */}
+        {!loading && (
+          <button
+            onClick={user ? handleMenuClick : handleSignIn}
+            className="flex items-center gap-3 bg-white rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors"
           >
-            {/* Hamburger to X animation with three lines */}
-            <motion.svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Top line */}
-              <motion.rect
-                x="4"
-                y="6"
-                width="16"
-                height="2"
-                rx="1"
-                fill="black"
-                animate={menuOpen ? { rotate: 45, y: 8, x: 4 } : { rotate: 0, y: 0, x: 4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              />
-              {/* Middle line */}
-              <motion.rect
-                x="4"
-                y="11"
-                width="16"
-                height="2"
-                rx="1"
-                fill="black"
-                animate={menuOpen ? { opacity: 0, scale: 0 } : { opacity: 1, scale: 1 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              />
-              {/* Bottom line */}
-              <motion.rect
-                x="4"
-                y="16"
-                width="16"
-                height="2"
-                rx="1"
-                fill="black"
-                animate={menuOpen ? { rotate: -45, y: 4, x: 4 } : { rotate: 0, y: 0, x: 4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              />
-            </motion.svg>
-          </motion.div>
-        </button>
-        {/* I'm interested button */}
-        <AnimatedInterestedButton onClick={onInterested} />
+            <span className="text-black text-sm font-semibold uppercase tracking-wide">
+              {user ? (user.user_metadata?.full_name || user.email?.split('@')[0] || 'USER').toUpperCase() : 'SIGN IN'}
+            </span>
+            
+            {/* Blue Snowflake/Starburst Icon */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="#3B82F6" stroke="#3B82F6" strokeWidth="1"/>
+              <circle cx="12" cy="10" r="2" fill="#3B82F6"/>
+            </svg>
+            
+            {/* Black Paw Print Icon */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="black" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 10C8 11.1 7.1 12 6 12C4.9 12 4 11.1 4 10C4 8.9 4.9 8 6 8C7.1 8 8 8.9 8 10ZM10 6C10 7.1 9.1 8 8 8C6.9 8 6 7.1 6 6C6 4.9 6.9 4 8 4C9.1 4 10 4.9 10 6ZM16 6C16 7.1 15.1 8 14 8C12.9 8 12 7.1 12 6C12 4.9 12.9 4 14 4C15.1 4 16 4.9 16 6ZM20 10C20 11.1 19.1 12 18 12C16.9 12 16 11.1 16 10C16 8.9 16.9 8 18 8C19.1 8 20 8.9 20 10ZM12 16C12 17.1 11.1 18 10 18C8.9 18 8 17.1 8 16C8 14.9 8.9 14 10 14C11.1 14 12 14.9 12 16Z"/>
+            </svg>
+          </button>
+        )}
+
         {/* Dropdown Panel */}
         <AnimatePresence>
           {menuOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              exit={{ opacity: 0, y: -10 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               style={{ width: dropdownWidth, right: 0 }}
-              className="absolute top-[calc(100%+16px)] right-0 bg-[#F7F5F4] rounded-3xl shadow-2xl p-8 z-50 flex flex-col gap-6 border border-gray-100"
+              className="absolute top-[calc(100%+8px)] right-0 bg-black/95 backdrop-blur-md border border-white/20 p-6 z-50 flex flex-col gap-4"
             >
               {/* Solutions */}
               <div>
-                <div className="text-lg text-[#8B8892] font-medium mb-2">Solutions</div>
+                <div className="text-sm text-white/60 font-medium mb-2">Solutions</div>
                 <div className="flex flex-col gap-1">
-                  <a href="#" className="font-bold text-black text-lg py-1">Learn about the team</a>
-                  <a href="https://beamthinktank.space" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Learn about BEAM</a>
+                  <Link href="#" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Learn about the team</Link>
+                  <a href="https://beamthinktank.space" target="_blank" rel="noopener noreferrer" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Learn about BEAM</a>
                 </div>
               </div>
               {/* Informations */}
               <div>
-                <div className="text-lg text-[#8B8892] font-medium mb-2">Informations</div>
+                <div className="text-sm text-white/60 font-medium mb-2">Informations</div>
                 <div className="flex flex-col gap-1">
-                  <a href="#" className="font-bold text-black text-lg py-1">Become a client</a>
-                  <a href="https://clients.readyaimgo.biz" target="_blank" rel="noopener noreferrer" className="font-bold text-black text-lg py-1">Client portal</a>
-                  <a href="/pricing" className="font-bold text-black text-lg py-1">View Pricing</a>
-                  <a href="/contact" className="font-bold text-black text-lg py-1">Contact</a>
+                  <Link href="#" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Become a client</Link>
+                  <a href="https://clients.readyaimgo.biz" target="_blank" rel="noopener noreferrer" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Client portal</a>
+                  <Link href="/pricing" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">View Pricing</Link>
+                  <Link href="/contact" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Contact</Link>
                 </div>
               </div>
               {/* ReadyAimGo */}
               <div>
-                <div className="text-lg text-[#8B8892] font-medium mb-2">ReadyAimGo</div>
+                <div className="text-sm text-white/60 font-medium mb-2">ReadyAimGo</div>
                 <div className="flex flex-col gap-1">
-                  <a href="/onboarding" className="font-bold text-black text-lg py-1">Join the Team</a>
-                  <a href="/dashboard" className="font-bold text-black text-lg py-1">RAG Service Dashboard</a>
+                  <Link href="/onboarding" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Join the Team</Link>
+                  <Link href="/dashboard" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">RAG Service Dashboard</Link>
                 </div>
               </div>
-              {/* Bottom row: Contact and combined language selector */}
-              <div className="flex items-center justify-between mt-4 gap-2">
-                <a href="/contact" className="flex-1 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent flex items-center justify-center">Contact</a>
-                <button className="w-28 h-12 rounded-2xl bg-white text-black font-semibold text-base shadow border border-transparent flex items-center justify-center">
-                  <span className="bg-black text-white px-2 py-1 rounded mr-1">fr</span>
-                  <span className="px-2 py-1 rounded">en</span>
-                </button>
-              </div>
+              {user && (
+                <div className="pt-4 border-t border-white/20">
+                  <Link href="/logout" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Sign Out</Link>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

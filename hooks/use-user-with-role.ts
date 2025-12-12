@@ -15,10 +15,9 @@ export function useUserWithRole() {
 
   useEffect(() => {
     // TODO: Implement Firebase authentication
-    console.log('Firebase authentication not yet implemented');
     setSession(null);
     setLoading(false);
-    setError('Firebase authentication not yet implemented');
+    // Silently handle missing auth - don't set error for now
   }, []);
 
   return { session, loading, error };
