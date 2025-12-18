@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { DollarSign, Users, ArrowRight } from 'lucide-react'
 
+// Force dynamic rendering - this page needs real-time data
+export const dynamic = 'force-dynamic'
+
 async function checkAdmin() {
   try {
     // Placeholder - implement proper Firebase Auth check

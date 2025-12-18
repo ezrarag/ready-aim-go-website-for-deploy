@@ -4,7 +4,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore'
 let app: App | null = null
 let db: Firestore | null = null
 
-export function getFirestoreDb(): Firestore {
+export function getFirestoreDb(): Firestore | null {
   if (db) {
     return db
   }
@@ -23,7 +23,8 @@ export function getFirestoreDb(): Firestore {
         })
       } catch (error) {
         console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error)
-        throw new Error(`Invalid FIREBASE_SERVICE_ACCOUNT_KEY format: ${error instanceof Error ? error.message : String(error)}`)
+        // Return null instead of throwing during build time
+        return null
       }
     } else {
       // Fallback: use individual credential fields
@@ -31,17 +32,10 @@ export function getFirestoreDb(): Firestore {
       const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
       const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
       
-      // Validate required fields
+      // Validate required fields - return null instead of throwing during build time
       if (!projectId || !clientEmail || !privateKey) {
-        const missing = []
-        if (!projectId) missing.push('NEXT_PUBLIC_FIREBASE_PROJECT_ID')
-        if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL')
-        if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY')
-        
-        throw new Error(
-          `Firebase Admin initialization failed: Missing required environment variables: ${missing.join(', ')}. ` +
-          `Please set FIREBASE_SERVICE_ACCOUNT_KEY or provide all individual Firebase credential fields.`
-        )
+        // Don't throw during build - return null and let runtime handle it
+        return null
       }
       
       try {
@@ -54,10 +48,8 @@ export function getFirestoreDb(): Firestore {
         })
       } catch (error) {
         console.error('Error initializing Firebase Admin:', error)
-        throw new Error(
-          `Firebase Admin initialization failed: ${error instanceof Error ? error.message : String(error)}. ` +
-          `Please check your Firebase credentials.`
-        )
+        // Return null instead of throwing during build time
+        return null
       }
     }
   } else {
@@ -66,7 +58,8 @@ export function getFirestoreDb(): Firestore {
 
   // Ensure app was successfully initialized
   if (!app) {
-    throw new Error('Firebase Admin app is not initialized. Check your Firebase configuration.')
+    // Return null instead of throwing during build time
+    return null
   }
 
   db = getFirestore(app)
@@ -100,6 +93,10 @@ export interface Contribution {
 // Partner helpers
 export async function getPartnerBySlug(slug: string): Promise<Partner | null> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch partner')
+    return null
+  }
   const partnersRef = db.collection('partners')
   const snapshot = await partnersRef.where('slug', '==', slug).limit(1).get()
   
@@ -113,6 +110,10 @@ export async function getPartnerBySlug(slug: string): Promise<Partner | null> {
 
 export async function getPartnerById(id: string): Promise<Partner | null> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch partner')
+    return null
+  }
   const doc = await db.collection('partners').doc(id).get()
   
   if (!doc.exists) {
@@ -124,6 +125,10 @@ export async function getPartnerById(id: string): Promise<Partner | null> {
 
 export async function getAllPartners(): Promise<Partner[]> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch partners')
+    return []
+  }
   const snapshot = await db.collection('partners').orderBy('createdAt', 'desc').get()
   
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Partner))
@@ -132,6 +137,9 @@ export async function getAllPartners(): Promise<Partner[]> {
 // Contribution helpers
 export async function createContribution(contribution: Omit<Contribution, 'id' | 'createdAt'>): Promise<string> {
   const db = getFirestoreDb()
+  if (!db) {
+    throw new Error('Firebase not initialized - cannot create contribution')
+  }
   const docRef = await db.collection('contributions').add({
     ...contribution,
     createdAt: new Date(),
@@ -141,6 +149,10 @@ export async function createContribution(contribution: Omit<Contribution, 'id' |
 
 export async function getContributionBySessionId(sessionId: string): Promise<Contribution | null> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch contribution')
+    return null
+  }
   const snapshot = await db.collection('contributions')
     .where('stripeSessionId', '==', sessionId)
     .limit(1)
@@ -156,6 +168,10 @@ export async function getContributionBySessionId(sessionId: string): Promise<Con
 
 export async function getContributionsByPartnerId(partnerId: string): Promise<Contribution[]> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch contributions')
+    return []
+  }
   const snapshot = await db.collection('contributions')
     .where('partnerId', '==', partnerId)
     .orderBy('createdAt', 'desc')
@@ -166,6 +182,10 @@ export async function getContributionsByPartnerId(partnerId: string): Promise<Co
 
 export async function getContributionsByPartnerSlug(partnerSlug: string): Promise<Contribution[]> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot fetch contributions')
+    return []
+  }
   const snapshot = await db.collection('contributions')
     .where('partnerSlug', '==', partnerSlug)
     .get()
@@ -176,6 +196,10 @@ export async function getContributionsByPartnerSlug(partnerSlug: string): Promis
 // Seed Carlot partner if it doesn't exist
 export async function ensureCarlotPartner(): Promise<void> {
   const db = getFirestoreDb()
+  if (!db) {
+    console.error('Firebase not initialized - cannot seed partner')
+    return
+  }
   const existing = await getPartnerBySlug('carlot')
   
   if (!existing) {
