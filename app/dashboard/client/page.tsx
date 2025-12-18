@@ -621,26 +621,26 @@ function ClientDashboardContent() {
               </div>
               <div className="space-y-2 text-xs font-mono">
                 <div className="text-neutral-500"># {new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC</div>
-                <div className="text-green-500">> [AGT:{session?.full_name?.replace(' ', '').toLowerCase() || 'agent'}] ::: INIT >></div>
+                <div className="text-green-500">{'>'} [AGT:{session?.full_name?.replace(' ', '').toLowerCase() || 'agent'}] ::: INIT {'>>'}</div>
                 <div className="text-neutral-400">^^^ loading secure channel</div>
-                <div className="text-blue-500">> CH#2 | {Math.random().toString().slice(2, 15)} ...xR3</div>
-                <div className="text-green-500">> KEY LOCKED</div>
-                <div className="text-neutral-300">> MSG >> "...mission override initiated ... awaiting delta node clearance"</div>
+                <div className="text-blue-500">{'>'} CH#2 | {Math.random().toString().slice(2, 15)} ...xR3</div>
+                <div className="text-green-500">{'>'} KEY LOCKED</div>
+                <div className="text-neutral-300">{'>'} MSG {'>>'} "...mission override initiated ... awaiting delta node clearance"</div>
                 
                 {/* AI Assistant Messages */}
                 {revenueData.total_revenue > 0 && (
                   <div className="text-blue-500 mt-4">
-                    > AI: You received ${revenueData.total_revenue} via Stripe on {new Date().toLocaleDateString()}
+                    {'>'} AI: You received ${revenueData.total_revenue} via Stripe on {new Date().toLocaleDateString()}
                   </div>
                 )}
                 {commissionRate > 0 && (
                   <div className="text-blue-500">
-                    > AI: Commission for {new Date().toLocaleDateString('en-US', { month: 'long' })}: ${(revenueData.total_revenue * commissionRate / 100).toFixed(2)}
+                    {'>'} AI: Commission for {new Date().toLocaleDateString('en-US', { month: 'long' })}: ${(revenueData.total_revenue * commissionRate / 100).toFixed(2)}
                   </div>
                 )}
                 {clientWebsite && (
                   <div className="text-blue-500">
-                    > AI: Your site traffic is up 12% this month
+                    {'>'} AI: Your site traffic is up 12% this month
                   </div>
                 )}
               </div>
