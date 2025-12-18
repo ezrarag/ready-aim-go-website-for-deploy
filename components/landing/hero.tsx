@@ -3,23 +3,58 @@
 import { motion } from "framer-motion"
 import { useState, useRef, useEffect } from "react"
 import { StoryOverlay } from "./story-overlay"
+import { RosterOverlay } from "./roster-overlay"
 
 interface HeroProps {
   onWatchDemo?: () => void
   onViewProjects?: () => void
+  initialStory?: string
 }
 
-export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
-  const [currentStory, setCurrentStory] = useState("femileasing")
+export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
+  // Initialize story from localStorage or prop, default to femileasing
+  const getInitialStory = () => {
+    if (initialStory) return initialStory
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lastViewedStory')
+      return saved || "femileasing"
+    }
+    return "femileasing"
+  }
+
+  const [currentStory, setCurrentStory] = useState(() => getInitialStory())
   const [showStoryOverlay, setShowStoryOverlay] = useState(false)
+  const [showRosterOverlay, setShowRosterOverlay] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Sync with localStorage when story changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lastViewedStory', currentStory)
+    }
+  }, [currentStory])
+
+  // Update story if initialStory prop changes (e.g., from URL params)
+  useEffect(() => {
+    if (initialStory && initialStory !== currentStory) {
+      setCurrentStory(initialStory)
+    }
+  }, [initialStory, currentStory])
 
   // Get video URL based on current story
   const getVideoUrl = (story: string) => {
     const videoUrls: Record<string, string> = {
-      femileasing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing2.mp4?alt=media&token=c6e20116-3eda-47fd-9fa2-9a39f67d2214"
+      femileasing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing2.mp4?alt=media&token=c6e20116-3eda-47fd-9fa2-9a39f67d2214",
+      carlot: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/carlot%2Fstory%2Fcarlot.mp4?alt=media&token=a43310b0-7fee-4ff3-a5be-62751da05831",
+      bishop: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/bishop-central-united%2Fstories%2Fbishop.mp4?alt=media&token=7cb00fc5-76e0-4e92-82af-894df88f500e",
+      BDSO: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/black-diaspora-symphony%2Fstories%2Fdayvin.mp4?alt=media&token=a128daf8-02cf-4544-b5b3-a1676ae5a7d3"
     }
     return videoUrls[story] || videoUrls.femileasing
+  }
+
+  // Handle hero selection from roster
+  const handleHeroSelect = (storyId: string) => {
+    setCurrentStory(storyId)
   }
 
   useEffect(() => {
@@ -80,7 +115,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           </button>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.location.href = '/roster'}
+              onClick={() => setShowRosterOverlay(true)}
               className="text-white hover:text-white/80 transition-colors text-left"
             >
               <h2 className="text-7xl md:text-9xl font-bold uppercase tracking-tight leading-none" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -135,7 +170,19 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
       </div>
 
       {/* Story Overlay */}
-      <StoryOverlay isOpen={showStoryOverlay} onClose={() => setShowStoryOverlay(false)} />
+      <StoryOverlay 
+        isOpen={showStoryOverlay} 
+        onClose={() => setShowStoryOverlay(false)}
+        currentStory={currentStory}
+      />
+
+      {/* Roster Overlay */}
+      <RosterOverlay 
+        isOpen={showRosterOverlay} 
+        onClose={() => setShowRosterOverlay(false)}
+        currentStory={currentStory}
+        onHeroSelect={handleHeroSelect}
+      />
     </section>
   )
 }
