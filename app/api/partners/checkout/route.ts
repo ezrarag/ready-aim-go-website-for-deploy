@@ -2,18 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getPartnerBySlug } from '@/lib/firestore'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
-}
-
-if (!process.env.NEXT_PUBLIC_APP_URL) {
-  throw new Error('NEXT_PUBLIC_APP_URL is not set')
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
-
 export async function POST(req: NextRequest) {
   try {
+    // Check environment variables at runtime, not build time
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: 'STRIPE_SECRET_KEY is not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (!process.env.NEXT_PUBLIC_APP_URL) {
+      return NextResponse.json(
+        { error: 'NEXT_PUBLIC_APP_URL is not configured' },
+        { status: 500 }
+      )
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
     const body = await req.json()
     const { partnerSlug, amountCents, userEmail, userName } = body
 

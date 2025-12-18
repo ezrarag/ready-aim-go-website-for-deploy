@@ -2,24 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 // TODO: Implement Firebase database operations
 
-// Check if required environment variables are set
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
-}
-
-if (!process.env.STRIPE_PRICE_ID) {
-  throw new Error('STRIPE_PRICE_ID is not set')
-}
-
-if (!process.env.NEXT_PUBLIC_APP_URL) {
-  throw new Error('NEXT_PUBLIC_APP_URL is not set')
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
-const priceId = process.env.STRIPE_PRICE_ID
-
 export async function POST(req: NextRequest) {
   try {
+    // Check environment variables at runtime, not build time
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: 'STRIPE_SECRET_KEY is not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (!process.env.STRIPE_PRICE_ID) {
+      return NextResponse.json(
+        { error: 'STRIPE_PRICE_ID is not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (!process.env.NEXT_PUBLIC_APP_URL) {
+      return NextResponse.json(
+        { error: 'NEXT_PUBLIC_APP_URL is not configured' },
+        { status: 500 }
+      )
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
+    const priceId = process.env.STRIPE_PRICE_ID
     // Get the current user from Supabase auth (cookie-based session)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
