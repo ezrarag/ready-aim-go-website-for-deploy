@@ -6,13 +6,15 @@ import Stripe from 'stripe'
 import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
-
 async function getSessionData(sessionId: string) {
+  // Check environment variable at runtime, not build time
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('STRIPE_SECRET_KEY is not configured')
+    return null
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
+
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId)
     
