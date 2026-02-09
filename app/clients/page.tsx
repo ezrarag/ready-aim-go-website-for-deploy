@@ -18,21 +18,9 @@ import {
   Users
 } from 'lucide-react';
 import Link from 'next/link';
+import type { ClientDirectoryEntry } from '@/lib/client-directory';
 
-interface Client {
-  id: string;
-  name: string;
-  brands: string[];
-  status: 'active' | 'inactive' | 'onboarding';
-  lastActivity: string;
-  pulseSummary?: string;
-  deployStatus?: 'live' | 'building' | 'error';
-  deployUrl?: string;
-  stripeStatus?: 'connected' | 'pending' | 'error';
-  revenue?: number;
-  meetings?: number;
-  emails?: number;
-}
+type Client = ClientDirectoryEntry;
 
 interface PulseData {
   summary: string;
@@ -77,67 +65,13 @@ export default function ClientsPage() {
         setPulseData(pulse);
       }
 
-      // Mock client data - in production, this would come from your database
-      const mockClients: Client[] = [
-        {
-          id: 'serenity',
-          name: 'Serenity Wellness',
-          brands: ['Serenity Spa', 'Serenity Retreat'],
-          status: 'active',
-          lastActivity: '2 hours ago',
-          pulseSummary: 'Menu update deployed, 3 new bookings this week',
-          deployStatus: 'live',
-          deployUrl: 'https://serenity-wellness.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 12500,
-          meetings: 2,
-          emails: 8
-        },
-        {
-          id: 'sweet-freak',
-          name: 'Sweet Freak Bakery',
-          brands: ['Sweet Freak', 'Sweet Freak Catering'],
-          status: 'active',
-          lastActivity: '1 hour ago',
-          pulseSummary: 'Instagram integration live, payment processing optimized',
-          deployStatus: 'live',
-          deployUrl: 'https://sweet-freak.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 8900,
-          meetings: 1,
-          emails: 5
-        },
-        {
-          id: 'femi',
-          name: 'Femi Leasing',
-          brands: ['Femi Properties', 'Femi Management'],
-          status: 'active',
-          lastActivity: '30 minutes ago',
-          pulseSummary: 'Stripe webhook fixed, investor portal updated',
-          deployStatus: 'live',
-          deployUrl: 'https://femi-leasing.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 45000,
-          meetings: 3,
-          emails: 12
-        },
-        {
-          id: 'jennalyn',
-          name: 'Jennalyn Research',
-          brands: ['NeuroTech Labs', 'Jennalyn Consulting'],
-          status: 'onboarding',
-          lastActivity: '1 day ago',
-          pulseSummary: 'Neuroscience collaboration proposal received',
-          deployStatus: 'building',
-          deployUrl: 'https://jennalyn-research.vercel.app',
-          stripeStatus: 'pending',
-          revenue: 0,
-          meetings: 1,
-          emails: 3
+      const clientsResponse = await fetch('/api/clients');
+      if (clientsResponse.ok) {
+        const payload = await clientsResponse.json();
+        if (payload?.success && Array.isArray(payload.clients)) {
+          setClients(payload.clients as Client[]);
         }
-      ];
-
-      setClients(mockClients);
+      }
     } catch (error) {
       console.error('Error fetching clients data:', error);
     } finally {

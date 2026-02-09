@@ -2,8 +2,12 @@
 
 import { motion } from "framer-motion"
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { StoryOverlay } from "./story-overlay"
 import { RosterOverlay } from "./roster-overlay"
+import { StoryAreaDetail } from "./story-area-detail"
+import type { Hero as RosterHero } from "./roster-overlay"
+import type { ClientDirectoryEntry } from "@/lib/client-directory"
 
 interface HeroProps {
   onWatchDemo?: () => void
@@ -11,7 +15,10 @@ interface HeroProps {
   initialStory?: string
 }
 
+const CATEGORY_SLUG_MAP: Record<string, string> = { web: "website", app: "app", rd: "rd", housing: "housing", transportation: "transportation", insurance: "insurance" }
+
 export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
+  const router = useRouter()
   // Initialize story from localStorage or prop, default to femileasing
   const getInitialStory = () => {
     if (initialStory) return initialStory
@@ -23,9 +30,45 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
   }
 
   const [currentStory, setCurrentStory] = useState(() => getInitialStory())
+  const [clients, setClients] = useState<ClientDirectoryEntry[]>([])
+  const [heroes, setHeroes] = useState<RosterHero[]>([])
   const [showStoryOverlay, setShowStoryOverlay] = useState(false)
   const [showRosterOverlay, setShowRosterOverlay] = useState(false)
+  const [showAreaDetail, setShowAreaDetail] = useState(false)
+  const [areaDetailPayload, setAreaDetailPayload] = useState<{ clientId: string; areaId: string; areaTitle: string } | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const fetchRoster = async () => {
+      try {
+        const response = await fetch("/api/clients")
+        if (!response.ok) return
+        const payload = await response.json()
+        if (!payload?.success || !Array.isArray(payload.clients)) return
+
+        const list = payload.clients as ClientDirectoryEntry[]
+        setClients(list)
+
+        const mapped = list
+          .filter((client) => Boolean(client.storyVideoUrl))
+          .map((client) => ({
+            id: client.id,
+            name: client.name.toUpperCase(),
+            storyId: client.storyId,
+            videoUrl: client.storyVideoUrl!,
+            isNew: client.isNewStory,
+          }))
+
+        if (mapped.length > 0) {
+          setHeroes(mapped)
+        }
+      } catch (error) {
+        console.error("Failed to fetch roster from /api/clients:", error)
+      }
+    }
+
+    fetchRoster()
+  }, [])
 
   // Sync with localStorage when story changes
   useEffect(() => {
@@ -43,13 +86,8 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
 
   // Get video URL based on current story
   const getVideoUrl = (story: string) => {
-    const videoUrls: Record<string, string> = {
-      femileasing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing2.mp4?alt=media&token=c6e20116-3eda-47fd-9fa2-9a39f67d2214",
-      carlot: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/carlot%2Fstory%2Fcarlot.mp4?alt=media&token=a43310b0-7fee-4ff3-a5be-62751da05831",
-      bishop: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/bishop-central-united%2Fstories%2Fbishop.mp4?alt=media&token=7cb00fc5-76e0-4e92-82af-894df88f500e",
-      BDSO: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/black-diaspora-symphony%2Fstories%2Fdayvin.mp4?alt=media&token=a128daf8-02cf-4544-b5b3-a1676ae5a7d3"
-    }
-    return videoUrls[story] || videoUrls.femileasing
+    const selected = heroes.find((hero) => hero.storyId === story)
+    return selected?.videoUrl ?? heroes[0]?.videoUrl ?? ""
   }
 
   // Handle hero selection from roster
@@ -58,12 +96,26 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
   }
 
   useEffect(() => {
-    if (videoRef.current) {
+    if (heroes.length === 0) return
+    const hasCurrentStory = heroes.some((hero) => hero.storyId === currentStory)
+    if (!hasCurrentStory) {
+      setCurrentStory(heroes[0].storyId)
+    }
+  }, [heroes, currentStory])
+
+  const videoUrl = getVideoUrl(currentStory)
+
+  useEffect(() => {
+    if (videoRef.current && videoUrl) {
       videoRef.current.play().catch((error) => {
         console.error('Error auto-playing video:', error)
       })
     }
-  }, [currentStory])
+  }, [currentStory, videoUrl])
+
+  const handleVideoCanPlay = () => {
+    videoRef.current?.play().catch(() => {})
+  }
 
   // Handle F4 key to exit
   useEffect(() => {
@@ -82,17 +134,20 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
     <section className="fixed inset-0 h-screen w-screen flex items-center justify-center overflow-hidden z-0">
       {/* Background Video */}
       <div className="absolute inset-0 z-0">
-        <video
-          key={currentStory}
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          loop
-          muted
-          playsInline
-          autoPlay
-        >
-          <source src={getVideoUrl(currentStory)} type="video/mp4" />
-        </video>
+        {videoUrl ? (
+          <video
+            key={currentStory}
+            ref={videoRef}
+            className="absolute inset-0 w-full h-full object-cover"
+            loop
+            muted
+            playsInline
+            autoPlay
+            onCanPlay={handleVideoCanPlay}
+          >
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+        ) : null}
         {/* Subtle overlay for text readability */}
         <div className="absolute inset-0 bg-black/30" />
       </div>
@@ -170,20 +225,39 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
       </div>
 
       {/* Story Overlay */}
-      <StoryOverlay 
-        isOpen={showStoryOverlay} 
+      <StoryOverlay
+        isOpen={showStoryOverlay}
         onClose={() => setShowStoryOverlay(false)}
         currentStory={currentStory}
+        client={clients.find((c) => c.storyId === currentStory) ?? null}
+        onOpenModule={(clientId, moduleId, _areaTitle) => {
+          const categorySlug = CATEGORY_SLUG_MAP[moduleId] ?? moduleId
+          setShowStoryOverlay(false)
+          router.push(`/story/${clientId}/${categorySlug}`)
+        }}
+      />
+
+      {/* Module detail (Latest updates) */}
+      <StoryAreaDetail
+        isOpen={showAreaDetail}
+        onClose={() => {
+          setShowAreaDetail(false)
+          setAreaDetailPayload(null)
+        }}
+        areaId={areaDetailPayload?.areaId ?? "web"}
+        areaTitle={areaDetailPayload?.areaTitle ?? "Website"}
+        currentStory={currentStory}
+        clientId={areaDetailPayload?.clientId ?? ""}
       />
 
       {/* Roster Overlay */}
-      <RosterOverlay 
-        isOpen={showRosterOverlay} 
+      <RosterOverlay
+        isOpen={showRosterOverlay}
         onClose={() => setShowRosterOverlay(false)}
         currentStory={currentStory}
         onHeroSelect={handleHeroSelect}
+        heroes={heroes}
       />
     </section>
   )
 }
-

@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { 
   Users, 
   ExternalLink, 
@@ -20,28 +29,18 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard-layout';
+import type { ClientDirectoryEntry } from '@/lib/client-directory';
 
-interface Client {
-  id: string;
-  name: string;
-  brands: string[];
-  status: 'active' | 'inactive' | 'onboarding';
-  lastActivity: string;
-  deployStatus: 'live' | 'building' | 'error';
-  deployUrl?: string;
-  stripeStatus: 'connected' | 'pending' | 'error';
-  revenue: number;
-  meetings: number;
-  emails: number;
-  commits: number;
-  lastDeploy?: string;
-}
+type Client = ClientDirectoryEntry;
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [addClientOpen, setAddClientOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', storyId: '' });
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
   useEffect(() => {
     fetchClientsData();
@@ -55,82 +54,41 @@ export default function ClientsPage() {
     try {
       setLoading(true);
       
-      // Fetch live data from Pulse APIs
-      const [githubResponse, vercelResponse, stripeResponse] = await Promise.all([
-        fetch('/api/pulse/github'),
-        fetch('/api/pulse/vercel'),
-        fetch('/api/pulse/stripe')
-      ]);
-
-      // Mock client data - in production, this would be aggregated from the APIs above
-      const mockClients: Client[] = [
-        {
-          id: 'serenity',
-          name: 'Serenity Wellness',
-          brands: ['Serenity Spa', 'Serenity Retreat'],
-          status: 'active',
-          lastActivity: '2 hours ago',
-          deployStatus: 'live',
-          deployUrl: 'https://serenity-wellness.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 12500,
-          meetings: 2,
-          emails: 8,
-          commits: 15,
-          lastDeploy: '2 hours ago'
-        },
-        {
-          id: 'sweet-freak',
-          name: 'Sweet Freak Bakery',
-          brands: ['Sweet Freak', 'Sweet Freak Catering'],
-          status: 'active',
-          lastActivity: '1 hour ago',
-          deployStatus: 'live',
-          deployUrl: 'https://sweet-freak.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 8900,
-          meetings: 1,
-          emails: 5,
-          commits: 23,
-          lastDeploy: '1 hour ago'
-        },
-        {
-          id: 'femi',
-          name: 'Femi Leasing',
-          brands: ['Femi Properties', 'Femi Management'],
-          status: 'active',
-          lastActivity: '30 minutes ago',
-          deployStatus: 'live',
-          deployUrl: 'https://femi-leasing.vercel.app',
-          stripeStatus: 'connected',
-          revenue: 45000,
-          meetings: 3,
-          emails: 12,
-          commits: 8,
-          lastDeploy: '30 minutes ago'
-        },
-        {
-          id: 'jennalyn',
-          name: 'Jennalyn Research',
-          brands: ['NeuroTech Labs', 'Jennalyn Consulting'],
-          status: 'onboarding',
-          lastActivity: '1 day ago',
-          deployStatus: 'building',
-          deployUrl: 'https://jennalyn-research.vercel.app',
-          stripeStatus: 'pending',
-          revenue: 0,
-          meetings: 1,
-          emails: 3,
-          commits: 5,
-          lastDeploy: '1 day ago'
+      const clientsResponse = await fetch('/api/clients');
+      if (clientsResponse.ok) {
+        const payload = await clientsResponse.json();
+        if (payload?.success && Array.isArray(payload.clients)) {
+          setClients(payload.clients as Client[]);
         }
-      ];
-
-      setClients(mockClients);
+      }
     } catch (error) {
       console.error('Error fetching clients data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddClient = async () => {
+    const name = addForm.name.trim();
+    const storyId = addForm.storyId.trim();
+    if (!name || !storyId) return;
+    setAddSubmitting(true);
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, storyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to create client');
+      setAddClientOpen(false);
+      setAddForm({ name: '', storyId: '' });
+      await fetchClientsData();
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : 'Failed to create client');
+    } finally {
+      setAddSubmitting(false);
     }
   };
 
@@ -149,10 +107,10 @@ export default function ClientsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'onboarding': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'active': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/30';
+      case 'inactive': return 'bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-200 dark:border-zinc-400/30';
+      case 'onboarding': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/20 dark:text-blue-200 dark:border-blue-400/30';
+      default: return 'bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-200 dark:border-zinc-400/30';
     }
   };
 
@@ -179,22 +137,22 @@ export default function ClientsPage() {
       <DashboardLayout>
         <div className="space-y-6">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-96"></div>
+            <div className="mb-2 h-8 w-64 rounded bg-muted"></div>
+            <div className="h-4 w-96 rounded bg-muted"></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
                 <CardHeader>
                   <div className="animate-pulse">
-                    <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="mb-2 h-6 w-32 rounded bg-muted"></div>
+                    <div className="h-4 w-24 rounded bg-muted"></div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="animate-pulse space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-full"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-4 w-full rounded bg-muted"></div>
+                    <div className="h-4 w-3/4 rounded bg-muted"></div>
                   </div>
                 </CardContent>
               </Card>
@@ -211,10 +169,10 @@ export default function ClientsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Client Management</h1>
-            <p className="text-gray-600">Monitor all client projects, deployments, and communications</p>
+            <h1 className="text-2xl font-bold text-foreground">Client Management</h1>
+            <p className="text-muted-foreground">Monitor all client projects, deployments, and communications</p>
           </div>
-          <Button>
+          <Button onClick={() => setAddClientOpen(true)}>
             <Users className="h-4 w-4 mr-2" />
             Add Client
           </Button>
@@ -225,7 +183,7 @@ export default function ClientsPage() {
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search clients or brands..."
                   value={searchTerm}
@@ -267,7 +225,7 @@ export default function ClientsPage() {
                 {/* Status Indicators */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Deploy Status</span>
+                    <span className="text-sm text-muted-foreground">Deploy Status</span>
                     <div className="flex items-center gap-2">
                       {getDeployStatusIcon(client.deployStatus)}
                       <span className="text-sm font-medium">{client.deployStatus}</span>
@@ -275,7 +233,7 @@ export default function ClientsPage() {
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Stripe Status</span>
+                    <span className="text-sm text-muted-foreground">Stripe Status</span>
                     <div className="flex items-center gap-2">
                       {getStripeStatusIcon(client.stripeStatus)}
                       <span className="text-sm font-medium">{client.stripeStatus}</span>
@@ -284,42 +242,42 @@ export default function ClientsPage() {
                 </div>
 
                 {/* Metrics */}
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                <div className="grid grid-cols-2 gap-4 border-t border-border pt-2">
                   <div className="text-center">
                     <div className="text-lg font-semibold text-green-600">
                       ${client.revenue.toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500">Revenue</div>
+                    <div className="text-xs text-muted-foreground">Revenue</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-blue-600">
                       {client.commits}
                     </div>
-                    <div className="text-xs text-gray-500">Commits</div>
+                    <div className="text-xs text-muted-foreground">Commits</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-purple-600">
                       {client.meetings}
                     </div>
-                    <div className="text-xs text-gray-500">Meetings</div>
+                    <div className="text-xs text-muted-foreground">Meetings</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-orange-600">
                       {client.emails}
                     </div>
-                    <div className="text-xs text-gray-500">Emails</div>
+                    <div className="text-xs text-muted-foreground">Emails</div>
                   </div>
                 </div>
 
                 {/* Last Activity */}
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                   <strong>Last Activity:</strong> {client.lastActivity}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View Details
+                  <Button variant="outline" size="sm" className="flex-1" asChild>
+                    <Link href={`/dashboard/clients/${client.id}`}>View Details</Link>
                   </Button>
                   {client.deployUrl && (
                     <Button variant="outline" size="sm" asChild>
@@ -344,8 +302,8 @@ export default function ClientsPage() {
               <div className="flex items-center">
                 <Users className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Clients</p>
-                  <p className="text-2xl font-bold text-gray-900">{clients.length}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
+                  <p className="text-2xl font-bold text-foreground">{clients.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -356,8 +314,8 @@ export default function ClientsPage() {
               <div className="flex items-center">
                 <CheckCircle className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Active Projects</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {clients.filter(c => c.status === 'active').length}
                   </p>
                 </div>
@@ -370,8 +328,8 @@ export default function ClientsPage() {
               <div className="flex items-center">
                 <DollarSign className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold text-foreground">
                     ${clients.reduce((sum, c) => sum + c.revenue, 0).toLocaleString()}
                   </p>
                 </div>
@@ -384,8 +342,8 @@ export default function ClientsPage() {
               <div className="flex items-center">
                 <GitBranch className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Commits</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Total Commits</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {clients.reduce((sum, c) => sum + c.commits, 0)}
                   </p>
                 </div>
@@ -394,6 +352,41 @@ export default function ClientsPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Client</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="add-name">Name *</Label>
+              <Input
+                id="add-name"
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Client name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-storyId">Story ID *</Label>
+              <Input
+                id="add-storyId"
+                value={addForm.storyId}
+                onChange={(e) => setAddForm((f) => ({ ...f, storyId: e.target.value }))}
+                placeholder="e.g. femileasing"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Used in roster and story (URL-friendly id).</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddClientOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddClient} disabled={!addForm.name.trim() || !addForm.storyId.trim() || addSubmitting}>
+              {addSubmitting ? 'Creating…' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -9,9 +9,10 @@ interface RosterOverlayProps {
   onClose: () => void
   currentStory: string
   onHeroSelect: (storyId: string) => void
+  heroes: Hero[]
 }
 
-interface Hero {
+export interface Hero {
   id: string
   name: string
   storyId: string
@@ -19,38 +20,7 @@ interface Hero {
   isNew?: boolean
 }
 
-const heroes: Hero[] = [
-  {
-    id: "femileasing",
-    name: "FEMILEASING",
-    storyId: "femileasing",
-    videoUrl: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/femileasing%2Fstory%2Ffemileasing2.mp4?alt=media&token=c6e20116-3eda-47fd-9fa2-9a39f67d2214",
-    isNew: false
-  },
-  {
-    id: "carlot",
-    name: "CARLOT",
-    storyId: "carlot",
-    videoUrl: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/carlot%2Fstory%2Fcarlot.mp4?alt=media&token=a43310b0-7fee-4ff3-a5be-62751da05831",
-    isNew: true
-  },
-  {
-  id: "bishop",
-  name: "BISHOP",
-  storyId: "bishop",
-  videoUrl: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/bishop-central-united%2Fstories%2Fbishop.mp4?alt=media&token=7cb00fc5-76e0-4e92-82af-894df88f500e",
-  isNew: true
-  },
-  {
-    id: "BDSO",
-    name: "BDSO",
-    storyId: "BDSO",
-    videoUrl: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/black-diaspora-symphony%2Fstories%2Fdayvin.mp4?alt=media&token=a128daf8-02cf-4544-b5b3-a1676ae5a7d3",
-    isNew: true
-  }
-]
-
-export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect }: RosterOverlayProps) {
+export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, heroes }: RosterOverlayProps) {
   const router = useRouter()
 
   // Handle ESC key to close
@@ -172,6 +142,11 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect }: R
                   )
                 })}
               </div>
+              {heroes.length === 0 && (
+                <div className="mt-6 border border-white/20 rounded-lg p-6 bg-black/40">
+                  <p className="text-white/80 text-sm">No roster entries found in Firestore `clients` collection.</p>
+                </div>
+              )}
 
               {/* ESC Hint / Back Button */}
               <motion.button
@@ -194,4 +169,3 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect }: R
     </AnimatePresence>
   )
 }
-
