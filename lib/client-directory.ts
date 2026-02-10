@@ -32,6 +32,14 @@ export interface ClientDirectoryEntry {
   websiteUrl?: string
   appUrl?: string
   appStoreUrl?: string
+  /** Key field for R/D card visibility. */
+  rdUrl?: string
+  /** Key field for Housing card visibility. */
+  housingUrl?: string
+  /** Key field for Transportation card visibility. */
+  transportationUrl?: string
+  /** Key field for Insurance card visibility. */
+  insuranceUrl?: string
   /** Data-driven story modules (web, app, rd, housing, transportation, insurance). Front-end fallback if missing. */
   modules?: Record<ModuleKey, ClientModule>
 }

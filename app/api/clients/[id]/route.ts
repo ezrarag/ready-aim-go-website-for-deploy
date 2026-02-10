@@ -72,6 +72,8 @@ export async function PATCH(
       "name", "storyId", "brands", "status", "lastActivity", "pulseSummary",
       "deployStatus", "deployUrl", "stripeStatus", "revenue", "meetings", "emails",
       "commits", "lastDeploy", "storyVideoUrl", "isNewStory", "modules",
+      "websiteUrl", "appUrl", "appStoreUrl",
+      "rdUrl", "housingUrl", "transportationUrl", "insuranceUrl",
     ] as const
     const updates: Record<string, unknown> = {}
     for (const key of allowed) {

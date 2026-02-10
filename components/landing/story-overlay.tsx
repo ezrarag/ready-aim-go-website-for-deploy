@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Globe, Smartphone, FlaskConical, Building2, Truck, Shield, ArrowRight, Lock } from "lucide-react"
+import { Globe, Smartphone, FlaskConical, Building2, Truck, Shield, ArrowRight } from "lucide-react"
 import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
 import { getDefaultModules } from "@/lib/client-directory"
 
@@ -12,7 +12,9 @@ interface StoryOverlayProps {
   currentStory: string
   /** When set, module cards are driven from client.modules (enabled only). Fallback to static list. */
   client?: ClientDirectoryEntry | null
-  /** Called when user clicks an unlocked module card: (clientId, moduleId, areaTitle) */
+  /** Only show cards for these module keys (key field set on client: websiteUrl, appUrl, rdUrl, etc.). */
+  moduleKeysWithData?: ModuleKey[]
+  /** Called when user clicks a module card: (clientId, moduleId, areaTitle) */
   onOpenModule?: (clientId: string, moduleId: ModuleKey, areaTitle: string) => void
 }
 
@@ -36,10 +38,6 @@ const areaVideoUrls: Record<string, string> = {
   insurance: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Finsurance-placeholder.mp4?alt=media&token=PLACEHOLDER_TOKEN"
 }
 
-const isAreaLocked = (areaId: string, storyId: string): boolean => {
-  if (areaId === "website" || areaId === "web") return storyId === "bishop"
-  return true
-}
 
 // Map module id to display title (uppercase)
 const moduleTitles: Record<string, string> = {
@@ -71,14 +69,16 @@ const moduleKeyToCardId: Record<ModuleKey, string> = {
   insurance: "insurance",
 }
 
-export function StoryOverlay({ isOpen, onClose, currentStory, client, onOpenModule }: StoryOverlayProps) {
+export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeysWithData = [], onOpenModule }: StoryOverlayProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
 
   const modules = client?.modules ?? getDefaultModules()
-  const moduleKeys = (["web", "app", "rd", "housing", "transportation", "insurance"] as const).filter(
+  const allEnabledKeys = (["web", "app", "rd", "housing", "transportation", "insurance"] as const).filter(
     (k) => modules[k]?.enabled !== false
   )
+  // Only show cards whose key field is set on the client (websiteUrl, appUrl, rdUrl, etc.)
+  const moduleKeys = !client ? [] : allEnabledKeys.filter((k) => moduleKeysWithData.includes(k))
   const storyCards: StoryCard[] = moduleKeys.map((key) => {
     const staticCard = allStoryCards.find((c) => c.id === (moduleKeyToCardId[key] ?? key)) ?? allStoryCards[0]
     const mod = modules[key]
@@ -149,142 +149,117 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, onOpenModu
             <div className="pointer-events-auto w-full max-w-7xl flex flex-col min-h-0 md:min-h-none flex-1 md:flex-initial overflow-y-auto overscroll-contain">
               {/* Title - tighter on mobile */}
               <div className="mb-4 md:mb-8 shrink-0">
-                <h2 className="text-3xl sm:text-4xl md:text-7xl font-bold text-white mb-1 md:mb-2">STORY</h2>
+                <h2 className="text-3xl sm:text-4xl md:text-7xl font-bold text-white mb-1 md:mb-2">
+                  STORY{client?.name ? `: ${client.name.toUpperCase()}` : ""}
+                </h2>
                 <p className="text-white/60 text-sm md:text-lg">Select an area to explore</p>
                 {currentStory && (
                   <p className="text-white/40 text-xs md:text-sm mt-0.5 md:mt-1 uppercase">Story: {currentStory}</p>
                 )}
               </div>
 
-              {/* Cards Grid - tighter gaps on mobile */}
+              {/* Cards Grid - only categories that have published updates in Firestore */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6 pb-20 md:pb-0">
-                {storyCards.map((card, index) => {
-                  const Icon = card.icon
-                  const isHovered = hoveredCard === card.id
-                  const isLocked = isAreaLocked(card.id, currentStory)
-                  const canOpen = client && onOpenModule && !isLocked
-                  const handleCardClick = () => {
-                    if (canOpen) onOpenModule(client.id, card.id as ModuleKey, card.title)
-                  }
-                  const handleKeyDown = (e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault()
-                      handleCardClick()
+                {storyCards.length === 0 ? (
+                  <p className="text-white/60 text-sm col-span-full py-8">
+                    {client ? "No story categories with updates yet." : "No story data for this hero."}
+                  </p>
+                ) : (
+                  storyCards.map((card, index) => {
+                    const isHovered = hoveredCard === card.id
+                    const canOpen = client && onOpenModule
+                    const handleCardClick = () => {
+                      if (canOpen) onOpenModule(client.id, card.id as ModuleKey, card.title)
                     }
-                  }
-                  return (
-                    <motion.div
-                      key={card.id}
-                      role="button"
-                      tabIndex={0}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: index * 0.1 }}
-                      className="group cursor-pointer relative outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-lg"
-                      onMouseEnter={() => setHoveredCard(card.id)}
-                      onMouseLeave={() => setHoveredCard(null)}
-                      onClick={handleCardClick}
-                      onKeyDown={handleKeyDown}
-                      aria-label={`Open ${card.title}, ${card.description}`}
-                    >
+                    const handleKeyDown = (e: React.KeyboardEvent) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        handleCardClick()
+                      }
+                    }
+                    return (
                       <motion.div
-                        className="h-[260px] sm:h-[320px] md:h-[450px] bg-black/60 backdrop-blur-sm border border-white/20 rounded-lg overflow-hidden hover:border-white/40 transition-all duration-300 flex flex-col relative"
-                        animate={{
-                          scale: isHovered ? 1.05 : 1,
-                        }}
+                        key={card.id}
+                        role="button"
+                        tabIndex={0}
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: index * 0.1 }}
+                        className="group cursor-pointer relative outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-lg"
+                        onMouseEnter={() => setHoveredCard(card.id)}
+                        onMouseLeave={() => setHoveredCard(null)}
+                        onClick={handleCardClick}
+                        onKeyDown={handleKeyDown}
+                        aria-label={`Open ${card.title}, ${card.description}`}
                       >
-                        {/* Top Section - Video always playing */}
-                        <div className={`flex-1 min-h-[60%] ${card.iconBg} relative overflow-hidden`}>
-                          {/* Video that always plays */}
-                          <video
-                            ref={(el) => {
-                              if (el) videoRefs.current[card.id] = el
-                            }}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            loop
-                            muted
-                            playsInline
-                            autoPlay
-                          >
-                            <source src={card.videoUrl} type="video/mp4" />
-                          </video>
-                          
-                          {/* Lock indicator */}
-                          {isLocked && (
-                            <div className="absolute top-4 right-4 z-20">
-                              <div className="bg-black/60 backdrop-blur-sm border border-white/20 rounded-full p-2">
-                                <Lock className="w-4 h-4 text-white/60" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Bottom Section - Animated to expand fully on hover */}
                         <motion.div
-                          className="bg-gray-800/80 absolute bottom-0 left-0 right-0 overflow-hidden z-30"
+                          className="h-[260px] sm:h-[320px] md:h-[450px] bg-black/60 backdrop-blur-sm border border-white/20 rounded-lg overflow-hidden hover:border-white/40 transition-all duration-300 flex flex-col relative"
                           animate={{
-                            height: isHovered ? "100%" : "40%",
-                            top: isHovered ? "0%" : "auto",
+                            scale: isHovered ? 1.05 : 1,
                           }}
-                          transition={{ duration: 0.4, ease: "easeOut" }}
                         >
-                          <AnimatePresence mode="wait">
-                            {!isHovered ? (
-                              <motion.div
-                                key="collapsed"
-                                initial={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="p-3 md:p-5 h-full flex flex-col justify-center"
-                              >
-                                <h3 className="text-white font-bold text-sm md:text-lg mb-1 md:mb-2 uppercase tracking-wide">
-                                  {card.title}
-                                </h3>
-                                <p className="text-white/70 text-[11px] md:text-sm leading-snug line-clamp-2 md:line-clamp-none">
-                                  {card.description}
-                                </p>
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                key="expanded"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.3 }}
-                                className="h-full flex items-center justify-center p-4 md:p-5"
-                              >
-                                {isLocked ? (
-                                  <div className="flex flex-col items-center gap-3 text-center">
-                                    <Lock className="w-8 h-8 text-white/60" />
-                                    <span className="text-white/60 text-sm font-semibold uppercase">Locked</span>
-                                  </div>
-                                ) : (
+                          <div className={`flex-1 min-h-[60%] ${card.iconBg} relative overflow-hidden`}>
+                            <video
+                              ref={(el) => {
+                                if (el) videoRefs.current[card.id] = el
+                              }}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              loop
+                              muted
+                              playsInline
+                              autoPlay
+                            >
+                              <source src={card.videoUrl} type="video/mp4" />
+                            </video>
+                          </div>
+
+                          <motion.div
+                            className="bg-gray-800/80 absolute bottom-0 left-0 right-0 overflow-hidden z-30"
+                            animate={{
+                              height: isHovered ? "100%" : "40%",
+                              top: isHovered ? "0%" : "auto",
+                            }}
+                            transition={{ duration: 0.4, ease: "easeOut" }}
+                          >
+                            <AnimatePresence mode="wait">
+                              {!isHovered ? (
+                                <motion.div
+                                  key="collapsed"
+                                  initial={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="p-3 md:p-5 h-full flex flex-col justify-center"
+                                >
+                                  <h3 className="text-white font-bold text-sm md:text-lg mb-1 md:mb-2 uppercase tracking-wide">
+                                    {card.title}
+                                  </h3>
+                                  <p className="text-white/70 text-[11px] md:text-sm leading-snug line-clamp-2 md:line-clamp-none">
+                                    {card.description}
+                                  </p>
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  key="expanded"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  transition={{ duration: 0.3 }}
+                                  className="h-full flex items-center justify-center p-4 md:p-5"
+                                >
                                   <div className="flex items-center gap-2 text-white hover:text-white/80 transition-colors cursor-pointer">
                                     <span className="text-base md:text-lg font-semibold uppercase">Explore</span>
                                     <ArrowRight className="w-5 h-5" />
                                   </div>
-                                )}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
                         </motion.div>
                       </motion.div>
-                    </motion.div>
-                  )
-                })}
+                    )
+                  })
+                )}
               </div>
-
-              {/* Close Button - safe area on mobile */}
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                onClick={onClose}
-                className="fixed top-4 right-4 md:absolute md:top-12 md:right-16 z-10 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-black/60 backdrop-blur-sm border border-white/20 rounded hover:bg-black/80 transition-colors"
-                aria-label="Close overlay"
-              >
-                <X className="w-4 h-4 md:w-5 md:h-5 text-white" />
-              </motion.button>
 
               {/* ESC Hint / Back Button - fixed at bottom on mobile so always visible */}
               <motion.button

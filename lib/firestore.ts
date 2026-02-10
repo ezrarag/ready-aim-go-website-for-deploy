@@ -140,6 +140,10 @@ type FirestoreClientDoc = {
   websiteUrl?: unknown
   appUrl?: unknown
   appStoreUrl?: unknown
+  rdUrl?: unknown
+  housingUrl?: unknown
+  transportationUrl?: unknown
+  insuranceUrl?: unknown
   modules?: unknown
 }
 
@@ -214,6 +218,10 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     websiteUrl: asString(doc.websiteUrl) || undefined,
     appUrl: asString(doc.appUrl) || undefined,
     appStoreUrl: asString(doc.appStoreUrl) || undefined,
+    rdUrl: asString(doc.rdUrl) || undefined,
+    housingUrl: asString(doc.housingUrl) || undefined,
+    transportationUrl: asString(doc.transportationUrl) || undefined,
+    insuranceUrl: asString(doc.insuranceUrl) || undefined,
     modules: asModules(doc.modules),
   }
 }

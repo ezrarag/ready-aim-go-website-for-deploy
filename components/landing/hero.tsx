@@ -7,7 +7,7 @@ import { StoryOverlay } from "./story-overlay"
 import { RosterOverlay } from "./roster-overlay"
 import { StoryAreaDetail } from "./story-area-detail"
 import type { Hero as RosterHero } from "./roster-overlay"
-import type { ClientDirectoryEntry } from "@/lib/client-directory"
+import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
 
 interface HeroProps {
   onWatchDemo?: () => void
@@ -36,6 +36,8 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
   const [showRosterOverlay, setShowRosterOverlay] = useState(false)
   const [showAreaDetail, setShowAreaDetail] = useState(false)
   const [areaDetailPayload, setAreaDetailPayload] = useState<{ clientId: string; areaId: string; areaTitle: string } | null>(null)
+  /** Module keys to show (only those with key field set on client: websiteUrl, appUrl, rdUrl, etc.). */
+  const [storyModuleKeysWithData, setStoryModuleKeysWithData] = useState<ModuleKey[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
@@ -103,6 +105,27 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
     }
   }, [heroes, currentStory])
 
+  // Only show story cards when the client has the key field set for that category (edit client URLs)
+  useEffect(() => {
+    if (!showStoryOverlay) {
+      setStoryModuleKeysWithData([])
+      return
+    }
+    const client = clients.find((c) => c.storyId === currentStory)
+    if (!client) {
+      setStoryModuleKeysWithData([])
+      return
+    }
+    const keys: ModuleKey[] = []
+    if (client.websiteUrl?.trim()) keys.push("web")
+    if (client.appUrl?.trim() || client.appStoreUrl?.trim()) keys.push("app")
+    if (client.rdUrl?.trim()) keys.push("rd")
+    if (client.housingUrl?.trim()) keys.push("housing")
+    if (client.transportationUrl?.trim()) keys.push("transportation")
+    if (client.insuranceUrl?.trim()) keys.push("insurance")
+    setStoryModuleKeysWithData(keys)
+  }, [showStoryOverlay, currentStory, clients])
+
   const videoUrl = getVideoUrl(currentStory)
 
   useEffect(() => {
@@ -165,7 +188,10 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
             className="text-white hover:text-white/80 transition-colors text-left"
           >
             <h2 className="text-7xl md:text-9xl font-bold uppercase tracking-tight leading-none" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              STORY
+              STORY{(() => {
+                const currentClient = clients.find((c) => c.storyId === currentStory)
+                return currentClient?.name ? `: ${currentClient.name.toUpperCase()}` : ""
+              })()}
             </h2>
           </button>
           <div className="flex items-center gap-3">
@@ -230,6 +256,7 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
         onClose={() => setShowStoryOverlay(false)}
         currentStory={currentStory}
         client={clients.find((c) => c.storyId === currentStory) ?? null}
+        moduleKeysWithData={storyModuleKeysWithData}
         onOpenModule={(clientId, moduleId, _areaTitle) => {
           const categorySlug = CATEGORY_SLUG_MAP[moduleId] ?? moduleId
           setShowStoryOverlay(false)

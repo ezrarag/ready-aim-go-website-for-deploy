@@ -13,7 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Users, 
   ExternalLink, 
@@ -26,10 +35,20 @@ import {
   Clock,
   Search,
   Filter,
-  MoreHorizontal
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  FileText
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import DashboardLayout from '@/components/dashboard-layout';
-import type { ClientDirectoryEntry } from '@/lib/client-directory';
+import type { ClientDirectoryEntry, ClientStatus, DeployStatus, StripeStatus } from '@/lib/client-directory';
 
 type Client = ClientDirectoryEntry;
 
@@ -41,6 +60,33 @@ export default function ClientsPage() {
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', storyId: '' });
   const [addSubmitting, setAddSubmitting] = useState(false);
+  const [editClientOpen, setEditClientOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    storyId: '',
+    brands: [] as string[],
+    status: 'onboarding' as ClientStatus,
+    deployStatus: 'building' as DeployStatus,
+    deployUrl: '',
+    stripeStatus: 'pending' as StripeStatus,
+    revenue: 0,
+    meetings: 0,
+    emails: 0,
+    commits: 0,
+    lastActivity: '',
+    pulseSummary: '',
+    websiteUrl: '',
+    appUrl: '',
+    appStoreUrl: '',
+    rdUrl: '',
+    housingUrl: '',
+    transportationUrl: '',
+    insuranceUrl: '',
+    storyVideoUrl: '',
+    isNewStory: false,
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => {
     fetchClientsData();
@@ -89,6 +135,80 @@ export default function ClientsPage() {
       alert(e instanceof Error ? e.message : 'Failed to create client');
     } finally {
       setAddSubmitting(false);
+    }
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setEditForm({
+      name: client.name,
+      storyId: client.storyId,
+      brands: client.brands || [],
+      status: client.status,
+      deployStatus: client.deployStatus,
+      deployUrl: client.deployUrl || '',
+      stripeStatus: client.stripeStatus,
+      revenue: client.revenue || 0,
+      meetings: client.meetings || 0,
+      emails: client.emails || 0,
+      commits: client.commits || 0,
+      lastActivity: client.lastActivity || '',
+      pulseSummary: client.pulseSummary || '',
+      websiteUrl: client.websiteUrl || '',
+      appUrl: client.appUrl || '',
+      appStoreUrl: client.appStoreUrl || '',
+      rdUrl: client.rdUrl || '',
+      housingUrl: client.housingUrl || '',
+      transportationUrl: client.transportationUrl || '',
+      insuranceUrl: client.insuranceUrl || '',
+      storyVideoUrl: client.storyVideoUrl || '',
+      isNewStory: client.isNewStory || false,
+    });
+    setEditClientOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingClient) return;
+    setEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(editingClient.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          storyId: editForm.storyId.trim(),
+          brands: editForm.brands,
+          status: editForm.status,
+          deployStatus: editForm.deployStatus,
+          deployUrl: editForm.deployUrl.trim() || undefined,
+          stripeStatus: editForm.stripeStatus,
+          revenue: editForm.revenue,
+          meetings: editForm.meetings,
+          emails: editForm.emails,
+          commits: editForm.commits,
+          lastActivity: editForm.lastActivity.trim() || new Date().toISOString(),
+          pulseSummary: editForm.pulseSummary.trim() || undefined,
+          websiteUrl: editForm.websiteUrl.trim() || undefined,
+          appUrl: editForm.appUrl.trim() || undefined,
+          appStoreUrl: editForm.appStoreUrl.trim() || undefined,
+          rdUrl: editForm.rdUrl.trim() || undefined,
+          housingUrl: editForm.housingUrl.trim() || undefined,
+          transportationUrl: editForm.transportationUrl.trim() || undefined,
+          insuranceUrl: editForm.insuranceUrl.trim() || undefined,
+          storyVideoUrl: editForm.storyVideoUrl.trim() || undefined,
+          isNewStory: editForm.isNewStory,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to update client');
+      setEditClientOpen(false);
+      setEditingClient(null);
+      await fetchClientsData();
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : 'Failed to update client');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -286,9 +406,33 @@ export default function ClientsPage() {
                       </a>
                     </Button>
                   )}
-                  <Button variant="outline" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditClient(client)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Client
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/clients/${client.id}`}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Details
+                        </Link>
+                      </DropdownMenuItem>
+                      {client.deployUrl && (
+                        <DropdownMenuItem asChild>
+                          <a href={client.deployUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open Deploy URL
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardContent>
             </Card>
@@ -383,6 +527,300 @@ export default function ClientsPage() {
             <Button variant="outline" onClick={() => setAddClientOpen(false)}>Cancel</Button>
             <Button onClick={handleAddClient} disabled={!addForm.name.trim() || !addForm.storyId.trim() || addSubmitting}>
               {addSubmitting ? 'Creating…' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={editClientOpen} onOpenChange={setEditClientOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>
+              Update client information in Firebase
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="Client name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-storyId">Story ID *</Label>
+                <Input
+                  id="edit-storyId"
+                  value={editForm.storyId}
+                  onChange={(e) => setEditForm({ ...editForm, storyId: e.target.value })}
+                  placeholder="e.g. femileasing"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-brands">Brands (comma-separated)</Label>
+              <Input
+                id="edit-brands"
+                value={editForm.brands.join(', ')}
+                onChange={(e) => setEditForm({ 
+                  ...editForm, 
+                  brands: e.target.value.split(',').map(b => b.trim()).filter(Boolean)
+                })}
+                placeholder="Brand 1, Brand 2, Brand 3"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value: ClientStatus) => setEditForm({ ...editForm, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="onboarding">Onboarding</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-deployStatus">Deploy Status</Label>
+                <Select
+                  value={editForm.deployStatus}
+                  onValueChange={(value: DeployStatus) => setEditForm({ ...editForm, deployStatus: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="live">Live</SelectItem>
+                    <SelectItem value="building">Building</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-stripeStatus">Stripe Status</Label>
+                <Select
+                  value={editForm.stripeStatus}
+                  onValueChange={(value: StripeStatus) => setEditForm({ ...editForm, stripeStatus: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="connected">Connected</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-deployUrl">Deploy URL</Label>
+              <Input
+                id="edit-deployUrl"
+                type="url"
+                value={editForm.deployUrl}
+                onChange={(e) => setEditForm({ ...editForm, deployUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-websiteUrl">Website URL</Label>
+                <Input
+                  id="edit-websiteUrl"
+                  type="url"
+                  value={editForm.websiteUrl}
+                  onChange={(e) => setEditForm({ ...editForm, websiteUrl: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-appUrl">App URL</Label>
+                <Input
+                  id="edit-appUrl"
+                  type="url"
+                  value={editForm.appUrl}
+                  onChange={(e) => setEditForm({ ...editForm, appUrl: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-appStoreUrl">App Store URL</Label>
+              <Input
+                id="edit-appStoreUrl"
+                type="url"
+                value={editForm.appStoreUrl}
+                onChange={(e) => setEditForm({ ...editForm, appStoreUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-rdUrl">R/D URL</Label>
+                <Input
+                  id="edit-rdUrl"
+                  type="url"
+                  value={editForm.rdUrl}
+                  onChange={(e) => setEditForm({ ...editForm, rdUrl: e.target.value })}
+                  placeholder="https://... (shows R/D card when set)"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-housingUrl">Housing URL</Label>
+                <Input
+                  id="edit-housingUrl"
+                  type="url"
+                  value={editForm.housingUrl}
+                  onChange={(e) => setEditForm({ ...editForm, housingUrl: e.target.value })}
+                  placeholder="https://... (shows Housing card when set)"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-transportationUrl">Transportation URL</Label>
+                <Input
+                  id="edit-transportationUrl"
+                  type="url"
+                  value={editForm.transportationUrl}
+                  onChange={(e) => setEditForm({ ...editForm, transportationUrl: e.target.value })}
+                  placeholder="https://... (shows Transportation card when set)"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-insuranceUrl">Insurance URL</Label>
+                <Input
+                  id="edit-insuranceUrl"
+                  type="url"
+                  value={editForm.insuranceUrl}
+                  onChange={(e) => setEditForm({ ...editForm, insuranceUrl: e.target.value })}
+                  placeholder="https://... (shows Insurance card when set)"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-storyVideoUrl">Story Video URL</Label>
+              <Input
+                id="edit-storyVideoUrl"
+                type="url"
+                value={editForm.storyVideoUrl}
+                onChange={(e) => setEditForm({ ...editForm, storyVideoUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="edit-revenue">Revenue</Label>
+                <Input
+                  id="edit-revenue"
+                  type="number"
+                  value={editForm.revenue}
+                  onChange={(e) => setEditForm({ ...editForm, revenue: parseFloat(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-meetings">Meetings</Label>
+                <Input
+                  id="edit-meetings"
+                  type="number"
+                  value={editForm.meetings}
+                  onChange={(e) => setEditForm({ ...editForm, meetings: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-emails">Emails</Label>
+                <Input
+                  id="edit-emails"
+                  type="number"
+                  value={editForm.emails}
+                  onChange={(e) => setEditForm({ ...editForm, emails: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-commits">Commits</Label>
+                <Input
+                  id="edit-commits"
+                  type="number"
+                  value={editForm.commits}
+                  onChange={(e) => setEditForm({ ...editForm, commits: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-lastActivity">Last Activity</Label>
+              <Input
+                id="edit-lastActivity"
+                type="datetime-local"
+                value={(() => {
+                  if (!editForm.lastActivity) return '';
+                  const d = new Date(editForm.lastActivity);
+                  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16);
+                })()}
+                onChange={(e) => setEditForm({ 
+                  ...editForm, 
+                  lastActivity: e.target.value ? new Date(e.target.value).toISOString() : ''
+                })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-pulseSummary">Pulse Summary</Label>
+              <Textarea
+                id="edit-pulseSummary"
+                value={editForm.pulseSummary}
+                onChange={(e) => setEditForm({ ...editForm, pulseSummary: e.target.value })}
+                placeholder="Summary of recent activity..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-isNewStory"
+                checked={editForm.isNewStory}
+                onChange={(e) => setEditForm({ ...editForm, isNewStory: e.target.checked })}
+                className="rounded"
+              />
+              <Label htmlFor="edit-isNewStory" className="cursor-pointer">
+                Is New Story
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditClientOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={!editForm.name.trim() || !editForm.storyId.trim() || editSubmitting}
+            >
+              {editSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>

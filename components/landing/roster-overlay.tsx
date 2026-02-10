@@ -65,23 +65,23 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
             onClick={onClose}
           />
 
-          {/* Overlay Content */}
+          {/* Overlay Content - scrollable when viewport is short (laptop/small desktop) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 md:px-8 pointer-events-none"
+            className="fixed inset-0 z-50 flex flex-col min-h-0 px-3 py-4 md:px-8 md:py-6 pointer-events-none overflow-hidden"
           >
-            <div className="pointer-events-auto w-full max-w-7xl">
-              {/* Title */}
-              <div className="mb-8">
-                <h2 className="text-5xl md:text-7xl font-bold text-white mb-2">HERO GALLERY</h2>
-                <p className="text-white/60 text-lg">Select a hero to explore their story</p>
+            <div className="pointer-events-auto w-full max-w-7xl flex flex-col flex-1 min-h-0 overflow-y-auto overscroll-contain pt-2 md:pt-0 mx-auto">
+              {/* Title - tighter on mobile */}
+              <div className="mb-4 md:mb-8 shrink-0">
+                <h2 className="text-3xl sm:text-4xl md:text-7xl font-bold text-white mb-1 md:mb-2">HERO GALLERY</h2>
+                <p className="text-white/60 text-sm md:text-lg">Select a hero to explore their story</p>
               </div>
 
-              {/* Heroes Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {/* Heroes Grid - smaller cards and gaps on mobile */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 pb-16 md:pb-0">
                 {heroes.map((hero, index) => {
                   const isSelected = hero.storyId === currentStory
                   return (
@@ -93,7 +93,7 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
                       className="group cursor-pointer relative"
                       onClick={() => handleHeroClick(hero)}
                     >
-                      <div className={`h-[280px] md:h-[320px] bg-black/60 backdrop-blur-sm border rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 flex flex-col ${
+                      <div className={`h-[220px] sm:h-[260px] md:h-[320px] bg-black/60 backdrop-blur-sm border rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 flex flex-col ${
                         isSelected 
                           ? 'border-orange-500 border-2' 
                           : 'border-white/20 hover:border-white/40'
@@ -112,8 +112,8 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
                           </video>
                           
                           {/* Hero Name Overlay */}
-                          <div className="relative z-10 text-center px-4">
-                            <h3 className="text-white font-bold text-2xl md:text-3xl uppercase tracking-wide drop-shadow-lg">
+                          <div className="relative z-10 text-center px-3">
+                            <h3 className="text-white font-bold text-lg sm:text-xl md:text-3xl uppercase tracking-wide drop-shadow-lg">
                               {hero.name}
                             </h3>
                           </div>
@@ -129,11 +129,11 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
                         </div>
 
                         {/* Bottom Section - Hero Info */}
-                        <div className="h-[40%] bg-gray-800/80 p-4 md:p-5 flex flex-col justify-center">
-                          <h3 className="text-white font-bold text-base md:text-lg mb-2 uppercase tracking-wide">
+                        <div className="h-[40%] bg-gray-800/80 p-3 md:p-5 flex flex-col justify-center">
+                          <h3 className="text-white font-bold text-sm md:text-lg mb-1 md:mb-2 uppercase tracking-wide">
                             {hero.name}
                           </h3>
-                          <p className="text-white/70 text-xs md:text-sm leading-relaxed">
+                          <p className="text-white/70 text-[11px] md:text-sm leading-snug">
                             {isSelected ? "Currently Selected" : "Click to select this hero"}
                           </p>
                         </div>
@@ -148,13 +148,13 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
                 </div>
               )}
 
-              {/* ESC Hint / Back Button */}
+              {/* ESC Hint / Back Button - fixed at bottom on mobile so always visible */}
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
                 onClick={onClose}
-                className="absolute bottom-8 left-8 md:bottom-12 md:left-16 text-white/60 text-sm font-mono hover:text-white/80 transition-colors cursor-pointer"
+                className="fixed bottom-4 left-4 right-4 md:absolute md:bottom-12 md:left-16 md:right-auto z-10 py-2 md:py-0 text-white/60 text-xs md:text-sm font-mono hover:text-white/80 transition-colors cursor-pointer flex justify-center md:justify-start"
                 aria-label="Go back"
               >
                 <div className="flex items-center gap-2">

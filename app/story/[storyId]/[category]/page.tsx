@@ -152,6 +152,7 @@ export default function StoryCategoryPage() {
   const categoryName = CATEGORY_DISPLAY[category]
   const hasWebsite = Boolean(client.websiteUrl?.trim())
   const hasApp = Boolean(client.appUrl?.trim() || client.appStoreUrl?.trim())
+  const showWebsitePreview = category === "website" && hasWebsite && client.websiteUrl
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
@@ -175,6 +176,49 @@ export default function StoryCategoryPage() {
             {categoryName}
           </p>
         </header>
+
+        {/* Website live preview + Visit link (only when category is website and URL is set) */}
+        {showWebsitePreview && (
+          <section className="mb-10">
+            <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <Globe className="w-5 h-5 text-orange-500" />
+              Live preview
+            </h2>
+            <a
+              href={client.websiteUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-lg overflow-hidden border border-white/10 bg-neutral-900/80 hover:border-orange-500/50 transition-colors"
+            >
+              <img
+                src={`https://api.microlink.io/?url=${encodeURIComponent(client.websiteUrl!)}&screenshot=true&meta=false&embed=screenshot.url&colorScheme=light`}
+                alt={`Preview of ${clientName} website`}
+                className="w-full h-auto max-h-[420px] object-cover object-top"
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement
+                  el.style.display = "none"
+                  const wrap = el.closest("a")
+                  if (wrap) {
+                    const fallback = document.createElement("div")
+                    fallback.className = "py-16 text-center text-white/60 text-sm"
+                    fallback.textContent = "Preview unavailable — click to visit site"
+                    wrap.appendChild(fallback)
+                  }
+                }}
+              />
+            </a>
+            <a
+              href={client.websiteUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              Visit Website
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </section>
+        )}
 
         {/* Build Updates (from Firestore) */}
         <section className="mb-10">
