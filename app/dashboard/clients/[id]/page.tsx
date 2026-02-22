@@ -55,6 +55,20 @@ const MODULE_TYPES: { value: ModuleKey; label: string }[] = [
   { value: "insurance", label: "Insurance" },
 ]
 
+interface BeamDirectoryEntry {
+  id: string
+  label: string
+  title: string
+  subtitle: string
+  url: string
+  previewImageUrl: string
+  sortOrder: number
+  isActive: boolean
+  createdBy: string
+  updatedBy: string
+  source: string
+}
+
 export default function ClientDetailPage() {
   const params = useParams()
   const clientId = params.id as string
@@ -97,6 +111,10 @@ export default function ClientDetailPage() {
     isNewStory: false,
   })
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [beamEntries, setBeamEntries] = useState<BeamDirectoryEntry[]>([])
+  const [beamLoading, setBeamLoading] = useState(false)
+  const [beamError, setBeamError] = useState<string | null>(null)
+  const [selectedBeamEntryId, setSelectedBeamEntryId] = useState<string | null>(null)
 
   const fetchClient = () => {
     if (!clientId) return
@@ -162,6 +180,45 @@ export default function ClientDetailPage() {
     if (!clientId) return
     fetchUpdates()
   }, [clientId])
+
+  useEffect(() => {
+    let cancelled = false
+    setBeamLoading(true)
+    setBeamError(null)
+
+    fetch("/api/beam/website-directory/internal", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return
+        const entries = Array.isArray(data?.entries) ? (data.entries as BeamDirectoryEntry[]) : []
+        setBeamEntries(entries)
+        if (!data?.success) {
+          setBeamError(data?.error || "Unable to sync BEAM sites right now.")
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        setBeamEntries([])
+        setBeamError("Unable to sync BEAM sites right now.")
+      })
+      .finally(() => {
+        if (!cancelled) setBeamLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (beamEntries.length === 0) {
+      setSelectedBeamEntryId(null)
+      return
+    }
+    if (!selectedBeamEntryId || !beamEntries.some((entry) => entry.id === selectedBeamEntryId)) {
+      setSelectedBeamEntryId(beamEntries[0].id)
+    }
+  }, [beamEntries, selectedBeamEntryId])
 
   const handleCreateUpdate = async () => {
     if (!form.title.trim()) return
@@ -280,6 +337,8 @@ export default function ClientDetailPage() {
     )
   }
 
+  const selectedBeamEntry = beamEntries.find((entry) => entry.id === selectedBeamEntryId) || null
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -335,6 +394,82 @@ export default function ClientDetailPage() {
                   >
                     <ExternalLink className="h-4 w-4" /> Deploy URL
                   </a>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  BEAM Home Sites
+                  <Badge className="bg-cyan-700 text-white">Read-only</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Internal BEAM directory sync for site switching. Existing client data remains unchanged.
+                </p>
+
+                {beamError && (
+                  <p className="text-sm text-amber-600">{beamError}</p>
+                )}
+
+                {beamLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading BEAM sites…</p>
+                ) : beamEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No BEAM sites available yet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Site Switch</p>
+                      {beamEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => setSelectedBeamEntryId(entry.id)}
+                          className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${
+                            selectedBeamEntryId === entry.id
+                              ? "bg-cyan-50 border-cyan-300 text-cyan-900"
+                              : "bg-background border-border hover:border-cyan-200"
+                          }`}
+                        >
+                          {entry.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="lg:col-span-2">
+                      {selectedBeamEntry && (
+                        <div className="border rounded-lg overflow-hidden bg-card">
+                          {selectedBeamEntry.previewImageUrl ? (
+                            <img
+                              src={selectedBeamEntry.previewImageUrl}
+                              alt={selectedBeamEntry.title}
+                              className="w-full h-44 object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-44 bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                              No preview image
+                            </div>
+                          )}
+                          <div className="p-4">
+                            <p className="font-semibold">{selectedBeamEntry.title}</p>
+                            {selectedBeamEntry.subtitle && (
+                              <p className="text-sm text-muted-foreground mt-1">{selectedBeamEntry.subtitle}</p>
+                            )}
+                            <a
+                              href={selectedBeamEntry.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-4 text-cyan-700 hover:text-cyan-800 font-medium"
+                            >
+                              Visit Site
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

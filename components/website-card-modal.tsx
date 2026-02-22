@@ -80,6 +80,20 @@ interface LivePerformanceData {
   };
 }
 
+interface BeamDirectoryEntry {
+  id: string;
+  label: string;
+  title: string;
+  subtitle: string;
+  url: string;
+  previewImageUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdBy: string;
+  updatedBy: string;
+  source: string;
+}
+
 import { TodoItem } from '@/lib/services/github-service';
 
 interface WebsiteCardModalProps {
@@ -101,6 +115,10 @@ export function WebsiteCardModal({ open, onClose, websiteInfo, clientPlan }: Web
   const [loadingPerformance, setLoadingPerformance] = useState(false);
   const [trafficError, setTrafficError] = useState<string | null>(null);
   const [performanceError, setPerformanceError] = useState<string | null>(null);
+  const [beamEntries, setBeamEntries] = useState<BeamDirectoryEntry[]>([]);
+  const [beamLoading, setBeamLoading] = useState(false);
+  const [beamError, setBeamError] = useState<string | null>(null);
+  const [selectedBeamEntryId, setSelectedBeamEntryId] = useState<string | null>(null);
 
   // Use GitHub service to fetch TODO.me content
   const { todoItems, loading: loadingTodos, error: todoError, isConfigured: githubConfigured } = useGitHubTodoMe(
@@ -237,6 +255,48 @@ export function WebsiteCardModal({ open, onClose, websiteInfo, clientPlan }: Web
     }
   }, [activeTab, websiteInfo]);
 
+  // Fetch BEAM Home internal directory (read-only) when modal opens.
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setBeamLoading(true);
+    setBeamError(null);
+
+    fetch('/api/beam/website-directory/internal', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const entries = Array.isArray(data?.entries) ? (data.entries as BeamDirectoryEntry[]) : [];
+        setBeamEntries(entries);
+        if (!data?.success) {
+          setBeamError(data?.error || 'Unable to sync BEAM sites right now.');
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBeamEntries([]);
+        setBeamError('Unable to sync BEAM sites right now.');
+      })
+      .finally(() => {
+        if (!cancelled) setBeamLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (beamEntries.length === 0) {
+      setSelectedBeamEntryId(null);
+      return;
+    }
+    if (!selectedBeamEntryId || !beamEntries.some((entry) => entry.id === selectedBeamEntryId)) {
+      setSelectedBeamEntryId(beamEntries[0].id);
+    }
+  }, [beamEntries, selectedBeamEntryId]);
+
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -276,6 +336,8 @@ export function WebsiteCardModal({ open, onClose, websiteInfo, clientPlan }: Web
       default: return 'bg-gray-600';
     }
   };
+
+  const selectedBeamEntry = beamEntries.find((entry) => entry.id === selectedBeamEntryId) || null;
 
   if (!websiteInfo) return null;
 
@@ -332,6 +394,90 @@ export function WebsiteCardModal({ open, onClose, websiteInfo, clientPlan }: Web
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* BEAM Home Site Switch (read-only) */}
+            <Card className="bg-neutral-800 border-neutral-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  BEAM Home Sites
+                  <Badge className="bg-cyan-700 text-white">Read-only</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-neutral-400">
+                  Internal directory sync from BEAM Home. Existing client website behavior is unchanged.
+                </p>
+
+                {beamError && (
+                  <div className="flex items-center gap-2 p-3 bg-yellow-900/20 border border-yellow-700 rounded text-yellow-300">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm">{beamError}</span>
+                  </div>
+                )}
+
+                {beamLoading ? (
+                  <p className="text-sm text-neutral-400">Loading BEAM sites…</p>
+                ) : beamEntries.length === 0 ? (
+                  <p className="text-sm text-neutral-500">No BEAM sites available yet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-1 space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-neutral-500">Site Switch</p>
+                      {beamEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => setSelectedBeamEntryId(entry.id)}
+                          className={`w-full text-left px-3 py-2 rounded border transition-colors ${
+                            selectedBeamEntryId === entry.id
+                              ? 'bg-cyan-600/20 border-cyan-500 text-white'
+                              : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:border-neutral-500'
+                          }`}
+                        >
+                          <span className="text-sm font-medium">{entry.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      {selectedBeamEntry && (
+                        <div className="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden">
+                          {selectedBeamEntry.previewImageUrl ? (
+                            <img
+                              src={selectedBeamEntry.previewImageUrl}
+                              alt={selectedBeamEntry.title}
+                              className="w-full h-44 object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-44 bg-neutral-800 flex items-center justify-center text-neutral-500 text-sm">
+                              No preview image
+                            </div>
+                          )}
+                          <div className="p-4">
+                            <p className="text-base font-semibold text-white">{selectedBeamEntry.title}</p>
+                            {selectedBeamEntry.subtitle && (
+                              <p className="text-sm text-neutral-400 mt-1">{selectedBeamEntry.subtitle}</p>
+                            )}
+                            <div className="mt-4">
+                              <a
+                                href={selectedBeamEntry.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded"
+                              >
+                                Visit Site
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
