@@ -1,15 +1,33 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Users, Trophy, Volume2, Wifi, Battery, Menu, MessageCircle, Mic, Video } from "lucide-react"
+import { Users, Trophy, Volume2, VolumeX, Wifi, Battery, Menu, MessageCircle, Mic, Video } from "lucide-react"
 
 export default function BusinessPage() {
   const [activeMenuItem, setActiveMenuItem] = useState("PLAY")
+  const [isMusicEnabled, setIsMusicEnabled] = useState(false)
   // TODO: Replace with your background image URL when ready
   // Example: const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>("https://your-image-url.com/image.jpg")
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null)
+  const backgroundMusicRef = useRef<HTMLAudioElement>(null)
+
+  const BUSINESS_LOADING_TRACK =
+    "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fbusiness-loading-page%2Fmusic%2FLil%20Revenged%20-%20No%20Lies.mp3?alt=media&token=5a2b9656-14f8-4851-bfa8-c81d5611d4c1"
+
+  useEffect(() => {
+    const audio = backgroundMusicRef.current
+    if (!audio) return
+
+    if (isMusicEnabled) {
+      audio.play().catch(() => {})
+      return
+    }
+
+    audio.pause()
+    audio.currentTime = 0
+  }, [isMusicEnabled])
 
   const menuItems = [
     { id: "PLAY", label: "PLAY" },
@@ -25,6 +43,8 @@ export default function BusinessPage() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
+      <audio ref={backgroundMusicRef} src={BUSINESS_LOADING_TRACK} loop preload="auto" />
+
       {/* Background Image - Full Screen */}
       <div 
         className="absolute inset-0 z-0"
@@ -99,7 +119,14 @@ export default function BusinessPage() {
 
             {/* System Icons */}
             <div className="flex items-center gap-3 ml-2">
-              <Volume2 className="w-5 h-5 text-white/80" />
+              <button
+                onClick={() => setIsMusicEnabled((prev) => !prev)}
+                className="text-white/80 hover:text-white transition-colors"
+                aria-label={isMusicEnabled ? "Disable background music" : "Enable background music"}
+                title={isMusicEnabled ? "Disable background music" : "Enable background music"}
+              >
+                {isMusicEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
               <Wifi className="w-5 h-5 text-white/80" />
               <Battery className="w-5 h-5 text-white/80" />
             </div>

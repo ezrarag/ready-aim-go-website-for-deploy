@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""
     const storyId = typeof body.storyId === "string" ? body.storyId.trim() : ""
-    if (!name || !storyId) {
+    const storyVideoUrl = typeof body.storyVideoUrl === "string" ? body.storyVideoUrl.trim() : ""
+    if (!name || !storyId || !storyVideoUrl) {
       return NextResponse.json(
-        { success: false, error: "name and storyId are required" },
+        { success: false, error: "name, storyId, and storyVideoUrl are required" },
         { status: 400 }
       )
     }
@@ -54,6 +55,16 @@ export async function POST(request: NextRequest) {
     const id = await createClientDocument({
       name,
       storyId,
+      storyVideoUrl,
+      githubRepo: typeof body.githubRepo === "string" ? body.githubRepo.trim() : undefined,
+      githubRepos: Array.isArray(body.githubRepos)
+        ? body.githubRepos.filter((v: unknown): v is string => typeof v === "string")
+        : undefined,
+      deployHosts: Array.isArray(body.deployHosts)
+        ? body.deployHosts.filter((v: unknown): v is string => typeof v === "string")
+        : undefined,
+      deployUrl: typeof body.deployUrl === "string" ? body.deployUrl.trim() : undefined,
+      showOnFrontend: body.showOnFrontend !== false,
       brands: Array.isArray(body.brands) ? body.brands : [],
       status: body.status ?? "onboarding",
       modules,

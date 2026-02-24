@@ -4,6 +4,7 @@ import {
   getLatestPublishedUpdate,
 } from "@/lib/firestore"
 import type { ModuleKey } from "@/lib/client-directory"
+import { collectClientDeployHosts, collectClientGithubRepos } from "@/lib/pulse-selectors"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -70,8 +71,9 @@ export async function PATCH(
     }
     const allowed = [
       "name", "storyId", "brands", "status", "lastActivity", "pulseSummary",
-      "deployStatus", "deployUrl", "stripeStatus", "revenue", "meetings", "emails",
+      "deployStatus", "deployUrl", "githubRepo", "githubRepos", "deployHosts", "pulseReport", "stripeStatus", "revenue", "meetings", "emails",
       "commits", "lastDeploy", "storyVideoUrl", "isNewStory", "modules",
+      "showOnFrontend",
       "websiteUrl", "appUrl", "appStoreUrl",
       "rdUrl", "housingUrl", "transportationUrl", "insuranceUrl",
     ] as const
@@ -79,9 +81,40 @@ export async function PATCH(
     for (const key of allowed) {
       if (key in body) updates[key] = body[key]
     }
+    const githubRepos = collectClientGithubRepos({
+      githubRepo:
+        typeof (updates.githubRepo ?? body.githubRepo) === "string"
+          ? String(updates.githubRepo ?? body.githubRepo)
+          : undefined,
+      githubRepos: Array.isArray(updates.githubRepos)
+        ? updates.githubRepos.filter((v): v is string => typeof v === "string")
+        : Array.isArray(body.githubRepos)
+          ? body.githubRepos.filter((v: unknown): v is string => typeof v === "string")
+          : undefined,
+    })
+    if ("githubRepo" in updates || "githubRepos" in updates) {
+      updates.githubRepos = githubRepos
+      updates.githubRepo = githubRepos[0] ?? null
+    }
+
+    const deployHosts = collectClientDeployHosts({
+      deployUrl:
+        typeof (updates.deployUrl ?? body.deployUrl) === "string"
+          ? String(updates.deployUrl ?? body.deployUrl)
+          : undefined,
+      deployHosts: Array.isArray(updates.deployHosts)
+        ? updates.deployHosts.filter((v): v is string => typeof v === "string")
+        : Array.isArray(body.deployHosts)
+          ? body.deployHosts.filter((v: unknown): v is string => typeof v === "string")
+          : undefined,
+    })
+    if ("deployUrl" in updates || "deployHosts" in updates) {
+      updates.deployHosts = deployHosts
+    }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ success: true })
     }
+    updates.updatedAt = new Date().toISOString()
     await ref.update(updates)
     return NextResponse.json({ success: true })
   } catch (error) {

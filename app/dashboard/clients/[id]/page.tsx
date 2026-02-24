@@ -101,6 +101,9 @@ export default function ClientDetailPage() {
     lastActivity: '',
     pulseSummary: '',
     websiteUrl: '',
+    githubRepo: '',
+    githubReposCsv: '',
+    deployHostsCsv: '',
     appUrl: '',
     appStoreUrl: '',
     rdUrl: '',
@@ -108,9 +111,11 @@ export default function ClientDetailPage() {
     transportationUrl: '',
     insuranceUrl: '',
     storyVideoUrl: '',
+    showOnFrontend: true,
     isNewStory: false,
   })
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [generatingPulse, setGeneratingPulse] = useState(false)
   const [beamEntries, setBeamEntries] = useState<BeamDirectoryEntry[]>([])
   const [beamLoading, setBeamLoading] = useState(false)
   const [beamError, setBeamError] = useState<string | null>(null)
@@ -140,6 +145,9 @@ export default function ClientDetailPage() {
             lastActivity: data.client.lastActivity || '',
             pulseSummary: data.client.pulseSummary || '',
             websiteUrl: data.client.websiteUrl || '',
+            githubRepo: data.client.githubRepo || '',
+            githubReposCsv: Array.isArray(data.client.githubRepos) ? data.client.githubRepos.join(', ') : '',
+            deployHostsCsv: Array.isArray(data.client.deployHosts) ? data.client.deployHosts.join(', ') : '',
             appUrl: data.client.appUrl || '',
             appStoreUrl: data.client.appStoreUrl || '',
             rdUrl: data.client.rdUrl || '',
@@ -147,6 +155,7 @@ export default function ClientDetailPage() {
             transportationUrl: data.client.transportationUrl || '',
             insuranceUrl: data.client.insuranceUrl || '',
             storyVideoUrl: data.client.storyVideoUrl || '',
+            showOnFrontend: data.client.showOnFrontend !== false,
             isNewStory: data.client.isNewStory || false,
           })
         }
@@ -285,6 +294,11 @@ export default function ClientDetailPage() {
 
   const handleSaveEdit = async () => {
     if (!clientId) return
+    const storyVideoUrl = editForm.storyVideoUrl.trim()
+    if (!storyVideoUrl) {
+      alert('Story Video URL is required')
+      return
+    }
     setEditSubmitting(true)
     try {
       const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
@@ -305,13 +319,23 @@ export default function ClientDetailPage() {
           lastActivity: editForm.lastActivity.trim() || new Date().toISOString(),
           pulseSummary: editForm.pulseSummary.trim() || undefined,
           websiteUrl: editForm.websiteUrl.trim() || undefined,
+          githubRepo: editForm.githubRepo.trim() || undefined,
+          githubRepos: editForm.githubReposCsv
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
+          deployHosts: editForm.deployHostsCsv
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
           appUrl: editForm.appUrl.trim() || undefined,
           appStoreUrl: editForm.appStoreUrl.trim() || undefined,
           rdUrl: editForm.rdUrl.trim() || undefined,
           housingUrl: editForm.housingUrl.trim() || undefined,
           transportationUrl: editForm.transportationUrl.trim() || undefined,
           insuranceUrl: editForm.insuranceUrl.trim() || undefined,
-          storyVideoUrl: editForm.storyVideoUrl.trim() || undefined,
+          storyVideoUrl,
+          showOnFrontend: editForm.showOnFrontend,
           isNewStory: editForm.isNewStory,
         }),
       })
@@ -324,6 +348,25 @@ export default function ClientDetailPage() {
       alert(e instanceof Error ? e.message : 'Failed to update client')
     } finally {
       setEditSubmitting(false)
+    }
+  }
+
+  const handleGeneratePulseSummary = async () => {
+    if (!clientId) return
+    setGeneratingPulse(true)
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/pulse-suggestions`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Failed to generate pulse summary")
+      const suggestions: string[] = Array.isArray(data.suggestions) ? data.suggestions : []
+      const combined = [data.summary, ...suggestions.map((s) => `- ${s}`)].filter(Boolean).join("\n")
+      setEditForm((prev) => ({ ...prev, pulseSummary: combined }))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to generate pulse summary")
+    } finally {
+      setGeneratingPulse(false)
     }
   }
 
@@ -770,6 +813,37 @@ export default function ClientDetailPage() {
             </div>
 
             <div>
+              <Label htmlFor="edit-githubRepo">GitHub Repo</Label>
+              <Input
+                id="edit-githubRepo"
+                value={editForm.githubRepo}
+                onChange={(e) => setEditForm({ ...editForm, githubRepo: e.target.value })}
+                placeholder="owner/repo or https://github.com/owner/repo"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-githubReposCsv">GitHub Repos (CSV)</Label>
+                <Input
+                  id="edit-githubReposCsv"
+                  value={editForm.githubReposCsv}
+                  onChange={(e) => setEditForm({ ...editForm, githubReposCsv: e.target.value })}
+                  placeholder="owner/repo-one, owner/repo-two"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-deployHostsCsv">Deploy Hosts (CSV)</Label>
+                <Input
+                  id="edit-deployHostsCsv"
+                  value={editForm.deployHostsCsv}
+                  onChange={(e) => setEditForm({ ...editForm, deployHostsCsv: e.target.value })}
+                  placeholder="app.example.com, preview.example.com"
+                />
+              </div>
+            </div>
+
+            <div>
               <Label htmlFor="edit-appStoreUrl">App Store URL</Label>
               <Input
                 id="edit-appStoreUrl"
@@ -826,7 +900,7 @@ export default function ClientDetailPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-storyVideoUrl">Story Video URL</Label>
+              <Label htmlFor="edit-storyVideoUrl">Story Video URL *</Label>
               <Input
                 id="edit-storyVideoUrl"
                 type="url"
@@ -834,6 +908,19 @@ export default function ClientDetailPage() {
                 onChange={(e) => setEditForm({ ...editForm, storyVideoUrl: e.target.value })}
                 placeholder="https://..."
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-showOnFrontend"
+                checked={editForm.showOnFrontend}
+                onChange={(e) => setEditForm({ ...editForm, showOnFrontend: e.target.checked })}
+                className="rounded"
+              />
+              <Label htmlFor="edit-showOnFrontend" className="cursor-pointer">
+                Show on Frontend Roster
+              </Label>
             </div>
 
             <div className="grid grid-cols-4 gap-4">
@@ -884,7 +971,11 @@ export default function ClientDetailPage() {
               <Input
                 id="edit-lastActivity"
                 type="datetime-local"
-                value={editForm.lastActivity ? new Date(editForm.lastActivity).toISOString().slice(0, 16) : ''}
+                value={(() => {
+                  if (!editForm.lastActivity) return ''
+                  const d = new Date(editForm.lastActivity)
+                  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16)
+                })()}
                 onChange={(e) => setEditForm({ 
                   ...editForm, 
                   lastActivity: e.target.value ? new Date(e.target.value).toISOString() : ''
@@ -893,7 +984,18 @@ export default function ClientDetailPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-pulseSummary">Pulse Summary</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="edit-pulseSummary">Pulse Summary</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeneratePulseSummary}
+                  disabled={generatingPulse}
+                >
+                  {generatingPulse ? "Generating…" : "Generate Pulse Summary"}
+                </Button>
+              </div>
               <Textarea
                 id="edit-pulseSummary"
                 value={editForm.pulseSummary}
@@ -922,7 +1024,7 @@ export default function ClientDetailPage() {
             </Button>
             <Button 
               onClick={handleSaveEdit} 
-              disabled={!editForm.name.trim() || !editForm.storyId.trim() || editSubmitting}
+              disabled={!editForm.name.trim() || !editForm.storyId.trim() || !editForm.storyVideoUrl.trim() || editSubmitting}
             >
               {editSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>

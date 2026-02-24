@@ -56,9 +56,10 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [missingFieldFilter, setMissingFieldFilter] = useState<'all' | 'storyVideo' | 'websiteUrl'>('all');
   const [loading, setLoading] = useState(true);
   const [addClientOpen, setAddClientOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', storyId: '' });
+  const [addForm, setAddForm] = useState({ name: '', storyId: '', storyVideoUrl: '', githubRepo: '', showOnFrontend: true });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [editClientOpen, setEditClientOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -77,6 +78,9 @@ export default function ClientsPage() {
     lastActivity: '',
     pulseSummary: '',
     websiteUrl: '',
+    githubRepo: '',
+    githubReposCsv: '',
+    deployHostsCsv: '',
     appUrl: '',
     appStoreUrl: '',
     rdUrl: '',
@@ -84,9 +88,11 @@ export default function ClientsPage() {
     transportationUrl: '',
     insuranceUrl: '',
     storyVideoUrl: '',
+    showOnFrontend: true,
     isNewStory: false,
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [generatingPulse, setGeneratingPulse] = useState(false);
 
   useEffect(() => {
     fetchClientsData();
@@ -94,7 +100,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     filterClients();
-  }, [searchTerm, clients]);
+  }, [searchTerm, clients, missingFieldFilter]);
 
   const fetchClientsData = async () => {
     try {
@@ -117,18 +123,26 @@ export default function ClientsPage() {
   const handleAddClient = async () => {
     const name = addForm.name.trim();
     const storyId = addForm.storyId.trim();
-    if (!name || !storyId) return;
+    const storyVideoUrl = addForm.storyVideoUrl.trim();
+    if (!name || !storyId || !storyVideoUrl) return;
     setAddSubmitting(true);
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, storyId }),
+        body: JSON.stringify({
+          name,
+          storyId,
+          storyVideoUrl,
+      githubRepo: addForm.githubRepo.trim() || undefined,
+      githubRepos: addForm.githubRepo.trim() ? [addForm.githubRepo.trim()] : undefined,
+          showOnFrontend: addForm.showOnFrontend
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to create client');
       setAddClientOpen(false);
-      setAddForm({ name: '', storyId: '' });
+      setAddForm({ name: '', storyId: '', storyVideoUrl: '', githubRepo: '', showOnFrontend: true });
       await fetchClientsData();
     } catch (e) {
       console.error(e);
@@ -155,6 +169,9 @@ export default function ClientsPage() {
       lastActivity: client.lastActivity || '',
       pulseSummary: client.pulseSummary || '',
       websiteUrl: client.websiteUrl || '',
+      githubRepo: client.githubRepo || '',
+      githubReposCsv: Array.isArray(client.githubRepos) ? client.githubRepos.join(', ') : '',
+      deployHostsCsv: Array.isArray(client.deployHosts) ? client.deployHosts.join(', ') : '',
       appUrl: client.appUrl || '',
       appStoreUrl: client.appStoreUrl || '',
       rdUrl: client.rdUrl || '',
@@ -162,6 +179,7 @@ export default function ClientsPage() {
       transportationUrl: client.transportationUrl || '',
       insuranceUrl: client.insuranceUrl || '',
       storyVideoUrl: client.storyVideoUrl || '',
+      showOnFrontend: client.showOnFrontend !== false,
       isNewStory: client.isNewStory || false,
     });
     setEditClientOpen(true);
@@ -169,6 +187,11 @@ export default function ClientsPage() {
 
   const handleSaveEdit = async () => {
     if (!editingClient) return;
+    const storyVideoUrl = editForm.storyVideoUrl.trim();
+    if (!storyVideoUrl) {
+      alert('Story Video URL is required');
+      return;
+    }
     setEditSubmitting(true);
     try {
       const res = await fetch(`/api/clients/${encodeURIComponent(editingClient.id)}`, {
@@ -189,13 +212,23 @@ export default function ClientsPage() {
           lastActivity: editForm.lastActivity.trim() || new Date().toISOString(),
           pulseSummary: editForm.pulseSummary.trim() || undefined,
           websiteUrl: editForm.websiteUrl.trim() || undefined,
+          githubRepo: editForm.githubRepo.trim() || undefined,
+          githubRepos: editForm.githubReposCsv
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
+          deployHosts: editForm.deployHostsCsv
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
           appUrl: editForm.appUrl.trim() || undefined,
           appStoreUrl: editForm.appStoreUrl.trim() || undefined,
           rdUrl: editForm.rdUrl.trim() || undefined,
           housingUrl: editForm.housingUrl.trim() || undefined,
           transportationUrl: editForm.transportationUrl.trim() || undefined,
           insuranceUrl: editForm.insuranceUrl.trim() || undefined,
-          storyVideoUrl: editForm.storyVideoUrl.trim() || undefined,
+          storyVideoUrl,
+          showOnFrontend: editForm.showOnFrontend,
           isNewStory: editForm.isNewStory,
         }),
       });
@@ -212,16 +245,53 @@ export default function ClientsPage() {
     }
   };
 
+  const handleGeneratePulseSummary = async () => {
+    if (!editingClient) return;
+    setGeneratingPulse(true);
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(editingClient.id)}/pulse-suggestions`, {
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to generate pulse summary');
+      const suggestions: string[] = Array.isArray(data.suggestions) ? data.suggestions : [];
+      const combined = [data.summary, ...suggestions.map((s) => `- ${s}`)].filter(Boolean).join('\n');
+      setEditForm((prev) => ({ ...prev, pulseSummary: combined }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to generate pulse summary');
+    } finally {
+      setGeneratingPulse(false);
+    }
+  };
+
   const filterClients = () => {
-    if (!searchTerm) {
-      setFilteredClients(clients);
-      return;
+    let filtered = [...clients];
+
+    if (searchTerm) {
+      filtered = filtered.filter(client =>
+        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.brands.some(brand => brand.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
     }
 
-    const filtered = clients.filter(client =>
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.brands.some(brand => brand.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    if (missingFieldFilter === 'storyVideo') {
+      filtered = filtered.filter(client => !client.storyVideoUrl?.trim());
+    }
+    if (missingFieldFilter === 'websiteUrl') {
+      filtered = filtered.filter(client => !client.websiteUrl?.trim());
+    }
+
+    const toTs = (value?: string): number => {
+      if (!value) return 0;
+      const t = new Date(value).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    };
+    filtered.sort((a, b) => {
+      const aTs = toTs(a.updatedAt) || toTs(a.lastActivity);
+      const bTs = toTs(b.updatedAt) || toTs(b.lastActivity);
+      return bTs - aTs;
+    });
+
     setFilteredClients(filtered);
   };
 
@@ -316,6 +386,16 @@ export default function ClientsPage() {
                 Filter
               </Button>
             </div>
+            {missingFieldFilter === 'storyVideo' && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Showing only clients missing Story Video URL.
+              </p>
+            )}
+            {missingFieldFilter === 'websiteUrl' && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Showing only clients missing Website URL.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -453,14 +533,20 @@ export default function ClientsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all ${missingFieldFilter === 'storyVideo' ? 'ring-2 ring-orange-500 border-orange-500/40' : ''}`}
+            onClick={() => setMissingFieldFilter((prev) => (prev === 'storyVideo' ? 'all' : 'storyVideo'))}
+          >
             <CardContent className="p-6">
               <div className="flex items-center">
                 <CheckCircle className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
+                  <p className="text-sm font-medium text-muted-foreground">Active Client Stories</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {clients.filter(c => c.status === 'active').length}
+                    {clients.filter(c => Boolean(c.storyVideoUrl?.trim())).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Missing: {clients.filter(c => !c.storyVideoUrl?.trim()).length}
                   </p>
                 </div>
               </div>
@@ -481,14 +567,20 @@ export default function ClientsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all ${missingFieldFilter === 'websiteUrl' ? 'ring-2 ring-orange-500 border-orange-500/40' : ''}`}
+            onClick={() => setMissingFieldFilter((prev) => (prev === 'websiteUrl' ? 'all' : 'websiteUrl'))}
+          >
             <CardContent className="p-6">
               <div className="flex items-center">
                 <GitBranch className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Total Commits</p>
+                  <p className="text-sm font-medium text-muted-foreground">Websites Connected</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {clients.reduce((sum, c) => sum + c.commits, 0)}
+                    {clients.filter(c => Boolean(c.websiteUrl?.trim())).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Missing: {clients.filter(c => !c.websiteUrl?.trim()).length}
                   </p>
                 </div>
               </div>
@@ -522,10 +614,41 @@ export default function ClientsPage() {
               />
               <p className="text-xs text-muted-foreground mt-1">Used in roster and story (URL-friendly id).</p>
             </div>
+            <div>
+              <Label htmlFor="add-storyVideoUrl">Story Video URL *</Label>
+              <Input
+                id="add-storyVideoUrl"
+                type="url"
+                value={addForm.storyVideoUrl}
+                onChange={(e) => setAddForm((f) => ({ ...f, storyVideoUrl: e.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-githubRepo">GitHub Repo (optional)</Label>
+              <Input
+                id="add-githubRepo"
+                value={addForm.githubRepo}
+                onChange={(e) => setAddForm((f) => ({ ...f, githubRepo: e.target.value }))}
+                placeholder="owner/repo or https://github.com/owner/repo"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="add-showOnFrontend"
+                checked={addForm.showOnFrontend}
+                onChange={(e) => setAddForm((f) => ({ ...f, showOnFrontend: e.target.checked }))}
+                className="rounded"
+              />
+              <Label htmlFor="add-showOnFrontend" className="cursor-pointer">
+                Show on Frontend Roster
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddClientOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddClient} disabled={!addForm.name.trim() || !addForm.storyId.trim() || addSubmitting}>
+            <Button onClick={handleAddClient} disabled={!addForm.name.trim() || !addForm.storyId.trim() || !addForm.storyVideoUrl.trim() || addSubmitting}>
               {addSubmitting ? 'Creating…' : 'Create'}
             </Button>
           </DialogFooter>
@@ -662,6 +785,37 @@ export default function ClientsPage() {
             </div>
 
             <div>
+              <Label htmlFor="edit-githubRepo">GitHub Repo</Label>
+              <Input
+                id="edit-githubRepo"
+                value={editForm.githubRepo}
+                onChange={(e) => setEditForm({ ...editForm, githubRepo: e.target.value })}
+                placeholder="owner/repo or https://github.com/owner/repo"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-githubReposCsv">GitHub Repos (CSV)</Label>
+                <Input
+                  id="edit-githubReposCsv"
+                  value={editForm.githubReposCsv}
+                  onChange={(e) => setEditForm({ ...editForm, githubReposCsv: e.target.value })}
+                  placeholder="owner/repo-one, owner/repo-two"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-deployHostsCsv">Deploy Hosts (CSV)</Label>
+                <Input
+                  id="edit-deployHostsCsv"
+                  value={editForm.deployHostsCsv}
+                  onChange={(e) => setEditForm({ ...editForm, deployHostsCsv: e.target.value })}
+                  placeholder="app.example.com, preview.example.com"
+                />
+              </div>
+            </div>
+
+            <div>
               <Label htmlFor="edit-appStoreUrl">App Store URL</Label>
               <Input
                 id="edit-appStoreUrl"
@@ -718,7 +872,7 @@ export default function ClientsPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-storyVideoUrl">Story Video URL</Label>
+              <Label htmlFor="edit-storyVideoUrl">Story Video URL *</Label>
               <Input
                 id="edit-storyVideoUrl"
                 type="url"
@@ -726,6 +880,19 @@ export default function ClientsPage() {
                 onChange={(e) => setEditForm({ ...editForm, storyVideoUrl: e.target.value })}
                 placeholder="https://..."
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-showOnFrontend"
+                checked={editForm.showOnFrontend}
+                onChange={(e) => setEditForm({ ...editForm, showOnFrontend: e.target.checked })}
+                className="rounded"
+              />
+              <Label htmlFor="edit-showOnFrontend" className="cursor-pointer">
+                Show on Frontend Roster
+              </Label>
             </div>
 
             <div className="grid grid-cols-4 gap-4">
@@ -789,7 +956,18 @@ export default function ClientsPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-pulseSummary">Pulse Summary</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="edit-pulseSummary">Pulse Summary</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeneratePulseSummary}
+                  disabled={generatingPulse || !editingClient}
+                >
+                  {generatingPulse ? 'Generating…' : 'Generate Pulse Summary'}
+                </Button>
+              </div>
               <Textarea
                 id="edit-pulseSummary"
                 value={editForm.pulseSummary}
@@ -818,7 +996,7 @@ export default function ClientsPage() {
             </Button>
             <Button 
               onClick={handleSaveEdit} 
-              disabled={!editForm.name.trim() || !editForm.storyId.trim() || editSubmitting}
+              disabled={!editForm.name.trim() || !editForm.storyId.trim() || !editForm.storyVideoUrl.trim() || editSubmitting}
             >
               {editSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>

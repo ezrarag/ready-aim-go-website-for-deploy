@@ -1,3 +1,5 @@
+import type { PulseReport } from "./pulse-report"
+
 export type ClientStatus = "active" | "inactive" | "onboarding"
 export type DeployStatus = "live" | "building" | "error"
 export type StripeStatus = "connected" | "pending" | "error"
@@ -18,9 +20,13 @@ export interface ClientDirectoryEntry {
   brands: string[]
   status: ClientStatus
   lastActivity: string
+  updatedAt?: string
   pulseSummary?: string
   deployStatus: DeployStatus
   deployUrl?: string
+  githubRepo?: string
+  githubRepos?: string[]
+  deployHosts?: string[]
   stripeStatus: StripeStatus
   revenue: number
   meetings: number
@@ -28,6 +34,7 @@ export interface ClientDirectoryEntry {
   commits: number
   lastDeploy?: string
   storyVideoUrl?: string
+  showOnFrontend?: boolean
   isNewStory?: boolean
   websiteUrl?: string
   appUrl?: string
@@ -42,6 +49,8 @@ export interface ClientDirectoryEntry {
   insuranceUrl?: string
   /** Data-driven story modules (web, app, rd, housing, transportation, insurance). Front-end fallback if missing. */
   modules?: Record<ModuleKey, ClientModule>
+  /** Structured Pulse output for BEAM-role aligned planning. */
+  pulseReport?: PulseReport
 }
 
 /** Baseline modules so front-end never breaks when Firestore has no modules. */

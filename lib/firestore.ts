@@ -12,6 +12,8 @@ import type {
   ClientUpdateVideo,
 } from './client-directory'
 import { getDefaultModules } from './client-directory'
+import { collectClientDeployHosts, collectClientGithubRepos, parseRepoSlug } from './pulse-selectors'
+import { pulseReportSchema } from './pulse-report'
 
 let app: App | null = null
 let db: Firestore | null = null
@@ -126,9 +128,14 @@ type FirestoreClientDoc = {
   brands?: unknown
   status?: unknown
   lastActivity?: unknown
+  updatedAt?: unknown
   pulseSummary?: unknown
   deployStatus?: unknown
   deployUrl?: unknown
+  githubRepo?: unknown
+  githubRepos?: unknown
+  deployHosts?: unknown
+  pulseReport?: unknown
   stripeStatus?: unknown
   revenue?: unknown
   meetings?: unknown
@@ -136,6 +143,7 @@ type FirestoreClientDoc = {
   commits?: unknown
   lastDeploy?: unknown
   storyVideoUrl?: unknown
+  showOnFrontend?: unknown
   isNewStory?: unknown
   websiteUrl?: unknown
   appUrl?: unknown
@@ -164,6 +172,9 @@ const asDeployStatus = (value: unknown): DeployStatus =>
 
 const asStripeStatus = (value: unknown): StripeStatus =>
   value === "connected" || value === "pending" || value === "error" ? value : "pending"
+
+const asBoolean = (value: unknown, fallback = false): boolean =>
+  typeof value === "boolean" ? value : fallback
 
 const MODULE_KEYS: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
 
@@ -197,6 +208,18 @@ function asModules(value: unknown): Record<ModuleKey, ClientModule> {
 
 const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry => {
   const normalizedId = id || asString(doc.storyId, "unknown")
+  const githubRepo = asString(doc.githubRepo) || undefined
+  const deployUrl = asString(doc.deployUrl) || undefined
+  const githubRepos = collectClientGithubRepos({
+    githubRepo,
+    githubRepos: asStringArray(doc.githubRepos),
+  })
+  const deployHosts = collectClientDeployHosts({
+    deployUrl,
+    deployHosts: asStringArray(doc.deployHosts),
+  })
+  const parsedPulseReport = pulseReportSchema.safeParse(doc.pulseReport)
+
   return {
     id: normalizedId,
     storyId: asString(doc.storyId, normalizedId),
@@ -204,9 +227,13 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     brands: asStringArray(doc.brands),
     status: asClientStatus(doc.status),
     lastActivity: asString(doc.lastActivity, "Recently updated"),
+    updatedAt: asString(doc.updatedAt) || undefined,
     pulseSummary: asString(doc.pulseSummary),
     deployStatus: asDeployStatus(doc.deployStatus),
-    deployUrl: asString(doc.deployUrl),
+    deployUrl,
+    githubRepo,
+    githubRepos,
+    deployHosts,
     stripeStatus: asStripeStatus(doc.stripeStatus),
     revenue: asNumber(doc.revenue),
     meetings: asNumber(doc.meetings),
@@ -214,6 +241,7 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     commits: asNumber(doc.commits),
     lastDeploy: asString(doc.lastDeploy),
     storyVideoUrl: asString(doc.storyVideoUrl),
+    showOnFrontend: asBoolean(doc.showOnFrontend, true),
     isNewStory: typeof doc.isNewStory === "boolean" ? doc.isNewStory : false,
     websiteUrl: asString(doc.websiteUrl) || undefined,
     appUrl: asString(doc.appUrl) || undefined,
@@ -223,6 +251,7 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     transportationUrl: asString(doc.transportationUrl) || undefined,
     insuranceUrl: asString(doc.insuranceUrl) || undefined,
     modules: asModules(doc.modules),
+    pulseReport: parsedPulseReport.success ? parsedPulseReport.data : undefined,
   }
 }
 
@@ -389,15 +418,32 @@ export async function createClientDocument(
   if (!db) throw new Error("Firebase not initialized")
   const ref = db.collection("clients").doc()
   const modules = data.modules ?? getDefaultModules()
+  const githubRepos = collectClientGithubRepos({
+    githubRepo: data.githubRepo,
+    githubRepos: data.githubRepos,
+  })
+  const deployHosts = collectClientDeployHosts({
+    deployUrl: data.deployUrl,
+    deployHosts: data.deployHosts,
+  })
+  const primaryGithubRepo = parseRepoSlug(data.githubRepo ?? "") || githubRepos[0] || null
+  const normalizedDeployUrl = data.deployUrl ?? null
+  const normalizedPulseReport = data.pulseReport ? pulseReportSchema.safeParse(data.pulseReport) : null
+
   await ref.set({
     storyId: data.storyId,
     name: data.name,
     brands: data.brands ?? [],
     status: data.status ?? "onboarding",
     lastActivity: data.lastActivity ?? "Recently updated",
+    updatedAt: data.updatedAt ?? new Date().toISOString(),
     pulseSummary: data.pulseSummary ?? null,
+    pulseReport: normalizedPulseReport?.success ? normalizedPulseReport.data : null,
     deployStatus: data.deployStatus ?? "building",
-    deployUrl: data.deployUrl ?? null,
+    deployUrl: normalizedDeployUrl,
+    githubRepo: primaryGithubRepo,
+    githubRepos,
+    deployHosts,
     stripeStatus: data.stripeStatus ?? "pending",
     revenue: data.revenue ?? 0,
     meetings: data.meetings ?? 0,
@@ -405,6 +451,7 @@ export async function createClientDocument(
     commits: data.commits ?? 0,
     lastDeploy: data.lastDeploy ?? null,
     storyVideoUrl: data.storyVideoUrl ?? null,
+    showOnFrontend: data.showOnFrontend ?? true,
     isNewStory: data.isNewStory ?? false,
     modules,
   })

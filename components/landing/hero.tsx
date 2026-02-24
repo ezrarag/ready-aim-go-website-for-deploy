@@ -52,7 +52,7 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
         setClients(list)
 
         const mapped = list
-          .filter((client) => Boolean(client.storyVideoUrl))
+          .filter((client) => client.showOnFrontend !== false && Boolean(client.storyVideoUrl))
           .map((client) => ({
             id: client.id,
             name: client.name.toUpperCase(),
@@ -146,12 +146,18 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
       if (e.key === 'F4') {
         e.preventDefault()
         window.location.href = '/business'
+        return
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        router.push('/business')
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [router])
 
   return (
     <section className="fixed inset-0 h-screen w-screen flex items-center justify-center overflow-hidden z-0">
@@ -244,9 +250,12 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
             ESC
           </div>
           {/* OPTIONS Button - No background, just text */}
-          <div className="bg-transparent text-white px-4 py-2 text-sm font-semibold uppercase">
+          <button
+            onClick={() => router.push('/business')}
+            className="bg-transparent text-white px-4 py-2 text-sm font-semibold uppercase hover:text-white/80 transition-colors"
+          >
             OPTIONS
-          </div>
+          </button>
         </motion.div>
       </div>
 
