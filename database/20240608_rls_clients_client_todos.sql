@@ -33,4 +33,4 @@ CREATE POLICY "Client can manage own todos" ON public.client_todos
   );
 
 -- Default deny all other access
--- (Supabase RLS is deny-by-default once enabled) 
+-- (Postgres RLS is deny-by-default once enabled) 

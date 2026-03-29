@@ -1,7 +1,7 @@
 -- Create Admin User for Testing
 -- Run this script to create an admin user that can access the admin dashboard
 
--- Insert admin user into auth.users (you'll need to do this through Supabase Auth UI or API)
+-- Insert admin user into auth.users (create the auth user in Firebase Auth first, then mirror UUID if using Postgres)
 -- For now, we'll create a profile record that assumes the user exists
 
 -- Create admin profile (replace 'your-admin-user-id' with actual UUID from auth.users)
@@ -33,4 +33,4 @@ ON CONFLICT (id) DO UPDATE SET
 --   updated_at = NOW();
 
 -- Grant admin permissions
--- Note: You'll need to create the user in Supabase Auth first, then update the UUID above 
+-- Note: Create the user in Firebase Auth first, then update the UUID above if syncing to SQL. 

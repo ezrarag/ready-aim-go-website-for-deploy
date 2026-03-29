@@ -74,7 +74,7 @@ All CTA buttons now link to `https://clients.readyaimgo.biz`:
 - Success/error states
 - Slack notification integration (optional)
 - Email service ready (SendGrid/Resend - requires configuration)
-- Database storage ready (Supabase - commented out for now)
+- Database storage ready (Firebase/Firestore or email provider as configured)
 
 **Current Behavior:**
 - Logs to console in development

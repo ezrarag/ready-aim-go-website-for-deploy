@@ -6,20 +6,21 @@ import { ExternalLink, Calendar, User } from 'lucide-react';
 
 interface ContributorPortfolioProps {
   contributorEmail: string;
-  supabaseUrl?: string;
-  supabaseKey?: string;
+  /** Optional PostgREST base URL for cross-stack RPC */
+  externalRestUrl?: string;
+  serviceApiKey?: string;
   title?: string;
   className?: string;
 }
 
 export function ContributorPortfolio({ 
   contributorEmail, 
-  supabaseUrl, 
-  supabaseKey, 
+  externalRestUrl, 
+  serviceApiKey, 
   title = "My Work",
   className = "" 
 }: ContributorPortfolioProps) {
-  const { projects, loading, error } = useContributorProjects(contributorEmail, supabaseUrl, supabaseKey);
+  const { projects, loading, error } = useContributorProjects(contributorEmail, externalRestUrl, serviceApiKey);
 
   if (loading) {
     return (

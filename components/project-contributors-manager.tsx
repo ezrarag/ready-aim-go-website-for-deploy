@@ -50,27 +50,7 @@ export function ProjectContributorsManager({ projectId, onUpdate }: ProjectContr
 
   const fetchProjectContributors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('project_contributors')
-        .select(`
-          id,
-          contributor_id,
-          role,
-          contribution_percentage,
-          attribution_order,
-          contributor:profiles!inner(
-            id,
-            full_name,
-            email,
-            avatar_url,
-            is_contributor
-          )
-        `)
-        .eq('project_id', projectId)
-        .order('attribution_order');
-
-      if (error) throw error;
-      setContributors(data || []);
+      setContributors([]);
     } catch (error) {
       console.error('Error fetching project contributors:', error);
     } finally {
@@ -80,14 +60,7 @@ export function ProjectContributorsManager({ projectId, onUpdate }: ProjectContr
 
   const fetchAvailableContributors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url, is_contributor')
-        .eq('is_contributor', true)
-        .order('full_name');
-
-      if (error) throw error;
-      setAvailableContributors(data || []);
+      setAvailableContributors([]);
     } catch (error) {
       console.error('Error fetching available contributors:', error);
     }
@@ -95,18 +68,7 @@ export function ProjectContributorsManager({ projectId, onUpdate }: ProjectContr
 
   const addContributor = async () => {
     try {
-      const { error } = await supabase
-        .from('project_contributors')
-        .insert({
-          project_id: projectId,
-          contributor_id: newContributor.contributor_id,
-          role: newContributor.role,
-          contribution_percentage: newContributor.contribution_percentage,
-          attribution_order: newContributor.attribution_order
-        });
-
-      if (error) throw error;
-
+      console.warn('addContributor: Firestore not implemented', projectId, newContributor);
       setShowAddDialog(false);
       setNewContributor({
         contributor_id: '',
@@ -123,13 +85,7 @@ export function ProjectContributorsManager({ projectId, onUpdate }: ProjectContr
 
   const removeContributor = async (contributorId: string) => {
     try {
-      const { error } = await supabase
-        .from('project_contributors')
-        .delete()
-        .eq('id', contributorId);
-
-      if (error) throw error;
-
+      console.warn('removeContributor: Firestore not implemented', contributorId);
       fetchProjectContributors();
       onUpdate?.();
     } catch (error) {
@@ -139,13 +95,7 @@ export function ProjectContributorsManager({ projectId, onUpdate }: ProjectContr
 
   const updateContributor = async (contributorId: string, updates: any) => {
     try {
-      const { error } = await supabase
-        .from('project_contributors')
-        .update(updates)
-        .eq('id', contributorId);
-
-      if (error) throw error;
-
+      console.warn('updateContributor: Firestore not implemented', contributorId, updates);
       fetchProjectContributors();
       onUpdate?.();
     } catch (error) {

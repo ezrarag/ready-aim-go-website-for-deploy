@@ -28,6 +28,7 @@ import {
 import DashboardLayout from "@/components/dashboard-layout"
 import {
   ArrowLeft,
+  Brain,
   Plus,
   FileText,
   Upload,
@@ -36,6 +37,7 @@ import {
   ExternalLink,
   Edit,
   MoreHorizontal,
+  RefreshCw,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -45,6 +47,20 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { ClientDirectoryEntry, ClientStatus, DeployStatus, StripeStatus } from "@/lib/client-directory"
 import type { ClientUpdate, ModuleKey, UpdateStatus } from "@/lib/client-directory"
+import type { ClientRoleSuggestionSnapshot } from "@/lib/client-role-suggestions"
+import { getClientPreferredProductionUrl } from "@/lib/vercel"
+import type {
+  ClientWorkspace,
+  ClientWorkspaceAction,
+  ClientWorkspaceActionStatus,
+  ClientWorkspaceCanvasBlock,
+  ClientWorkspaceCanvasKind,
+  ClientWorkspaceHealth,
+  ClientWorkspaceNote,
+  ClientWorkspaceNoteKind,
+  ClientWorkspacePhase,
+  ClientWorkspacePriority,
+} from "@/lib/client-workspace"
 
 const MODULE_TYPES: { value: ModuleKey; label: string }[] = [
   { value: "web", label: "Website" },
@@ -67,6 +83,148 @@ interface BeamDirectoryEntry {
   createdBy: string
   updatedBy: string
   source: string
+}
+
+const WORKSPACE_PHASE_OPTIONS: Array<{ value: ClientWorkspacePhase; label: string }> = [
+  { value: "discovery", label: "Discovery" },
+  { value: "planning", label: "Planning" },
+  { value: "building", label: "Building" },
+  { value: "launching", label: "Launching" },
+  { value: "support", label: "Support" },
+]
+
+const WORKSPACE_HEALTH_OPTIONS: Array<{ value: ClientWorkspaceHealth; label: string }> = [
+  { value: "on_track", label: "On Track" },
+  { value: "watch", label: "Watch" },
+  { value: "blocked", label: "Blocked" },
+]
+
+const WORKSPACE_NOTE_KIND_OPTIONS: Array<{ value: ClientWorkspaceNoteKind; label: string }> = [
+  { value: "general", label: "General" },
+  { value: "decision", label: "Decision" },
+  { value: "meeting", label: "Meeting" },
+  { value: "pulse", label: "Pulse" },
+]
+
+const WORKSPACE_ACTION_STATUS_OPTIONS: Array<{ value: ClientWorkspaceActionStatus; label: string }> = [
+  { value: "todo", label: "To Do" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "blocked", label: "Blocked" },
+  { value: "done", label: "Done" },
+]
+
+const WORKSPACE_PRIORITY_OPTIONS: Array<{ value: ClientWorkspacePriority; label: string }> = [
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+]
+
+const WORKSPACE_CANVAS_KIND_OPTIONS: Array<{ value: ClientWorkspaceCanvasKind; label: string }> = [
+  { value: "objective", label: "Objective" },
+  { value: "status", label: "Status" },
+  { value: "scope", label: "Scope" },
+  { value: "risks", label: "Risks" },
+  { value: "next_steps", label: "Next Steps" },
+  { value: "custom", label: "Custom" },
+]
+
+function createWorkspaceItemId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function createEmptyWorkspaceNote(): ClientWorkspaceNote {
+  const timestamp = nowIso()
+  return {
+    id: createWorkspaceItemId("note"),
+    title: "",
+    body: "",
+    kind: "general",
+    pinned: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+}
+
+function createEmptyWorkspaceAction(): ClientWorkspaceAction {
+  const timestamp = nowIso()
+  return {
+    id: createWorkspaceItemId("action"),
+    title: "",
+    detail: "",
+    status: "todo",
+    priority: "medium",
+    owner: "",
+    dueDate: "",
+    source: "manual",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+}
+
+function createEmptyWorkspaceCanvasBlock(): ClientWorkspaceCanvasBlock {
+  return {
+    id: createWorkspaceItemId("canvas"),
+    title: "New Block",
+    content: "",
+    kind: "custom",
+  }
+}
+
+function formatTimestamp(value?: string): string {
+  if (!value) return "Not saved yet"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function sanitizeWorkspaceForSave(workspace: ClientWorkspace): ClientWorkspace {
+  const timestamp = nowIso()
+
+  return {
+    ...workspace,
+    currentFocus: workspace.currentFocus.trim(),
+    summary: workspace.summary.trim(),
+    notes: workspace.notes
+      .filter((note) => note.title.trim() || note.body.trim())
+      .map((note) => ({
+        ...note,
+        title: note.title.trim() || "Untitled note",
+        body: note.body.trim(),
+        updatedAt: timestamp,
+      })),
+    actions: workspace.actions
+      .filter(
+        (action) =>
+          action.title.trim() ||
+          (action.detail ?? "").trim() ||
+          (action.owner ?? "").trim() ||
+          (action.dueDate ?? "").trim()
+      )
+      .map((action) => ({
+        ...action,
+        title: action.title.trim() || "Untitled action",
+        detail: action.detail?.trim() || undefined,
+        owner: action.owner?.trim() || undefined,
+        dueDate: action.dueDate?.trim() || undefined,
+        source: action.source?.trim() || undefined,
+        updatedAt: timestamp,
+      })),
+    canvas: workspace.canvas
+      .filter((block) => block.title.trim() || block.content.trim())
+      .map((block) => ({
+        ...block,
+        title: block.title.trim() || "Untitled block",
+        content: block.content.trim(),
+      })),
+    updatedAt: timestamp,
+  }
 }
 
 export default function ClientDetailPage() {
@@ -116,10 +274,19 @@ export default function ClientDetailPage() {
   })
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [generatingPulse, setGeneratingPulse] = useState(false)
+  const [syncingVercel, setSyncingVercel] = useState(false)
+  const [roleSuggestionSnapshot, setRoleSuggestionSnapshot] = useState<ClientRoleSuggestionSnapshot | null>(null)
+  const [generatingRoleSuggestions, setGeneratingRoleSuggestions] = useState(false)
+  const [updatingRoleStatusId, setUpdatingRoleStatusId] = useState<string | null>(null)
   const [beamEntries, setBeamEntries] = useState<BeamDirectoryEntry[]>([])
   const [beamLoading, setBeamLoading] = useState(false)
   const [beamError, setBeamError] = useState<string | null>(null)
   const [selectedBeamEntryId, setSelectedBeamEntryId] = useState<string | null>(null)
+  const [workspace, setWorkspace] = useState<ClientWorkspace | null>(null)
+  const [workspaceLoading, setWorkspaceLoading] = useState(false)
+  const [workspaceSaving, setWorkspaceSaving] = useState(false)
+  const [workspaceDirty, setWorkspaceDirty] = useState(false)
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
 
   const fetchClient = () => {
     if (!clientId) return
@@ -129,6 +296,7 @@ export default function ClientDetailPage() {
       .then((data) => {
         if (data?.client) {
           setClient(data.client)
+          setRoleSuggestionSnapshot(data.client.roleSuggestionSnapshot || null)
           // Initialize edit form with client data
           setEditForm({
             name: data.client.name,
@@ -185,9 +353,36 @@ export default function ClientDetailPage() {
       .finally(() => setUpdatesLoading(false))
   }
 
+  const fetchWorkspace = () => {
+    if (!clientId) return
+    setWorkspaceLoading(true)
+    setWorkspaceError(null)
+    fetch(`/api/clients/${encodeURIComponent(clientId)}/workspace`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && data.workspace) {
+          setWorkspace(data.workspace)
+          setWorkspaceDirty(false)
+          return
+        }
+        setWorkspaceError(data?.error || "Unable to load workspace right now.")
+      })
+      .catch(() => {
+        setWorkspaceError("Unable to load workspace right now.")
+      })
+      .finally(() => setWorkspaceLoading(false))
+  }
+
   useEffect(() => {
     if (!clientId) return
     fetchUpdates()
+  }, [clientId])
+
+  useEffect(() => {
+    if (!clientId) return
+    fetchWorkspace()
   }, [clientId])
 
   useEffect(() => {
@@ -370,6 +565,194 @@ export default function ClientDetailPage() {
     }
   }
 
+  const handleSyncFromVercel = async () => {
+    if (!clientId) return
+    setSyncingVercel(true)
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/sync-vercel`, {
+        method: "POST",
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Failed to sync from Vercel")
+      fetchClient()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to sync from Vercel")
+    } finally {
+      setSyncingVercel(false)
+    }
+  }
+
+  const handleGenerateRoleSuggestions = async () => {
+    if (!clientId) return
+    setGeneratingRoleSuggestions(true)
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/role-suggestions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshPulse: true }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Failed to generate role suggestions")
+      setRoleSuggestionSnapshot(data.roleSuggestionSnapshot || null)
+      fetchClient()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to generate role suggestions")
+    } finally {
+      setGeneratingRoleSuggestions(false)
+    }
+  }
+
+  const handleUpdateRoleSuggestionStatus = async (
+    suggestionId: string,
+    status: "suggested" | "shortlisted" | "approved" | "rejected"
+  ) => {
+    if (!clientId) return
+    setUpdatingRoleStatusId(suggestionId)
+    try {
+      const res = await fetch(
+        `/api/clients/${encodeURIComponent(clientId)}/role-suggestions/${encodeURIComponent(suggestionId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Failed to update role suggestion")
+      setRoleSuggestionSnapshot(data.roleSuggestionSnapshot || null)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to update role suggestion")
+    } finally {
+      setUpdatingRoleStatusId(null)
+    }
+  }
+
+  const updateWorkspace = (updater: (current: ClientWorkspace) => ClientWorkspace) => {
+    setWorkspace((current) => {
+      if (!current) return current
+      return updater(current)
+    })
+    setWorkspaceDirty(true)
+  }
+
+  const handleSaveWorkspace = async () => {
+    if (!clientId || !workspace) return
+    setWorkspaceSaving(true)
+    try {
+      const payload = sanitizeWorkspaceForSave(workspace)
+      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/workspace`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace: payload }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.success) throw new Error(data?.error || "Failed to save workspace")
+      setWorkspace(data.workspace || payload)
+      setWorkspaceDirty(false)
+      setWorkspaceError(null)
+    } catch (e) {
+      console.error(e)
+      alert(e instanceof Error ? e.message : "Failed to save workspace")
+    } finally {
+      setWorkspaceSaving(false)
+    }
+  }
+
+  const handleAddWorkspaceNote = () => {
+    updateWorkspace((current) => ({
+      ...current,
+      notes: [createEmptyWorkspaceNote(), ...current.notes],
+    }))
+  }
+
+  const handleUpdateWorkspaceNote = (
+    noteId: string,
+    patch: Partial<Omit<ClientWorkspaceNote, "id" | "createdAt">>
+  ) => {
+    updateWorkspace((current) => ({
+      ...current,
+      notes: current.notes.map((note) =>
+        note.id === noteId
+          ? {
+              ...note,
+              ...patch,
+              updatedAt: nowIso(),
+            }
+          : note
+      ),
+    }))
+  }
+
+  const handleRemoveWorkspaceNote = (noteId: string) => {
+    updateWorkspace((current) => ({
+      ...current,
+      notes: current.notes.filter((note) => note.id !== noteId),
+    }))
+  }
+
+  const handleAddWorkspaceAction = () => {
+    updateWorkspace((current) => ({
+      ...current,
+      actions: [createEmptyWorkspaceAction(), ...current.actions],
+    }))
+  }
+
+  const handleUpdateWorkspaceAction = (
+    actionId: string,
+    patch: Partial<Omit<ClientWorkspaceAction, "id" | "createdAt">>
+  ) => {
+    updateWorkspace((current) => ({
+      ...current,
+      actions: current.actions.map((action) =>
+        action.id === actionId
+          ? {
+              ...action,
+              ...patch,
+              updatedAt: nowIso(),
+            }
+          : action
+      ),
+    }))
+  }
+
+  const handleRemoveWorkspaceAction = (actionId: string) => {
+    updateWorkspace((current) => ({
+      ...current,
+      actions: current.actions.filter((action) => action.id !== actionId),
+    }))
+  }
+
+  const handleAddCanvasBlock = () => {
+    updateWorkspace((current) => ({
+      ...current,
+      canvas: [...current.canvas, createEmptyWorkspaceCanvasBlock()],
+    }))
+  }
+
+  const handleUpdateCanvasBlock = (
+    blockId: string,
+    patch: Partial<Omit<ClientWorkspaceCanvasBlock, "id">>
+  ) => {
+    updateWorkspace((current) => ({
+      ...current,
+      canvas: current.canvas.map((block) =>
+        block.id === blockId
+          ? {
+              ...block,
+              ...patch,
+            }
+          : block
+      ),
+    }))
+  }
+
+  const handleRemoveCanvasBlock = (blockId: string) => {
+    updateWorkspace((current) => ({
+      ...current,
+      canvas: current.canvas.filter((block) => block.id !== blockId),
+    }))
+  }
+
   if (loading || !client) {
     return (
       <DashboardLayout>
@@ -381,6 +764,17 @@ export default function ClientDetailPage() {
   }
 
   const selectedBeamEntry = beamEntries.find((entry) => entry.id === selectedBeamEntryId) || null
+  const preferredProductionUrl = getClientPreferredProductionUrl(client)
+  const workspaceActionCounts = workspace
+    ? {
+        open: workspace.actions.filter((action) => action.status !== "done").length,
+        blocked: workspace.actions.filter((action) => action.status === "blocked").length,
+        done: workspace.actions.filter((action) => action.status === "done").length,
+      }
+    : null
+  const pulseWorkItemCount = client.pulseReport?.workItems?.length ?? 0
+  const activeRoleSuggestionCount =
+    roleSuggestionSnapshot?.roleSuggestions.filter((suggestion) => suggestion.status !== "rejected").length ?? 0
 
   return (
     <DashboardLayout>
@@ -406,6 +800,10 @@ export default function ClientDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleSyncFromVercel}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Sync from Vercel
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Client
@@ -417,6 +815,8 @@ export default function ClientDetailPage() {
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="workspace">Workspace</TabsTrigger>
+            <TabsTrigger value="roles">Role Suggestions</TabsTrigger>
             <TabsTrigger value="updates">Updates</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="space-y-4">
@@ -428,9 +828,15 @@ export default function ClientDetailPage() {
                 <p><strong>Story ID:</strong> {client.storyId}</p>
                 <p><strong>Status:</strong> {client.status}</p>
                 <p><strong>Last activity:</strong> {client.lastActivity}</p>
-                {client.deployUrl && (
+                <div className="pt-2">
+                  <Button variant="outline" size="sm" onClick={handleSyncFromVercel} disabled={syncingVercel}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncingVercel ? "animate-spin" : ""}`} />
+                    {syncingVercel ? "Syncing…" : "Sync from Vercel"}
+                  </Button>
+                </div>
+                {preferredProductionUrl && (
                   <a
-                    href={client.deployUrl}
+                    href={preferredProductionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary flex items-center gap-1"
@@ -438,6 +844,76 @@ export default function ClientDetailPage() {
                     <ExternalLink className="h-4 w-4" /> Deploy URL
                   </a>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>App Delivery</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {client.appStoreConnectAppId || client.appUrl || client.appStoreUrl ? (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Linked App</p>
+                        <p className="mt-1 text-sm text-foreground">
+                          {client.appStoreConnectName || client.appStoreConnectBundleId || "Manual app link only"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Latest Build</p>
+                        <p className="mt-1 text-sm text-foreground">
+                          {client.appStoreConnectVersionString || "?"} ({client.appStoreConnectBuildNumber || "?"})
+                          {client.appStoreConnectBuildState ? ` · ${client.appStoreConnectBuildState}` : ""}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Bundle ID</p>
+                        <p className="mt-1 text-sm text-foreground">{client.appStoreConnectBundleId || "Not linked yet"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">TestFlight Groups</p>
+                        <p className="mt-1 text-sm text-foreground">
+                          {client.appStoreConnectBetaGroups && client.appStoreConnectBetaGroups.length > 0
+                            ? client.appStoreConnectBetaGroups.join(", ")
+                            : "No beta groups detected"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      {client.appStoreUrl ? (
+                        <a
+                          href={client.appStoreUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-4 w-4" /> App Store URL
+                        </a>
+                      ) : null}
+                      {client.appUrl ? (
+                        <a
+                          href={client.appUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-4 w-4" /> App URL
+                        </a>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No App Store Connect app is linked to this client yet.
+                  </p>
+                )}
+
+                <Button variant="outline" asChild size="sm">
+                  <Link href="/dashboard/web-development/app-store-sync">Open App Store Sync</Link>
+                </Button>
               </CardContent>
             </Card>
 
@@ -512,6 +988,604 @@ export default function ClientDetailPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="workspace" className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Client Workspace</h2>
+                <p className="text-sm text-muted-foreground">
+                  Internal working area for notes, delivery actions, and a live client canvas that Pulse can build on.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchWorkspace}
+                  disabled={workspaceLoading || workspaceSaving}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${workspaceLoading ? "animate-spin" : ""}`} />
+                  Reload
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveWorkspace}
+                  disabled={!workspace || workspaceSaving || workspaceLoading || !workspaceDirty}
+                >
+                  {workspaceSaving ? "Saving…" : workspaceDirty ? "Save workspace" : "Saved"}
+                </Button>
+              </div>
+            </div>
+
+            {workspaceError ? (
+              <Card>
+                <CardContent className="py-6 text-sm text-amber-600">{workspaceError}</CardContent>
+              </Card>
+            ) : null}
+
+            {workspaceLoading && !workspace ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">Loading workspace…</CardContent>
+              </Card>
+            ) : workspace ? (
+              <>
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <Card className="xl:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-base">Workspace State</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label className="mb-2 block">Phase</Label>
+                          <Select
+                            value={workspace.phase}
+                            onValueChange={(value) =>
+                              updateWorkspace((current) => ({
+                                ...current,
+                                phase: value as ClientWorkspacePhase,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {WORKSPACE_PHASE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Health</Label>
+                          <Select
+                            value={workspace.health}
+                            onValueChange={(value) =>
+                              updateWorkspace((current) => ({
+                                ...current,
+                                health: value as ClientWorkspaceHealth,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {WORKSPACE_HEALTH_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="mb-2 block">Current Focus</Label>
+                        <Textarea
+                          value={workspace.currentFocus}
+                          onChange={(e) =>
+                            updateWorkspace((current) => ({
+                              ...current,
+                              currentFocus: e.target.value,
+                            }))
+                          }
+                          placeholder="What is Pulse actively tracking for this client right now?"
+                          rows={3}
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="mb-2 block">Workspace Summary</Label>
+                        <Textarea
+                          value={workspace.summary}
+                          onChange={(e) =>
+                            updateWorkspace((current) => ({
+                              ...current,
+                              summary: e.target.value,
+                            }))
+                          }
+                          placeholder="Capture the latest working summary for this client."
+                          rows={4}
+                        />
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        Last saved: {formatTimestamp(workspace.updatedAt)}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Pulse Context</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{pulseWorkItemCount} pulse items</Badge>
+                        <Badge variant="outline">{activeRoleSuggestionCount} active role drafts</Badge>
+                        {workspaceActionCounts ? (
+                          <Badge variant="secondary">{workspaceActionCounts.open} open actions</Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Pulse Summary</p>
+                        <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+                          {client.pulseSummary || "No client-specific pulse summary has been generated yet."}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border p-3 space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Connected Signals</p>
+                        <p className="text-sm">
+                          <strong>Deploy:</strong> {client.deployStatus}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Repos:</strong>{" "}
+                          {client.githubRepos && client.githubRepos.length > 0
+                            ? client.githubRepos.join(", ")
+                            : "No GitHub repos linked"}
+                        </p>
+                        <p className="text-sm">
+                          <strong>Hosts:</strong>{" "}
+                          {client.deployHosts && client.deployHosts.length > 0
+                            ? client.deployHosts.join(", ")
+                            : client.deployUrl || "No deploy hosts linked"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between gap-3 text-base">
+                        <span>Notes</span>
+                        <Button size="sm" variant="outline" onClick={handleAddWorkspaceNote}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Note
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {workspace.notes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No notes yet. Capture client context, meeting takeaways, or decisions here.
+                        </p>
+                      ) : (
+                        workspace.notes.map((note) => (
+                          <div key={note.id} className="rounded-lg border p-4 space-y-3">
+                            <div className="flex flex-col gap-3 lg:flex-row">
+                              <Input
+                                value={note.title}
+                                onChange={(e) =>
+                                  handleUpdateWorkspaceNote(note.id, { title: e.target.value })
+                                }
+                                placeholder="Note title"
+                              />
+                              <div className="flex gap-2 lg:w-[260px]">
+                                <Select
+                                  value={note.kind}
+                                  onValueChange={(value) =>
+                                    handleUpdateWorkspaceNote(note.id, {
+                                      kind: value as ClientWorkspaceNoteKind,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {WORKSPACE_NOTE_KIND_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveWorkspaceNote(note.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+
+                            <Textarea
+                              value={note.body}
+                              onChange={(e) =>
+                                handleUpdateWorkspaceNote(note.id, { body: e.target.value })
+                              }
+                              placeholder="Write the note details here..."
+                              rows={4}
+                            />
+
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  checked={note.pinned}
+                                  onChange={(e) =>
+                                    handleUpdateWorkspaceNote(note.id, { pinned: e.target.checked })
+                                  }
+                                  className="rounded"
+                                />
+                                Pin note
+                              </label>
+                              <p className="text-xs text-muted-foreground">
+                                Updated {formatTimestamp(note.updatedAt)}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between gap-3 text-base">
+                        <span>Actions</span>
+                        <Button size="sm" variant="outline" onClick={handleAddWorkspaceAction}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Action
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {workspace.actions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No actions yet. Track delivery tasks, blockers, and follow-ups here.
+                        </p>
+                      ) : (
+                        workspace.actions.map((action) => (
+                          <div key={action.id} className="rounded-lg border p-4 space-y-3">
+                            <div className="flex flex-col gap-3 lg:flex-row">
+                              <Input
+                                value={action.title}
+                                onChange={(e) =>
+                                  handleUpdateWorkspaceAction(action.id, { title: e.target.value })
+                                }
+                                placeholder="Action title"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveWorkspaceAction(action.id)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                              <div>
+                                <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                  Status
+                                </Label>
+                                <Select
+                                  value={action.status}
+                                  onValueChange={(value) =>
+                                    handleUpdateWorkspaceAction(action.id, {
+                                      status: value as ClientWorkspaceActionStatus,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {WORKSPACE_ACTION_STATUS_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                  Priority
+                                </Label>
+                                <Select
+                                  value={action.priority}
+                                  onValueChange={(value) =>
+                                    handleUpdateWorkspaceAction(action.id, {
+                                      priority: value as ClientWorkspacePriority,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {WORKSPACE_PRIORITY_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                  Owner
+                                </Label>
+                                <Input
+                                  value={action.owner ?? ""}
+                                  onChange={(e) =>
+                                    handleUpdateWorkspaceAction(action.id, { owner: e.target.value })
+                                  }
+                                  placeholder="Owner"
+                                />
+                              </div>
+                              <div>
+                                <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                  Due Date
+                                </Label>
+                                <Input
+                                  type="date"
+                                  value={action.dueDate ?? ""}
+                                  onChange={(e) =>
+                                    handleUpdateWorkspaceAction(action.id, { dueDate: e.target.value })
+                                  }
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                Details
+                              </Label>
+                              <Textarea
+                                value={action.detail ?? ""}
+                                onChange={(e) =>
+                                  handleUpdateWorkspaceAction(action.id, { detail: e.target.value })
+                                }
+                                placeholder="Capture the action details, context, or blockers."
+                                rows={3}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between gap-3 text-base">
+                      <span>Canvas</span>
+                      <Button size="sm" variant="outline" onClick={handleAddCanvasBlock}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Block
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Treat this like a lightweight markdown canvas for the client. Pulse, notes, and next-step framing
+                      can all live here.
+                    </p>
+
+                    {workspace.canvas.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No canvas blocks yet.</p>
+                    ) : (
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        {workspace.canvas.map((block) => (
+                          <div key={block.id} className="rounded-lg border p-4 space-y-3">
+                            <div className="flex flex-col gap-3 lg:flex-row">
+                              <Input
+                                value={block.title}
+                                onChange={(e) =>
+                                  handleUpdateCanvasBlock(block.id, { title: e.target.value })
+                                }
+                                placeholder="Block title"
+                              />
+                              <div className="flex gap-2 lg:w-[280px]">
+                                <Select
+                                  value={block.kind}
+                                  onValueChange={(value) =>
+                                    handleUpdateCanvasBlock(block.id, {
+                                      kind: value as ClientWorkspaceCanvasKind,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {WORKSPACE_CANVAS_KIND_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveCanvasBlock(block.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+
+                            <Textarea
+                              value={block.content}
+                              onChange={(e) =>
+                                handleUpdateCanvasBlock(block.id, { content: e.target.value })
+                              }
+                              placeholder="Use this block for working notes, scope, risks, or markdown-style outlines."
+                              rows={6}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  Workspace unavailable right now.
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          <TabsContent value="roles" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <Brain className="h-5 w-5" />
+                    Draft Role Suggestions
+                  </span>
+                  <Button onClick={handleGenerateRoleSuggestions} disabled={generatingRoleSuggestions}>
+                    {generatingRoleSuggestions ? "Generating…" : "Generate Draft Roles"}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Unified inputs: website content, client record details, pulse output, and recent client updates. These
+                  are draft suggestions only until a client or admin changes their status.
+                </p>
+                {roleSuggestionSnapshot ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border p-4">
+                      <p className="text-sm"><strong>Business type:</strong> {roleSuggestionSnapshot.businessType || "Unknown"}</p>
+                      {roleSuggestionSnapshot.summary ? (
+                        <p className="mt-2 text-sm text-muted-foreground">{roleSuggestionSnapshot.summary}</p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Generated {new Date(roleSuggestionSnapshot.generatedAt).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Work Contexts</CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid gap-3 md:grid-cols-2">
+                        {roleSuggestionSnapshot.workContexts.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No work contexts generated yet.</p>
+                        ) : (
+                          roleSuggestionSnapshot.workContexts.map((context) => (
+                            <div key={context.id} className="rounded-lg border p-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-medium">{context.label}</p>
+                                <Badge variant="outline">{context.status}</Badge>
+                              </div>
+                              <p className="mt-2 text-sm text-muted-foreground">{context.summary}</p>
+                              {context.sources.length > 0 ? (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  Sources: {context.sources.join(", ")}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Suggested Roles</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {roleSuggestionSnapshot.roleSuggestions.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No role suggestions generated yet.</p>
+                        ) : (
+                          roleSuggestionSnapshot.roleSuggestions.map((suggestion) => (
+                            <div key={suggestion.id} className="rounded-lg border p-4">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-medium">{suggestion.title}</p>
+                                    <Badge variant="outline">{suggestion.category}</Badge>
+                                    <Badge variant="secondary">{suggestion.workstream}</Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{suggestion.summary}</p>
+                                  <p className="text-sm">{suggestion.rationale}</p>
+                                  {suggestion.sourceContexts.length > 0 ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      Contexts: {suggestion.sourceContexts.join(", ")}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="lg:w-[220px]">
+                                  <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">
+                                    Review Status
+                                  </Label>
+                                  <Select
+                                    value={suggestion.status}
+                                    onValueChange={(value) =>
+                                      handleUpdateRoleSuggestionStatus(
+                                        suggestion.id,
+                                        value as "suggested" | "shortlisted" | "approved" | "rejected"
+                                      )
+                                    }
+                                    disabled={updatingRoleStatusId === suggestion.id}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="suggested">Suggested</SelectItem>
+                                      <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                                      <SelectItem value="approved">Approved</SelectItem>
+                                      <SelectItem value="rejected">Rejected</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                    No unified role suggestion snapshot exists for this client yet.
                   </div>
                 )}
               </CardContent>

@@ -27,51 +27,8 @@ export function useOperators() {
         setLoading(true);
         setError(null);
 
-        const { data, error: queryError } = await supabase
-          .from('operators')
-          .select(`
-            id,
-            name,
-            email,
-            avatar_url,
-            status,
-            efficiency_rating,
-            capacity_override,
-            type_id,
-            operator_types!inner (
-              id,
-              type_name,
-              icon,
-              color,
-              hourly_capacity
-            )
-          `)
-          .order('name');
-
-        if (queryError) {
-          console.error('Error fetching operators:', queryError);
-          setError('Failed to load operators');
-          return;
-        }
-
-        // Transform the data to match our interface
-        const transformedOperators = (data || []).map((op: any) => ({
-          id: op.id,
-          name: op.name,
-          email: op.email,
-          avatar_url: op.avatar_url,
-          status: op.status,
-          efficiency_rating: op.efficiency_rating,
-          capacity_override: op.capacity_override,
-          type_id: op.type_id,
-          type_name: op.operator_types?.type_name || 'Unknown',
-          icon: op.operator_types?.icon || 'User',
-          color: op.operator_types?.color || '#6B7280',
-          hourly_capacity: op.operator_types?.hourly_capacity || 40,
-          current_allocation_percentage: 0 // This would be calculated from project_operators table
-        }));
-
-        setOperators(transformedOperators);
+        // TODO: Load operators from Firestore / API
+        setOperators([]);
       } catch (err) {
         console.error('Error in fetchOperators:', err);
         setError('Failed to load operators');

@@ -1,5 +1,5 @@
 -- Script to find client IDs for testing
--- Run this in your Supabase SQL Editor to get the client IDs
+-- Run in your PostgreSQL client to list client IDs
 
 -- Find all clients in the profiles table
 SELECT 

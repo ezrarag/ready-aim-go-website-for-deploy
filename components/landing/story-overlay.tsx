@@ -32,10 +32,11 @@ interface StoryCard {
 const areaVideoUrls: Record<string, string> = {
   website: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Fwebsitebusiness-loop.mp4?alt=media&token=9804d9a8-5972-4cbc-a7ad-5109fe3d7fda",
   app: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Fwebsitebusiness-loop.mp4?alt=media&token=9804d9a8-5972-4cbc-a7ad-5109fe3d7fda",
-  rd: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Frd-placeholder.mp4?alt=media&token=PLACEHOLDER_TOKEN",
-  housing: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Fhousing-placeholder.mp4?alt=media&token=PLACEHOLDER_TOKEN",
-  transportation: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Ftransportation-placeholder.mp4?alt=media&token=PLACEHOLDER_TOKEN",
-  insurance: "https://firebasestorage.googleapis.com/v0/b/readyaimgo-clients-temp.firebasestorage.app/o/readyaimgo%2Fstory%2Finsurance-placeholder.mp4?alt=media&token=PLACEHOLDER_TOKEN"
+  // Keep missing previews empty until a real asset exists; placeholder tokens cause 403 media errors in the browser.
+  rd: "",
+  housing: "",
+  transportation: "",
+  insurance: "",
 }
 
 
@@ -72,6 +73,7 @@ const moduleKeyToCardId: Record<ModuleKey, string> = {
 export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeysWithData = [], onOpenModule }: StoryOverlayProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
+  const [failedVideos, setFailedVideos] = useState<Record<string, true>>({})
 
   const modules = client?.modules ?? getDefaultModules()
   const allEnabledKeys = (["web", "app", "rd", "housing", "transportation", "insurance"] as const).filter(
@@ -89,6 +91,12 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
       description: mod?.overview ?? staticCard.description,
     }
   })
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setFailedVideos({})
+    }
+  }, [isOpen, currentStory])
   
   // Play all videos when overlay opens
   React.useEffect(() => {
@@ -168,6 +176,8 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
                   storyCards.map((card, index) => {
                     const isHovered = hoveredCard === card.id
                     const canOpen = client && onOpenModule
+                    const CardIcon = card.icon
+                    const showVideo = Boolean(card.videoUrl) && !failedVideos[card.id]
                     const handleCardClick = () => {
                       if (canOpen) onOpenModule(client.id, card.id as ModuleKey, card.title)
                     }
@@ -199,18 +209,30 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
                           }}
                         >
                           <div className={`flex-1 min-h-[60%] ${card.iconBg} relative overflow-hidden`}>
-                            <video
-                              ref={(el) => {
-                                if (el) videoRefs.current[card.id] = el
-                              }}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              loop
-                              muted
-                              playsInline
-                              autoPlay
-                            >
-                              <source src={card.videoUrl} type="video/mp4" />
-                            </video>
+                            {showVideo ? (
+                              <video
+                                ref={(el) => {
+                                  if (el) videoRefs.current[card.id] = el
+                                }}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                loop
+                                muted
+                                playsInline
+                                autoPlay
+                                onError={() => {
+                                  setFailedVideos((prev) => (prev[card.id] ? prev : { ...prev, [card.id]: true }))
+                                }}
+                              >
+                                <source src={card.videoUrl} type="video/mp4" />
+                              </video>
+                            ) : (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/10 px-4 text-center">
+                                <CardIcon className={`h-12 w-12 ${card.iconColor}`} />
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
+                                  Preview coming soon
+                                </p>
+                              </div>
+                            )}
                           </div>
 
                           <motion.div

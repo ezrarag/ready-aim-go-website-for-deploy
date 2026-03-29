@@ -12,13 +12,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!process.env.STRIPE_PRICE_ID) {
-      return NextResponse.json(
-        { error: 'STRIPE_PRICE_ID is not configured' },
-        { status: 500 }
-      )
-    }
-
     if (!process.env.NEXT_PUBLIC_APP_URL) {
       return NextResponse.json(
         { error: 'NEXT_PUBLIC_APP_URL is not configured' },
@@ -27,27 +20,40 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
-    const priceId = process.env.STRIPE_PRICE_ID
-    // Get the current user from Supabase auth (cookie-based session)
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      console.error('Authentication error:', authError)
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+    const body = await req.json().catch(() => ({} as Record<string, unknown>))
+    const priceIdFromBody =
+      typeof body.priceId === 'string' && body.priceId.startsWith('price_') ? body.priceId : null
+    const priceId = priceIdFromBody || process.env.STRIPE_PRICE_ID
+
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'Stripe price id missing: set STRIPE_PRICE_ID or pass priceId in body' },
+        { status: 500 }
+      )
+    }
+    const email =
+      typeof body.email === 'string' && body.email.includes('@') ? body.email.trim() : null
+    const userId = typeof body.userId === 'string' ? body.userId : undefined
+
+    if (!email) {
+      return NextResponse.json(
+        { error: 'email is required in JSON body for checkout' },
+        { status: 400 }
+      )
     }
 
-    // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [
         { price: priceId, quantity: 1 },
       ],
-      customer_email: user.email,
+      customer_email: email,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/client?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?canceled=1`,
       metadata: {
-        user_id: user.id,
+        ...(userId ? { user_id: userId } : {}),
       },
     })
 

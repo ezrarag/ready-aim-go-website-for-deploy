@@ -14,6 +14,8 @@ import type {
 import { getDefaultModules } from './client-directory'
 import { collectClientDeployHosts, collectClientGithubRepos, parseRepoSlug } from './pulse-selectors'
 import { pulseReportSchema } from './pulse-report'
+import { clientRoleSuggestionSnapshotSchema } from './client-role-suggestions'
+import { clientWorkspaceSchema, type ClientWorkspace } from './client-workspace'
 
 let app: App | null = null
 let db: Firestore | null = null
@@ -135,7 +137,12 @@ type FirestoreClientDoc = {
   githubRepo?: unknown
   githubRepos?: unknown
   deployHosts?: unknown
+  vercelProjectId?: unknown
+  vercelProjectName?: unknown
+  vercelProjectDomains?: unknown
+  vercelProjectUpdatedAt?: unknown
   pulseReport?: unknown
+  roleSuggestionSnapshot?: unknown
   stripeStatus?: unknown
   revenue?: unknown
   meetings?: unknown
@@ -148,11 +155,53 @@ type FirestoreClientDoc = {
   websiteUrl?: unknown
   appUrl?: unknown
   appStoreUrl?: unknown
+  appStoreConnectAppId?: unknown
+  appStoreConnectName?: unknown
+  appStoreConnectBundleId?: unknown
+  appStoreConnectPlatform?: unknown
+  appStoreConnectSku?: unknown
+  appStoreConnectVersionString?: unknown
+  appStoreConnectBuildNumber?: unknown
+  appStoreConnectBuildState?: unknown
+  appStoreConnectBetaGroups?: unknown
+  appStoreConnectUpdatedAt?: unknown
   rdUrl?: unknown
   housingUrl?: unknown
   transportationUrl?: unknown
   insuranceUrl?: unknown
   modules?: unknown
+}
+
+async function getClientDocumentByRef(
+  clientRef: string
+): Promise<{ id: string; data: FirestoreClientDoc } | null> {
+  const db = getFirestoreDb()
+  if (!db) return null
+
+  const normalizedRef = clientRef.trim()
+  if (!normalizedRef) return null
+
+  const directDoc = await db.collection("clients").doc(normalizedRef).get()
+  if (directDoc.exists) {
+    return {
+      id: directDoc.id,
+      data: directDoc.data() as FirestoreClientDoc,
+    }
+  }
+
+  const byStoryId = await db
+    .collection("clients")
+    .where("storyId", "==", normalizedRef)
+    .limit(1)
+    .get()
+
+  if (byStoryId.empty) return null
+
+  const storyDoc = byStoryId.docs[0]
+  return {
+    id: storyDoc.id,
+    data: storyDoc.data() as FirestoreClientDoc,
+  }
 }
 
 const asString = (value: unknown, fallback = ""): string =>
@@ -219,6 +268,7 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     deployHosts: asStringArray(doc.deployHosts),
   })
   const parsedPulseReport = pulseReportSchema.safeParse(doc.pulseReport)
+  const parsedRoleSuggestionSnapshot = clientRoleSuggestionSnapshotSchema.safeParse(doc.roleSuggestionSnapshot)
 
   return {
     id: normalizedId,
@@ -234,6 +284,10 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     githubRepo,
     githubRepos,
     deployHosts,
+    vercelProjectId: asString(doc.vercelProjectId) || undefined,
+    vercelProjectName: asString(doc.vercelProjectName) || undefined,
+    vercelProjectDomains: asStringArray(doc.vercelProjectDomains),
+    vercelProjectUpdatedAt: asString(doc.vercelProjectUpdatedAt) || undefined,
     stripeStatus: asStripeStatus(doc.stripeStatus),
     revenue: asNumber(doc.revenue),
     meetings: asNumber(doc.meetings),
@@ -246,12 +300,23 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     websiteUrl: asString(doc.websiteUrl) || undefined,
     appUrl: asString(doc.appUrl) || undefined,
     appStoreUrl: asString(doc.appStoreUrl) || undefined,
+    appStoreConnectAppId: asString(doc.appStoreConnectAppId) || undefined,
+    appStoreConnectName: asString(doc.appStoreConnectName) || undefined,
+    appStoreConnectBundleId: asString(doc.appStoreConnectBundleId) || undefined,
+    appStoreConnectPlatform: asString(doc.appStoreConnectPlatform) || undefined,
+    appStoreConnectSku: asString(doc.appStoreConnectSku) || undefined,
+    appStoreConnectVersionString: asString(doc.appStoreConnectVersionString) || undefined,
+    appStoreConnectBuildNumber: asString(doc.appStoreConnectBuildNumber) || undefined,
+    appStoreConnectBuildState: asString(doc.appStoreConnectBuildState) || undefined,
+    appStoreConnectBetaGroups: asStringArray(doc.appStoreConnectBetaGroups),
+    appStoreConnectUpdatedAt: asString(doc.appStoreConnectUpdatedAt) || undefined,
     rdUrl: asString(doc.rdUrl) || undefined,
     housingUrl: asString(doc.housingUrl) || undefined,
     transportationUrl: asString(doc.transportationUrl) || undefined,
     insuranceUrl: asString(doc.insuranceUrl) || undefined,
     modules: asModules(doc.modules),
     pulseReport: parsedPulseReport.success ? parsedPulseReport.data : undefined,
+    roleSuggestionSnapshot: parsedRoleSuggestionSnapshot.success ? parsedRoleSuggestionSnapshot.data : undefined,
   }
 }
 
@@ -308,13 +373,16 @@ function mapUpdateDoc(id: string, data: FirebaseFirestore.DocumentData): ClientU
 }
 
 export async function getClientUpdates(
-  clientId: string,
+  clientRef: string,
   opts: { type?: ModuleKey; status?: UpdateStatus; limit?: number } = {}
 ): Promise<ClientUpdate[]> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) return []
+
   const db = getFirestoreDb()
   if (!db) return []
   const limit = Math.min(opts.limit ?? 50, 100)
-  const ref = db.collection("clients").doc(clientId).collection("updates")
+  const ref = db.collection("clients").doc(resolvedClientId).collection("updates")
 
   try {
     if (opts.type != null && opts.status != null) {
@@ -343,20 +411,23 @@ export async function getClientUpdates(
 }
 
 export async function getLatestPublishedUpdate(
-  clientId: string,
+  clientRef: string,
   type: ModuleKey
 ): Promise<ClientUpdate | null> {
-  const list = await getClientUpdates(clientId, { type, status: "published", limit: 1 })
+  const list = await getClientUpdates(clientRef, { type, status: "published", limit: 1 })
   return list[0] ?? null
 }
 
 export async function createClientUpdate(
-  clientId: string,
+  clientRef: string,
   data: Omit<ClientUpdate, "id" | "createdAt">
 ): Promise<string> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) throw new Error("Client not found")
+
   const db = getFirestoreDb()
   if (!db) throw new Error("Firebase not initialized")
-  const ref = db.collection("clients").doc(clientId).collection("updates").doc()
+  const ref = db.collection("clients").doc(resolvedClientId).collection("updates").doc()
   const createdAt = new Date()
   const bodyOrDetails = data.body ?? data.details ?? null
   await ref.set({
@@ -377,13 +448,16 @@ export async function createClientUpdate(
 }
 
 export async function updateClientUpdate(
-  clientId: string,
+  clientRef: string,
   updateId: string,
   data: Partial<Omit<ClientUpdate, "id" | "createdAt" | "createdByUid">>
 ): Promise<void> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) throw new Error("Client not found")
+
   const db = getFirestoreDb()
   if (!db) throw new Error("Firebase not initialized")
-  const ref = db.collection("clients").doc(clientId).collection("updates").doc(updateId)
+  const ref = db.collection("clients").doc(resolvedClientId).collection("updates").doc(updateId)
   const payload: Record<string, unknown> = {}
   if (data.type !== undefined) payload.type = data.type
   if (data.title !== undefined) payload.title = data.title
@@ -400,14 +474,63 @@ export async function updateClientUpdate(
 }
 
 export async function getClientUpdateById(
-  clientId: string,
+  clientRef: string,
   updateId: string
 ): Promise<ClientUpdate | null> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) return null
+
   const db = getFirestoreDb()
   if (!db) return null
-  const doc = await db.collection("clients").doc(clientId).collection("updates").doc(updateId).get()
+  const doc = await db.collection("clients").doc(resolvedClientId).collection("updates").doc(updateId).get()
   if (!doc.exists) return null
   return mapUpdateDoc(doc.id, doc.data()!)
+}
+
+export async function getClientWorkspace(
+  clientRef: string
+): Promise<ClientWorkspace | null> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) return null
+
+  const db = getFirestoreDb()
+  if (!db) return null
+
+  const doc = await db.collection("clients").doc(resolvedClientId).collection("workspace").doc("state").get()
+  if (!doc.exists) return null
+
+  const parsed = clientWorkspaceSchema.safeParse(doc.data())
+  return parsed.success ? parsed.data : null
+}
+
+export async function upsertClientWorkspace(
+  clientRef: string,
+  workspace: ClientWorkspace
+): Promise<void> {
+  const resolvedClientId = await resolveClientDocumentId(clientRef)
+  if (!resolvedClientId) throw new Error("Client not found")
+
+  const db = getFirestoreDb()
+  if (!db) throw new Error("Firebase not initialized")
+
+  const normalized = clientWorkspaceSchema.parse({
+    ...workspace,
+    updatedAt: new Date().toISOString(),
+  })
+
+  await db
+    .collection("clients")
+    .doc(resolvedClientId)
+    .collection("workspace")
+    .doc("state")
+    .set(normalized, { merge: true })
+
+  await db.collection("clients").doc(resolvedClientId).set(
+    {
+      updatedAt: normalized.updatedAt,
+    },
+    { merge: true }
+  )
 }
 
 /** Create a new client document with baseline modules (for Add Client flow). */
@@ -439,6 +562,7 @@ export async function createClientDocument(
     updatedAt: data.updatedAt ?? new Date().toISOString(),
     pulseSummary: data.pulseSummary ?? null,
     pulseReport: normalizedPulseReport?.success ? normalizedPulseReport.data : null,
+    roleSuggestionSnapshot: data.roleSuggestionSnapshot ?? null,
     deployStatus: data.deployStatus ?? "building",
     deployUrl: normalizedDeployUrl,
     githubRepo: primaryGithubRepo,
@@ -453,6 +577,27 @@ export async function createClientDocument(
     storyVideoUrl: data.storyVideoUrl ?? null,
     showOnFrontend: data.showOnFrontend ?? true,
     isNewStory: data.isNewStory ?? false,
+    websiteUrl: data.websiteUrl ?? null,
+    appUrl: data.appUrl ?? null,
+    appStoreUrl: data.appStoreUrl ?? null,
+    rdUrl: data.rdUrl ?? null,
+    housingUrl: data.housingUrl ?? null,
+    transportationUrl: data.transportationUrl ?? null,
+    insuranceUrl: data.insuranceUrl ?? null,
+    vercelProjectId: data.vercelProjectId ?? null,
+    vercelProjectName: data.vercelProjectName ?? null,
+    vercelProjectDomains: data.vercelProjectDomains ?? [],
+    vercelProjectUpdatedAt: data.vercelProjectUpdatedAt ?? null,
+    appStoreConnectAppId: data.appStoreConnectAppId ?? null,
+    appStoreConnectName: data.appStoreConnectName ?? null,
+    appStoreConnectBundleId: data.appStoreConnectBundleId ?? null,
+    appStoreConnectPlatform: data.appStoreConnectPlatform ?? null,
+    appStoreConnectSku: data.appStoreConnectSku ?? null,
+    appStoreConnectVersionString: data.appStoreConnectVersionString ?? null,
+    appStoreConnectBuildNumber: data.appStoreConnectBuildNumber ?? null,
+    appStoreConnectBuildState: data.appStoreConnectBuildState ?? null,
+    appStoreConnectBetaGroups: data.appStoreConnectBetaGroups ?? [],
+    appStoreConnectUpdatedAt: data.appStoreConnectUpdatedAt ?? null,
     modules,
   })
   return ref.id
@@ -606,11 +751,13 @@ export async function getAllClientDirectoryEntries(): Promise<ClientDirectoryEnt
 }
 
 export async function getClientDirectoryEntryById(clientId: string): Promise<ClientDirectoryEntry | null> {
-  const db = getFirestoreDb()
-  if (!db) return null
+  const resolved = await getClientDocumentByRef(clientId)
+  if (!resolved) return null
 
-  const doc = await db.collection("clients").doc(clientId).get()
-  if (!doc.exists) return null
+  return mapClientDoc(resolved.id, resolved.data)
+}
 
-  return mapClientDoc(doc.id, doc.data() as FirestoreClientDoc)
+export async function resolveClientDocumentId(clientRef: string): Promise<string | null> {
+  const resolved = await getClientDocumentByRef(clientRef)
+  return resolved?.id ?? null
 }

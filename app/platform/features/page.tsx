@@ -143,25 +143,8 @@ export default function PlatformFeaturesPage() {
   useEffect(() => {
     if (openModal === "Website Generator") {
       setLoading(true);
-      supabase.from("projects").select("*").then(({ data, error }) => {
-        if (error) {
-          setProjects([]);
-        } else {
-          const normalized = (data || []).map((p: any) => ({
-            ...p,
-            liveUrl: p.live_url,
-            imageUrl: p.image_url,
-            createdAt: p.created_at,
-            tags: Array.isArray(p.tags)
-              ? p.tags
-              : typeof p.tags === "string"
-              ? p.tags.split(",").map((t: string) => t.trim())
-              : [],
-          }));
-          setProjects(normalized);
-        }
-        setLoading(false);
-      });
+      setProjects([]);
+      setLoading(false);
     }
   }, [openModal]);
 

@@ -22,6 +22,60 @@ html, body {
   }
 }
 
+@layer components {
+  .admin-panel {
+    border-color: hsl(var(--border) / 0.72);
+    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
+    box-shadow: 0 24px 55px -32px hsl(var(--foreground) / 0.18);
+  }
+
+  .admin-panel-inset {
+    border-color: hsl(var(--border) / 0.72);
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+  }
+
+  .admin-panel-title {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #f97316;
+  }
+
+  .dark .admin-panel {
+    box-shadow: 0 20px 48px -30px rgb(0 0 0 / 0.72);
+  }
+
+  .admin-table-head {
+    border-color: hsl(var(--border) / 0.72);
+    background: hsl(var(--muted) / 0.55);
+  }
+
+  .admin-table-row {
+    border-color: hsl(var(--border) / 0.55);
+  }
+
+  .admin-table-row:hover {
+    background: hsl(var(--muted) / 0.38);
+  }
+
+  .admin-table-empty {
+    background: hsl(var(--muted) / 0.4);
+  }
+
+  .dark .admin-table-head {
+    background: rgb(255 255 255 / 0.04);
+  }
+
+  .dark .admin-table-row:hover {
+    background: rgb(255 255 255 / 0.03);
+  }
+
+  .dark .admin-table-empty {
+    background: rgb(255 255 255 / 0.02);
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Ready Aim Go DevTools",
+  "version": "1.0.0",
+  "description": "Checklist, page context, Drive folder switching, and dev console for Ready Aim Go development",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://localhost:3001/*",
+    "https://readyaimgo.biz/*",
+    "https://www.readyaimgo.biz/*",
+    "https://clients.readyaimgo.biz/*",
+    "https://drive.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "https://readyaimgo.biz/*",
+        "https://www.readyaimgo.biz/*",
+        "https://clients.readyaimgo.biz/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar/sidebar.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bridge.js"],
+      "matches": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "https://readyaimgo.biz/*",
+        "https://www.readyaimgo.biz/*",
+        "https://clients.readyaimgo.biz/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "Ready Aim Go DevTools"
+  }
+}

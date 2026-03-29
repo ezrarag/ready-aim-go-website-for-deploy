@@ -7,6 +7,7 @@ import {
   normalizeHost,
   parseRepoSlug,
 } from "@/lib/pulse-selectors"
+import { buildClientUpdatesFromVercelProject, listVercelProjects, matchVercelProjectToClient } from "@/lib/vercel"
 import { pulseReportSchema, summarizePulseReport } from "@/lib/pulse-report"
 import type { PulseReport } from "@/lib/pulse-report"
 
@@ -247,13 +248,33 @@ async function persistPulseReport(clientId: string, pulseReport: PulseReport, su
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const client = await getClientDirectoryEntryById(id)
+    let client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })
     }
 
-    const githubRepos = collectClientGithubRepos(client)
-    const deployHosts = collectClientDeployHosts(client)
+    let githubRepos = collectClientGithubRepos(client)
+    let deployHosts = collectClientDeployHosts(client)
+
+    try {
+      const projects = await listVercelProjects()
+      const match = matchVercelProjectToClient(client, projects)
+      if (match) {
+        const db = getFirestoreDb()
+        const updates = buildClientUpdatesFromVercelProject(client, match.project)
+        if (db) {
+          await db.collection("clients").doc(client.id).update(updates)
+          const refreshedClient = await getClientDirectoryEntryById(id)
+          if (refreshedClient) {
+            client = refreshedClient
+            githubRepos = collectClientGithubRepos(client)
+            deployHosts = collectClientDeployHosts(client)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Pulse suggestion Vercel sync skipped:", error)
+    }
 
     if (githubRepos.length === 0 && deployHosts.length === 0) {
       return NextResponse.json(

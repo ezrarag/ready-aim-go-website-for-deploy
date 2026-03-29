@@ -1,4 +1,5 @@
 import type { PulseReport } from "./pulse-report"
+import type { ClientRoleSuggestionSnapshot } from "./client-role-suggestions"
 
 export type ClientStatus = "active" | "inactive" | "onboarding"
 export type DeployStatus = "live" | "building" | "error"
@@ -27,6 +28,10 @@ export interface ClientDirectoryEntry {
   githubRepo?: string
   githubRepos?: string[]
   deployHosts?: string[]
+  vercelProjectId?: string
+  vercelProjectName?: string
+  vercelProjectDomains?: string[]
+  vercelProjectUpdatedAt?: string
   stripeStatus: StripeStatus
   revenue: number
   meetings: number
@@ -39,6 +44,16 @@ export interface ClientDirectoryEntry {
   websiteUrl?: string
   appUrl?: string
   appStoreUrl?: string
+  appStoreConnectAppId?: string
+  appStoreConnectName?: string
+  appStoreConnectBundleId?: string
+  appStoreConnectPlatform?: string
+  appStoreConnectSku?: string
+  appStoreConnectVersionString?: string
+  appStoreConnectBuildNumber?: string
+  appStoreConnectBuildState?: string
+  appStoreConnectBetaGroups?: string[]
+  appStoreConnectUpdatedAt?: string
   /** Key field for R/D card visibility. */
   rdUrl?: string
   /** Key field for Housing card visibility. */
@@ -51,6 +66,8 @@ export interface ClientDirectoryEntry {
   modules?: Record<ModuleKey, ClientModule>
   /** Structured Pulse output for BEAM-role aligned planning. */
   pulseReport?: PulseReport
+  /** Unified AI-generated work contexts and draft role suggestions for admin/client review. */
+  roleSuggestionSnapshot?: ClientRoleSuggestionSnapshot
 }
 
 /** Baseline modules so front-end never breaks when Firestore has no modules. */

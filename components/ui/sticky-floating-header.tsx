@@ -24,24 +24,9 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
   const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
   const router = useRouter()
 
-  // Check for user session
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Check if supabase is available (client-side)
-        if (typeof window !== 'undefined' && (window as any).supabase) {
-          const { data: { session }, error } = await (window as any).supabase.auth.getSession()
-          if (!error && session?.user) {
-            setUser(session.user)
-          }
-        }
-      } catch (error) {
-        console.error('Error checking session:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    checkSession()
+    // TODO: Firebase Auth session
+    setLoading(false)
   }, [])
 
   const handleHomeClick = () => {

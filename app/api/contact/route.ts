@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       console.log('================================');
 
       // In production, you would:
-      // 1. Save to database (Supabase)
+      // 1. Save to database (e.g. Firestore)
       // 2. Send email via SendGrid/Resend
       // 3. Send Slack notification
       // 4. Create CRM entry
@@ -58,27 +58,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Option 2: Save to Supabase database
-    // Uncomment when Supabase is configured
-    /*
-    const { data, error } = await supabase
-      .from('contact_submissions')
-      .insert({
-        name,
-        email,
-        company,
-        phone,
-        plan,
-        message,
-        created_at: new Date().toISOString(),
-      });
-
-    if (error) {
-      throw error;
-    }
-    */
-
-    // Option 3: Send Slack notification
+    // Option 2: Send Slack notification
     if (process.env.SLACK_BOT_TOKEN) {
       try {
         await fetch(`${req.nextUrl.origin}/api/slack/notify`, {

@@ -1,5 +1,5 @@
 -- Script to create an admin user
--- Run this in your Supabase SQL editor after setting up your environment variables
+-- Run in your PostgreSQL client if you still maintain legacy SQL tables (optional).
 
 -- First, make sure you have a user in the auth.users table
 -- You can create one by signing up through your app or manually

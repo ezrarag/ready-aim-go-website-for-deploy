@@ -5,6 +5,7 @@ import {
 } from "@/lib/firestore"
 import type { ModuleKey } from "@/lib/client-directory"
 import { collectClientDeployHosts, collectClientGithubRepos } from "@/lib/pulse-selectors"
+import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -53,6 +54,10 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  if (!isInternalMutationAuthorized(request)) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const params = await context.params
     const clientId = params.id
@@ -73,8 +78,12 @@ export async function PATCH(
       "name", "storyId", "brands", "status", "lastActivity", "pulseSummary",
       "deployStatus", "deployUrl", "githubRepo", "githubRepos", "deployHosts", "pulseReport", "stripeStatus", "revenue", "meetings", "emails",
       "commits", "lastDeploy", "storyVideoUrl", "isNewStory", "modules",
+      "roleSuggestionSnapshot",
       "showOnFrontend",
       "websiteUrl", "appUrl", "appStoreUrl",
+      "appStoreConnectAppId", "appStoreConnectName", "appStoreConnectBundleId", "appStoreConnectPlatform",
+      "appStoreConnectSku", "appStoreConnectVersionString", "appStoreConnectBuildNumber",
+      "appStoreConnectBuildState", "appStoreConnectBetaGroups", "appStoreConnectUpdatedAt",
       "rdUrl", "housingUrl", "transportationUrl", "insuranceUrl",
     ] as const
     const updates: Record<string, unknown> = {}

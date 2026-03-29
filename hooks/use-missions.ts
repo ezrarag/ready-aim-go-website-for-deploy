@@ -50,31 +50,10 @@ export function useMissions(clientId?: string) {
       setLoading(true);
       setError(null);
 
-      // Fetch missions
-      const { data: missionsData, error: missionsError } = await supabase
-        .from('missions')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
+      // TODO: missions from Firestore / API
+      setMissions([]);
 
-      if (missionsError) {
-        throw missionsError;
-      }
-
-      setMissions(missionsData || []);
-
-      // Fetch mission stats
-      const { data: statsData, error: statsError } = await supabase
-        .from('mission_stats')
-        .select('*')
-        .eq('client_id', clientId)
-        .single();
-
-      if (statsError && statsError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.warn('Error fetching mission stats:', statsError);
-      }
-
-      setStats(statsData || {
+      setStats({
         total_missions: 0,
         completed_missions: 0,
         active_missions: 0,
@@ -100,19 +79,9 @@ export function useMissions(clientId?: string) {
 
   const createMission = useCallback(async (missionData: Partial<Mission>) => {
     try {
-      const { data, error } = await supabase
-        .from('missions')
-        .insert(missionData)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      // Refresh missions list
+      console.warn("createMission: persist via Firestore (not implemented)", missionData);
       await fetchMissions();
-      return data;
+      return null;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create mission';
       setError(errorMessage);
@@ -122,20 +91,9 @@ export function useMissions(clientId?: string) {
 
   const updateMission = useCallback(async (missionId: string, updates: Partial<Mission>) => {
     try {
-      const { data, error } = await supabase
-        .from('missions')
-        .update(updates)
-        .eq('id', missionId)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      // Refresh missions list
+      console.warn("updateMission: persist via Firestore (not implemented)", missionId, updates);
       await fetchMissions();
-      return data;
+      return null;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update mission';
       setError(errorMessage);
@@ -145,16 +103,7 @@ export function useMissions(clientId?: string) {
 
   const deleteMission = useCallback(async (missionId: string) => {
     try {
-      const { error } = await supabase
-        .from('missions')
-        .delete()
-        .eq('id', missionId);
-
-      if (error) {
-        throw error;
-      }
-
-      // Refresh missions list
+      console.warn("deleteMission: persist via Firestore (not implemented)", missionId);
       await fetchMissions();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete mission';

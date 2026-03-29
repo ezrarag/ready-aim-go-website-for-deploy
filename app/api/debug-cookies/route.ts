@@ -11,9 +11,9 @@ export async function GET(req: NextRequest) {
       name: cookie.name,
       value: cookie.value.substring(0, 50) + '...', // Truncate for security
     })),
-    supabaseCookies: allCookies.filter(cookie => 
+    authCookieNames: allCookies.filter(cookie => 
       cookie.name.includes('sb-') || 
-      cookie.name.includes('supabase') ||
+      cookie.name.includes('session') ||
       cookie.name.includes('auth')
     ).map(cookie => cookie.name)
   });

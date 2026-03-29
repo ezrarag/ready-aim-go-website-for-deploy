@@ -41,7 +41,7 @@ export function WebsiteMissionModal({ open, onClose }: MissionModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Submit to Supabase
+    // TODO: Submit to Firestore / API
     console.log('Website mission:', formData);
     onClose();
   };

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,10 +42,9 @@ import {
   FolderKanban,
   Bell,
   TrendingUp,
-  Calendar,
-  FileText
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard-layout';
+import { AdminMetricTile, AdminPanel } from '@/components/admin/admin-panel';
 import { toast } from 'sonner';
 
 interface Project {
@@ -83,7 +81,6 @@ interface Task {
 }
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
   const { addNotification } = useNotifications();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -433,34 +430,34 @@ export default function AdminDashboardPage() {
     switch (status) {
       case 'active':
       case 'completed':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-300 border border-green-300 dark:border-green-700';
+        return 'border border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-200';
       case 'on-hold':
       case 'blocked':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700';
+        return 'border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-200';
       case 'pending':
       case 'todo':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border border-blue-300 dark:border-blue-700';
+        return 'border border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200';
       case 'inactive':
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-600';
+        return 'border border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200';
       case 'in-progress':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-300 border border-purple-300 dark:border-purple-700';
+        return 'border border-violet-300 bg-violet-100 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/15 dark:text-violet-200';
       default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-600';
+        return 'border border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-300 border border-red-300 dark:border-red-700';
+        return 'border border-red-300 bg-red-100 text-red-900 dark:border-red-500/20 dark:bg-red-500/15 dark:text-red-200';
       case 'high':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-300 border border-orange-300 dark:border-orange-700';
+        return 'border border-orange-300 bg-orange-100 text-orange-900 dark:border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-200';
       case 'medium':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700';
+        return 'border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-200';
       case 'low':
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-600';
+        return 'border border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200';
       default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-600';
+        return 'border border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200';
     }
   };
 
@@ -492,10 +489,10 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px] bg-white dark:bg-gray-900">
+        <div className="flex min-h-[400px] items-center justify-center bg-background">
           <div className="text-center">
-            <div className="w-8 h-8 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-700 dark:text-gray-300 font-medium">Loading...</p>
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent"></div>
+            <p className="font-medium text-muted-foreground">Loading...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -508,8 +505,8 @@ export default function AdminDashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage projects, clients, and track your work status</p>
+            <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+            <p className="mt-1 text-muted-foreground">Manage projects, clients, and track your work status</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={clientDialogOpen} onOpenChange={(open) => {
@@ -683,61 +680,43 @@ export default function AdminDashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Clients</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{clients.length}</p>
-                </div>
-                <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Projects</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    {projects.filter(p => p.status === 'active').length}
-                  </p>
-                </div>
-                <FolderKanban className="h-8 w-8 text-green-600 dark:text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Urgent Tasks</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{urgentTasks.length}</p>
-                </div>
-                <Bell className="h-8 w-8 text-red-600 dark:text-red-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Overdue Tasks</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{overdueTasks.length}</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
-              </div>
-            </CardContent>
-          </Card>
+          <AdminMetricTile
+            className="transition-shadow hover:shadow-lg"
+            label="Total Clients"
+            value={clients.length}
+            valueClassName="text-2xl font-bold"
+            trailing={<Users className="h-8 w-8 text-orange-500 dark:text-orange-400" />}
+          />
+          <AdminMetricTile
+            className="transition-shadow hover:shadow-lg"
+            label="Active Projects"
+            value={projects.filter(p => p.status === 'active').length}
+            valueClassName="text-2xl font-bold"
+            trailing={<FolderKanban className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />}
+          />
+          <AdminMetricTile
+            className="transition-shadow hover:shadow-lg"
+            label="Urgent Tasks"
+            value={urgentTasks.length}
+            valueClassName="text-2xl font-bold"
+            trailing={<Bell className="h-8 w-8 text-red-500 dark:text-red-400" />}
+          />
+          <AdminMetricTile
+            className="transition-shadow hover:shadow-lg"
+            label="Overdue Tasks"
+            value={overdueTasks.length}
+            valueClassName="text-2xl font-bold"
+            trailing={<AlertCircle className="h-8 w-8 text-amber-500 dark:text-amber-400" />}
+          />
         </div>
 
         {/* Tasks Section */}
-        <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md">
-          <CardHeader className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+        <AdminPanel className="overflow-hidden">
+          <CardHeader className="border-b border-border/70 bg-muted/40 dark:bg-white/[0.03]">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-gray-900 dark:text-gray-100">Tasks & To-Dos</CardTitle>
-                <CardDescription className="text-gray-600 dark:text-gray-400">Track what needs to be done</CardDescription>
+                <CardTitle className="text-foreground">Tasks & To-Dos</CardTitle>
+                <CardDescription className="text-muted-foreground">Track what needs to be done</CardDescription>
               </div>
               <Dialog open={taskDialogOpen} onOpenChange={(open) => {
                 setTaskDialogOpen(open);
@@ -869,23 +848,23 @@ export default function AdminDashboardPage() {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent className="bg-white dark:bg-gray-800">
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Title</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Project</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Client</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Status</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Priority</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Due Date</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Actions</TableHead>
+                <TableRow className="admin-table-head hover:bg-transparent">
+                  <TableHead className="font-semibold text-foreground">Title</TableHead>
+                  <TableHead className="font-semibold text-foreground">Project</TableHead>
+                  <TableHead className="font-semibold text-foreground">Client</TableHead>
+                  <TableHead className="font-semibold text-foreground">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground">Priority</TableHead>
+                  <TableHead className="font-semibold text-foreground">Due Date</TableHead>
+                  <TableHead className="font-semibold text-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tasks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-gray-600 dark:text-gray-400 py-8 bg-gray-50 dark:bg-gray-700/30">
+                    <TableCell colSpan={7} className="admin-table-empty py-8 text-center text-muted-foreground">
                       No tasks yet. Create your first task to get started.
                     </TableCell>
                   </TableRow>
@@ -894,10 +873,10 @@ export default function AdminDashboardPage() {
                     const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
                     const client = task.clientId ? clients.find(c => c.id === task.clientId) : null;
                     return (
-                      <TableRow key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700">
-                        <TableCell className="font-medium text-gray-900 dark:text-gray-100">{task.title}</TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">{project?.name || '-'}</TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">{client?.name || '-'}</TableCell>
+                      <TableRow key={task.id} className="admin-table-row">
+                        <TableCell className="font-medium text-foreground">{task.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{project?.name || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{client?.name || '-'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(task.status)}>
                             <span className="flex items-center gap-1">
@@ -911,7 +890,7 @@ export default function AdminDashboardPage() {
                             {task.priority}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">
+                        <TableCell className="text-muted-foreground">
                           {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}
                         </TableCell>
                         <TableCell>
@@ -920,17 +899,17 @@ export default function AdminDashboardPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditTask(task)}
-                              className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="hover:bg-muted/60 dark:hover:bg-white/[0.05]"
                             >
-                              <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              <Edit className="h-4 w-4 text-muted-foreground" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteTask(task.id)}
-                              className="hover:bg-red-50 dark:hover:bg-red-900/20"
+                              className="hover:bg-red-500/10"
                             >
-                              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                              <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                             </Button>
                           </div>
                         </TableCell>
@@ -941,38 +920,38 @@ export default function AdminDashboardPage() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </AdminPanel>
 
         {/* Projects Section */}
-        <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md">
-          <CardHeader className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-            <CardTitle className="text-gray-900 dark:text-gray-100">Projects</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">Manage all your active projects</CardDescription>
+        <AdminPanel className="overflow-hidden">
+          <CardHeader className="border-b border-border/70 bg-muted/40 dark:bg-white/[0.03]">
+            <CardTitle className="text-foreground">Projects</CardTitle>
+            <CardDescription className="text-muted-foreground">Manage all your active projects</CardDescription>
           </CardHeader>
-          <CardContent className="bg-white dark:bg-gray-800">
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Project Name</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Client</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Status</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Priority</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Due Date</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Actions</TableHead>
+                <TableRow className="admin-table-head hover:bg-transparent">
+                  <TableHead className="font-semibold text-foreground">Project Name</TableHead>
+                  <TableHead className="font-semibold text-foreground">Client</TableHead>
+                  <TableHead className="font-semibold text-foreground">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground">Priority</TableHead>
+                  <TableHead className="font-semibold text-foreground">Due Date</TableHead>
+                  <TableHead className="font-semibold text-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {projects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-600 dark:text-gray-400 py-8 bg-gray-50 dark:bg-gray-700/30">
+                    <TableCell colSpan={6} className="admin-table-empty py-8 text-center text-muted-foreground">
                       No projects yet. Create your first project to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
                   projects.map((project) => (
-                    <TableRow key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700">
-                      <TableCell className="font-medium text-gray-900 dark:text-gray-100">{project.name}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">{project.clientName}</TableCell>
+                    <TableRow key={project.id} className="admin-table-row">
+                      <TableCell className="font-medium text-foreground">{project.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{project.clientName}</TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(project.status)}>
                           <span className="flex items-center gap-1">
@@ -986,7 +965,7 @@ export default function AdminDashboardPage() {
                           {project.priority}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">
+                      <TableCell className="text-muted-foreground">
                         {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : '-'}
                       </TableCell>
                       <TableCell>
@@ -995,17 +974,17 @@ export default function AdminDashboardPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditProject(project)}
-                            className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                            className="hover:bg-muted/60 dark:hover:bg-white/[0.05]"
                           >
-                            <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            <Edit className="h-4 w-4 text-muted-foreground" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteProject(project.id)}
-                            className="hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="hover:bg-red-500/10"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1015,29 +994,29 @@ export default function AdminDashboardPage() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </AdminPanel>
 
         {/* Clients Section */}
-        <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-md">
-          <CardHeader className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-            <CardTitle className="text-gray-900 dark:text-gray-100">Clients</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">Manage your client relationships</CardDescription>
+        <AdminPanel className="overflow-hidden">
+          <CardHeader className="border-b border-border/70 bg-muted/40 dark:bg-white/[0.03]">
+            <CardTitle className="text-foreground">Clients</CardTitle>
+            <CardDescription className="text-muted-foreground">Manage your client relationships</CardDescription>
           </CardHeader>
-          <CardContent className="bg-white dark:bg-gray-800">
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Client Name</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Email</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Status</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Projects</TableHead>
-                  <TableHead className="text-gray-900 dark:text-gray-100 font-semibold">Actions</TableHead>
+                <TableRow className="admin-table-head hover:bg-transparent">
+                  <TableHead className="font-semibold text-foreground">Client Name</TableHead>
+                  <TableHead className="font-semibold text-foreground">Email</TableHead>
+                  <TableHead className="font-semibold text-foreground">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground">Projects</TableHead>
+                  <TableHead className="font-semibold text-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {clients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-600 dark:text-gray-400 py-8 bg-gray-50 dark:bg-gray-700/30">
+                    <TableCell colSpan={5} className="admin-table-empty py-8 text-center text-muted-foreground">
                       No clients yet. Add your first client to get started.
                     </TableCell>
                   </TableRow>
@@ -1045,32 +1024,32 @@ export default function AdminDashboardPage() {
                   clients.map((client) => {
                     const clientProjects = projects.filter(p => p.clientId === client.id);
                     return (
-                      <TableRow key={client.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700">
-                        <TableCell className="font-medium text-gray-900 dark:text-gray-100">{client.name}</TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">{client.email || '-'}</TableCell>
+                      <TableRow key={client.id} className="admin-table-row">
+                        <TableCell className="font-medium text-foreground">{client.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{client.email || '-'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(client.status)}>
                             {client.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">{clientProjects.length}</TableCell>
+                        <TableCell className="text-muted-foreground">{clientProjects.length}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditClient(client)}
-                              className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="hover:bg-muted/60 dark:hover:bg-white/[0.05]"
                             >
-                              <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              <Edit className="h-4 w-4 text-muted-foreground" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteClient(client.id)}
-                              className="hover:bg-red-50 dark:hover:bg-red-900/20"
+                              className="hover:bg-red-500/10"
                             >
-                              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                              <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1081,9 +1060,8 @@ export default function AdminDashboardPage() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </AdminPanel>
       </div>
     </DashboardLayout>
   );
 }
-

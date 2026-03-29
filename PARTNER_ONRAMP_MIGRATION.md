@@ -1,8 +1,8 @@
-# Partner Onramp Migration: Supabase → Firebase/Firestore
+# Partner Onramp: Firebase/Firestore
 
 ## Summary
 
-Successfully migrated the Partner Investment Onramp from Supabase to Firebase/Firestore. The hero section has also been updated with new copy and CTA structure.
+Partner Investment Onramp data lives in Firebase/Firestore. The hero section was updated with new copy and CTA structure.
 
 ## Changes Made
 
@@ -20,12 +20,11 @@ Successfully migrated the Partner Investment Onramp from Supabase to Firebase/Fi
 
 - **Created** `lib/firestore.ts` with Firebase Admin SDK initialization
 - **Installed** `firebase-admin` package
-- **Removed** `lib/supabase-server.ts`
-- **Removed** `@supabase/supabase-js` dependency
+- **Removed** legacy Postgres-oriented server helper and JS client in favor of Firestore
 
 ### 3. Firestore Collections
 
-Two collections replace the Supabase tables:
+Two collections replace the prior relational tables:
 
 #### `partners` Collection
 - `slug` (string, unique)
@@ -131,13 +130,13 @@ Or manually create it in Firebase Console:
 
 ## Files Removed
 
-- ❌ `lib/supabase-server.ts` - Replaced with `lib/firestore.ts`
-- ❌ `app/api/stripe/webhook.ts` - Replaced with `app/api/stripe/webhook/route.ts`
-- ❌ `database/create-partners-tables.sql` - No longer needed (Firestore auto-creates collections)
+- Prior Postgres-oriented server module — replaced with `lib/firestore.ts`
+- `app/api/stripe/webhook.ts` — replaced with `app/api/stripe/webhook/route.ts`
+- `database/create-partners-tables.sql` — no longer needed (Firestore auto-creates collections)
 
 ## Notes
 
-- **Other Supabase usage**: The rest of the codebase still uses Supabase for auth, client dashboards, etc. Only the partner onramp was migrated to Firebase.
+- **Stack**: Use Firebase Auth and Firestore for new features; legacy SQL under `database/` is optional/historical for Postgres environments.
 - **Admin Auth**: Admin pages currently have placeholder auth checks. Implement proper Firebase Auth verification for production.
 - **Idempotency**: Webhook handler checks for existing contributions by `stripeSessionId` to prevent duplicates.
 
@@ -147,5 +146,3 @@ Or manually create it in Firebase Console:
 2. Test the partner flow end-to-end
 3. Implement proper admin authentication using Firebase Auth
 4. Add more partners by creating documents in the `partners` collection
-
-

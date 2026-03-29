@@ -21,36 +21,11 @@ export function CommissionRateModal({ open, onClose, currentRate, onRateChange }
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        console.error('Error getting user:', userError);
-        throw new Error('User not authenticated');
-      }
-
-      // Save to Supabase profiles table
-      const { error } = await supabase
-        .from('profiles')
-        .update({ commission_rate: tempRate })
-        .eq('id', user.id);
-      
-      if (error) {
-        // If column doesn't exist yet, just update locally
-        if (error.code === '42703') {
-          console.log('Commission rate column not found, updating locally only');
-        } else {
-          console.error('Error saving commission rate:', error);
-          throw error;
-        }
-      }
-      
-      // Update the rate and close modal
+      // TODO: persist commission_rate to Firestore client profile
       onRateChange(tempRate);
       onClose();
     } catch (error) {
       console.error('Error saving commission rate:', error);
-      // Still close the modal even if save fails
       onClose();
     } finally {
       setIsSaving(false);

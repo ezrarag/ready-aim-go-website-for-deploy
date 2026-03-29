@@ -162,7 +162,7 @@ export function RoleExtractionModal({ open, onClose, onComplete, businessPlanTex
     setIsPublishing(true);
 
     try {
-      // Save roles to Supabase
+      // TODO: Save roles to Firestore
       const response = await fetch('/api/roles/publish', {
         method: 'POST',
         headers: {

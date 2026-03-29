@@ -8,10 +8,9 @@ export default function IntakePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Placeholder for future Supabase save
+  // Placeholder for future Firestore save
   const saveAnalysisToProfile = async (analysis: any) => {
-    // TODO: Implement saving to Supabase and linking to client profile
-    // Example: await supabase.from('website_analyses').insert({ ...analysis, client_id })
+    // TODO: save analysis to Firestore and link to client profile
     // For now, just log
     console.log("Scaffold: Save analysis to profile", analysis)
   }

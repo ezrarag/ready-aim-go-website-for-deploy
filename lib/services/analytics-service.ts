@@ -60,39 +60,13 @@ export class AnalyticsService {
     return analytics.pageViews;
   }
 
-  // Update analytics config in Supabase
+  /** TODO: persist analytics config in Firestore */
   async updateAnalyticsConfig(clientId: string, config: Partial<GoogleAnalyticsConfig>) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          analytics_config: config,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', clientId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating analytics config:', error);
-      throw error;
-    }
+    console.warn('updateAnalyticsConfig: Firestore not implemented', clientId, config);
   }
 
-  // Get analytics config from Supabase
-  async getAnalyticsConfig(clientId: string): Promise<GoogleAnalyticsConfig | null> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('analytics_config')
-        .eq('id', clientId)
-        .single();
-
-      if (error) throw error;
-      return data?.analytics_config || null;
-    } catch (error) {
-      console.error('Error fetching analytics config:', error);
-      return null;
-    }
+  async getAnalyticsConfig(_clientId: string): Promise<GoogleAnalyticsConfig | null> {
+    return null;
   }
 }
 

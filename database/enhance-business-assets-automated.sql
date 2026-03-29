@@ -61,7 +61,7 @@ BEGIN
         'https://' || LOWER(REPLACE(client_name_1, ' ', '')) || '.com',
         'website',
         'active',
-        ARRAY['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Supabase'],
+        ARRAY['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Firebase'],
         'https://github.com/' || LOWER(REPLACE(client_name_1, ' ', '')) || '/portfolio',
         'Personal portfolio website showcasing creative work and services'
       )

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getBeamHomeInternalDirectoryEndpoints } from "@/lib/beam-api"
 
 interface BeamWebsiteDirectoryEntry {
   id: string
@@ -13,11 +14,6 @@ interface BeamWebsiteDirectoryEntry {
   updatedBy: string
   source: string
 }
-
-const DIRECTORY_ENDPOINTS = [
-  "https://beamthinktank.space/api/website-directory/internal",
-  "http://localhost:3000/api/website-directory/internal",
-] as const
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -55,9 +51,10 @@ function normalizeEntry(entry: unknown): BeamWebsiteDirectoryEntry | null {
 }
 
 export async function GET() {
+  const directoryEndpoints = getBeamHomeInternalDirectoryEndpoints()
   const errors: string[] = []
 
-  for (const endpoint of DIRECTORY_ENDPOINTS) {
+  for (const endpoint of directoryEndpoints) {
     try {
       const res = await fetch(endpoint, {
         method: "GET",

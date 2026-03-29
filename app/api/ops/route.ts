@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { Operation } from "@/lib/types/platform"
 
-// Mock database - in production this would be replaced with Supabase
+// Mock data — production can use Firestore or another store
 const operations: Operation[] = []
 
 export async function POST(request: NextRequest) {

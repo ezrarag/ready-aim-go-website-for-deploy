@@ -37,7 +37,7 @@ INSERT INTO business_assets (
     'https://ezrahaugabrooks.com',
     'website',
     'active',
-    ARRAY['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Supabase'],
+    ARRAY['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Firebase'],
     'https://github.com/ezrahaugabrooks/portfolio',
     'Personal portfolio website showcasing creative work and services'
   )

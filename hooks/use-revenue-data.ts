@@ -41,48 +41,16 @@ export function useRevenueData(clientId: string | undefined) {
       setLoading(true);
       setError(null);
 
-      // Try to use the Supabase Edge Function
-      try {
-        const { data, error: functionError } = await supabase.functions.invoke('revenue-metrics', {
-          body: { client_id: clientId }
-        });
-
-        if (functionError) {
-          console.warn('Edge Function failed, using fallback data:', functionError);
-          // Use fallback data when Edge Function fails
-          setRevenueData({
-            total_revenue: 0,
-            monthly_revenue: 0,
-            quarterly_revenue: 0,
-            last_payment_date: null,
-            recent_events: [],
-            threshold_progress: 0,
-            has_revenue: false
-          });
-        } else if (data) {
-          setRevenueData({
-            total_revenue: data.total_revenue || 0,
-            monthly_revenue: data.monthly_revenue || 0,
-            quarterly_revenue: data.quarterly_revenue || 0,
-            last_payment_date: data.last_payment_date,
-            recent_events: data.recent_events || [],
-            threshold_progress: data.threshold_progress || 0,
-            has_revenue: data.has_revenue || false
-          });
-        }
-      } catch (edgeFunctionError) {
-        console.warn('Edge Function not available, using fallback data:', edgeFunctionError);
-        // Use fallback data when Edge Function is not available
-        setRevenueData({
-          total_revenue: 0,
-          monthly_revenue: 0,
-          quarterly_revenue: 0,
-          last_payment_date: null,
-          recent_events: [],
-          threshold_progress: 0,
-          has_revenue: false
-        });
-      }
+      // TODO: revenue metrics from Firestore / `/api/...`
+      setRevenueData({
+        total_revenue: 0,
+        monthly_revenue: 0,
+        quarterly_revenue: 0,
+        last_payment_date: null,
+        recent_events: [],
+        threshold_progress: 0,
+        has_revenue: false
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
@@ -103,7 +71,7 @@ export function useRevenueData(clientId: string | undefined) {
     }
   }, [clientId]);
 
-  // Set up polling for revenue updates (since Edge Functions don't support real-time subscriptions)
+  // Poll for revenue updates until realtime (e.g. Firestore listeners) is wired
   useEffect(() => {
     if (!clientId) return;
 

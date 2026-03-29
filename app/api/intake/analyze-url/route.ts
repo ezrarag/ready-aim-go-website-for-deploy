@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
 import { OpenAI } from 'openai';
-
-async function fetchAndExtract(url: string) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!res.ok) throw new Error('Failed to fetch URL');
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  const title = $('title').text() || '';
-  const metaDescription = $('meta[name="description"]').attr('content') || '';
-  const h1 = $('h1').first().text() || '';
-
-  // Get visible text (basic approach)
-  let text = $('body').text().replace(/\s+/g, ' ').trim();
-  // Limit to 1000 words
-  text = text.split(' ').slice(0, 1000).join(' ');
-
-  return { title, metaDescription, h1, text };
-}
+import { fetchAndExtractWebsite } from '@/lib/website-analysis';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid url' }, { status: 400 });
     }
     
-    const scraped = await fetchAndExtract(url);
+    const scraped = await fetchAndExtractWebsite(url);
 
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {

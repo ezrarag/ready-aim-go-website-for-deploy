@@ -149,49 +149,9 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
 
   const initializeNotificationSystem = async () => {
     try {
-      // Load user preferences from Supabase
-      const { data: userPrefs } = await supabase.from("notification_preferences").select("*").single()
-
-      if (userPrefs) {
-        setPreferences(userPrefs.preferences)
-      }
-
-      // Load notification templates
-      const { data: templatesData } = await supabase.from("notification_templates").select("*")
-
-      if (templatesData) {
-        setTemplates(templatesData)
-      }
-
-      // Initialize push notifications
+      // TODO: preferences / templates / inbox from Firestore
       if (preferences.push) {
         await pushService.initialize()
-      }
-
-      // Set up real-time subscription for new notifications
-      const subscription = supabase
-        .channel("notifications")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "notifications",
-          },
-          (payload) => {
-            const newNotification = payload.new as EnhancedNotification
-            setNotifications((prev) => [newNotification, ...prev])
-
-            // Handle real-time notification display
-            if (preferences.inApp) {
-              showInAppNotification(newNotification)
-            }
-          },
-        )
-        .subscribe()
-
-      return () => {
-        subscription.unsubscribe()
       }
     } catch (error) {
       console.error("Failed to initialize notification system:", error)
@@ -213,11 +173,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
         createdAt: new Date(),
         ...notification,
       }
-
-      // Save to database
-      const { error } = await supabase.from("notifications").insert(fullNotification)
-
-      if (error) throw error
 
       // Send through configured channels
       await sendThroughChannels(fullNotification)
@@ -266,25 +221,19 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
     metadata?: Record<string, any>,
   ): Promise<boolean> => {
     try {
-      // Get user's Apple Business Chat preferences
-      const { data: user } = await supabase
-        .from("users")
-        .select("apple_business_chat_id, notification_preferences")
-        .eq("id", userId)
-        .single()
+      // TODO: load user Apple Business Chat id from Firestore
+      const user: { apple_business_chat_id?: string; notification_preferences?: { appleBusinessChat?: boolean } } = {}
 
       if (!user?.apple_business_chat_id) {
         console.log("User doesn't have Apple Business Chat enabled")
         return false
       }
 
-      // Check if user has Apple Business Chat enabled in preferences
       if (!user.notification_preferences?.appleBusinessChat) {
         console.log("User has disabled Apple Business Chat notifications")
         return false
       }
 
-      // Send through Apple Business Chat API
       const response = await fetch("/api/notifications/apple-business-chat", {
         method: "POST",
         headers: {
@@ -301,29 +250,11 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
         throw new Error(`Apple Business Chat API error: ${response.statusText}`)
       }
 
-      const result = await response.json()
-
-      // Log successful delivery
-      await supabase.from("notification_logs").insert({
-        notification_id: metadata?.notificationId,
-        channel: "apple_business_chat",
-        status: "delivered",
-        delivered_at: new Date(),
-        metadata: result,
-      })
+      await response.json()
 
       return true
     } catch (error) {
       console.error("Apple Business Chat delivery failed:", error)
-
-      // Log failed delivery
-      await supabase.from("notification_logs").insert({
-        notification_id: metadata?.notificationId,
-        channel: "apple_business_chat",
-        status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-        attempted_at: new Date(),
-      })
 
       return false
     }
@@ -383,8 +314,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
         createdAt: new Date(),
       }
 
-      await supabase.from("scheduled_notifications").insert(scheduledNotification)
-
       console.log("Notification scheduled for:", scheduledFor)
     } catch (error) {
       console.error("Failed to schedule notification:", error)
@@ -393,8 +322,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
 
   const markAsRead = async (id: string) => {
     try {
-      await supabase.from("notifications").update({ readAt: new Date() }).eq("id", id)
-
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date() } : n)))
     } catch (error) {
       console.error("Failed to mark notification as read:", error)
@@ -403,8 +330,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
 
   const deleteNotification = async (id: string) => {
     try {
-      await supabase.from("notifications").delete().eq("id", id)
-
       setNotifications((prev) => prev.filter((n) => n.id !== id))
     } catch (error) {
       console.error("Failed to delete notification:", error)
@@ -414,11 +339,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
   const updatePreferences = async (newPreferences: Partial<NotificationPreferences>) => {
     try {
       const updatedPreferences = { ...preferences, ...newPreferences }
-
-      await supabase.from("notification_preferences").upsert({
-        user_id: "current-user-id", // Replace with actual user ID
-        preferences: updatedPreferences,
-      })
 
       setPreferences(updatedPreferences)
     } catch (error) {
@@ -432,8 +352,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
         ...template,
         id: crypto.randomUUID(),
       }
-
-      await supabase.from("notification_templates").insert(newTemplate)
 
       setTemplates((prev) => [...prev, newTemplate])
     } catch (error) {
@@ -476,11 +394,6 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
         ),
       )
 
-      // Save to database
-      await supabase.from("notification_channels").upsert({
-        id: channelId,
-        config,
-      })
     } catch (error) {
       console.error("Failed to configure channel:", error)
     }
@@ -508,31 +421,13 @@ export function NotificationSystemProvider({ children }: { children: ReactNode }
     }
   }
 
-  const getAnalytics = async (timeRange: "24h" | "7d" | "30d") => {
+  const getAnalytics = async (_timeRange: "24h" | "7d" | "30d") => {
     try {
-      const { data } = await supabase
-        .from("notification_analytics")
-        .select("*")
-        .gte("created_at", getTimeRangeDate(timeRange))
-
-      return data
+      // TODO: notification analytics from Firestore
+      return null
     } catch (error) {
       console.error("Failed to get analytics:", error)
       return null
-    }
-  }
-
-  const getTimeRangeDate = (range: string): string => {
-    const now = new Date()
-    switch (range) {
-      case "24h":
-        return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-      case "7d":
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      case "30d":
-        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      default:
-        return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
     }
   }
 

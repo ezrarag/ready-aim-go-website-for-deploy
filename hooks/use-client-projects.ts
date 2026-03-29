@@ -31,19 +31,8 @@ export function useClientProjects(clientId: string | undefined) {
         setLoading(true);
         setError(null);
 
-        const { data, error: queryError } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('client_id', clientId)
-          .order('created_at', { ascending: false });
-
-        if (queryError) {
-          console.error('Error fetching client projects:', queryError);
-          setError(queryError.message);
-          return;
-        }
-
-        setProjects(data || []);
+        // TODO: projects from Firestore / API
+        setProjects([]);
       } catch (err) {
         console.error('Error fetching client projects:', err);
         setError('Failed to fetch projects');

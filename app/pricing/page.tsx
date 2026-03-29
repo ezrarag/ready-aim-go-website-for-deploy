@@ -93,6 +93,14 @@ export default function PricingPage() {
       return;
     }
 
+    const email =
+      typeof window !== 'undefined'
+        ? window.prompt('Enter your email for Stripe checkout')?.trim() || ''
+        : ''
+    if (!email.includes('@')) {
+      return
+    }
+
     try {
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
@@ -102,6 +110,7 @@ export default function PricingPage() {
         body: JSON.stringify({
           priceId: stripePriceId,
           planId: planId,
+          email,
         }),
       });
 

@@ -1,15 +1,14 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Client Dashboard | Readyaimgo.biz',
-  description: 'Your executive cockpit for managing all client operations, AI Pulse insights, and business intelligence.',
-};
+  title: 'ReadyAimGo Operations | Readyaimgo.biz',
+  description: 'Operations dashboard for clients, delivery areas, staff, BEAM participants, and sync health.',
+}
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  return <>{children}</>;
+  return <>{children}</>
 }
-

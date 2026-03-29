@@ -1,43 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-// TODO: Implement Firebase database operations
+import { NextRequest, NextResponse } from "next/server"
 
+/** TODO: contributor projects from Firestore */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { email: string } }
+  { params }: { params: Promise<{ email: string }> }
 ) {
   try {
-    const email = decodeURIComponent(params.email);
-    
-    // Call the database function to get projects by contributor
-    const { data, error } = await supabase
-      .rpc('get_projects_by_contributor', {
-        contributor_email: email
-      });
-
-    if (error) {
-      console.error('Error fetching contributor projects:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch contributor projects' },
-        { status: 500 }
-      );
-    }
-
-    // Filter to only show completed or active projects for public display
-    const publicProjects = data?.filter((project: any) => 
-      project.project_status === 'completed' || project.project_status === 'active'
-    ) || [];
-
+    const { email: raw } = await params
+    const email = decodeURIComponent(raw)
     return NextResponse.json({
       contributor_email: email,
-      projects: publicProjects,
-      total: publicProjects.length
-    });
-
+      projects: [],
+      total: 0,
+    })
   } catch (error) {
-    console.error('Error in contributor projects API:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("Error in contributor projects API:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-} 
+}

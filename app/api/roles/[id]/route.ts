@@ -1,82 +1,28 @@
 import { type NextRequest, NextResponse } from "next/server"
-// TODO: Implement Firebase database operations
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { data: role, error } = await supabase.from("roles").select("*").eq("id", params.id).single()
-
-    if (error) {
-      console.error("Error fetching role:", error)
-      return NextResponse.json({ error: "Role not found" }, { status: 404 })
-    }
-
-    return NextResponse.json({ role })
+    const { id } = await params
+    return NextResponse.json({ error: "Role not found", id }, { status: 404 })
   } catch (error) {
     console.error("Error in role GET:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, _ctx: { params: Promise<{ id: string }> }) {
   try {
-    const body = await request.json()
-    const {
-      title,
-      description,
-      category,
-      skills,
-      payRange,
-      deadline,
-      location,
-      workstream,
-      visibility,
-      tags,
-      mediaUrl,
-      status,
-    } = body
-
-    const { data: role, error } = await supabase
-      .from("roles")
-      .update({
-        title,
-        description,
-        category,
-        skills,
-        pay_range: payRange,
-        deadline,
-        location,
-        workstream,
-        visibility,
-        tags,
-        media_url: mediaUrl,
-        status,
-      })
-      .eq("id", params.id)
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error updating role:", error)
-      return NextResponse.json({ error: "Failed to update role" }, { status: 500 })
-    }
-
-    return NextResponse.json({ role })
+    await request.json()
+    return NextResponse.json({ error: "Role update not implemented" }, { status: 501 })
   } catch (error) {
     console.error("Error in role PUT:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, _ctx: { params: Promise<{ id: string }> }) {
   try {
-    const { error } = await supabase.from("roles").delete().eq("id", params.id)
-
-    if (error) {
-      console.error("Error deleting role:", error)
-      return NextResponse.json({ error: "Failed to delete role" }, { status: 500 })
-    }
-
-    return NextResponse.json({ message: "Role deleted successfully" })
+    return NextResponse.json({ error: "Role delete not implemented" }, { status: 501 })
   } catch (error) {
     console.error("Error in role DELETE:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

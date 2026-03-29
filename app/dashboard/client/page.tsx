@@ -172,7 +172,7 @@ function ClientDashboardContent() {
   const [financesEnabled, setFinancesEnabled] = useState(false);
   const [chatbotEnabled, setChatbotEnabled] = useState(false);
 
-  // Dynamic business assets data - will be fetched from Supabase
+  // Dynamic business assets data — TODO: Firestore / API
   const [businessAssets, setBusinessAssets] = useState([
     {
       id: 1,
@@ -242,7 +242,7 @@ function ClientDashboardContent() {
     },
   ]);
 
-  // Mock data for development - will be replaced with real Supabase data
+  // Mock activity — TODO: Firestore / API
   const mockActivity = [
     { id: "1", action: "Project Completed", details: "Website redesign finished", created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), project_title: "Website Redesign" },
     { id: "2", action: "Payment Received", details: "Invoice #1234 paid", created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), project_title: "SEO Optimization" },
@@ -251,90 +251,22 @@ function ClientDashboardContent() {
 
   // Sign out handler
   const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
-      } else {
-        // Redirect to home page after successful sign out
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
+    window.location.href = "/api/logout"
   };
 
   useEffect(() => {
-    if (!session?.user) return;
-    async function fetchTodos() {
-      if (!session?.user) return;
-      const clientId = session.user.id;
-      let query = supabase
-        .from('client_todos')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
-      if (statusFilter) query = query.eq('status', statusFilter);
-      const { data } = await query;
-      if (data) setTodos(data);
-    }
-    fetchTodos();
-  }, [session?.user, statusFilter]);
+    if (!session?.user) return
+    // TODO: client todos from Firestore
+    setTodos([])
+  }, [session?.user, statusFilter])
 
   useEffect(() => {
-    // Check if user has completed setup and populate business assets
     const checkFirstTimeUser = async () => {
       if (session?.user?.id) {
         try {
-          // Get profile data
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('has_completed_setup, business_assets')
-            .eq('id', session.user.id)
-            .single();
-          
-          // Get existing client data (websites, etc.)
-          let { data: clientData, error: clientError } = await supabase
-            .from('clients')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          console.log('Client data:', clientData);
-          console.log('Client error:', clientError);
-          
-          // If client doesn't exist, create one
-          if (clientError && clientError.code === 'PGRST116') {
-            console.log('Creating client entry for user:', session.user.id);
-            const { error: createClientError } = await supabase
-              .from('clients')
-              .insert({
-                id: session.user.id,
-                company_name: session.user.user_metadata?.full_name || 'My Company',
-                contact_name: session.user.user_metadata?.full_name || session.user.email,
-                contact_email: session.user.email,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              });
-            
-            if (createClientError) {
-              console.error('Error creating client entry:', createClientError);
-            } else {
-              console.log('Client entry created successfully');
-              // Re-fetch client data
-              const { data: newClientData } = await supabase
-                .from('clients')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (newClientData) {
-                clientData = newClientData;
-              }
-            }
-          }
-          
-          // Initialize business assets with existing data
+          const profile: { has_completed_setup?: boolean; business_assets?: any[] } | null = null
+          const clientData: { website_url?: string; app_url?: string } | null = null
+
           const initialBusinessAssets = [
             {
               type: 'business_plan',
@@ -427,35 +359,13 @@ function ClientDashboardContent() {
   };
 
   const handleEditSave = async (todo: any) => {
-    await supabase.from('client_todos').update({ title: editText }).eq('id', todo.id);
+    setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, title: editText } : t)));
     setEditingTodo(null);
     setEditText("");
-    // Refresh todos
-    if (!session?.user) return;
-    const clientId = session.user.id;
-    let query = supabase
-      .from('client_todos')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false });
-    if (statusFilter) query = query.eq('status', statusFilter);
-    const { data } = await query;
-    if (data) setTodos(data);
   };
 
   const handleStatusChange = async (todo: any, newStatus: string) => {
-    await supabase.from('client_todos').update({ status: newStatus }).eq('id', todo.id);
-    // Refresh todos
-    if (!session?.user) return;
-    const clientId = session.user.id;
-    let query = supabase
-      .from('client_todos')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false });
-    if (statusFilter) query = query.eq('status', statusFilter);
-    const { data } = await query;
-    if (data) setTodos(data);
+    setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, status: newStatus } : t)));
   };
 
   const stats = clientStats;
@@ -3392,26 +3302,14 @@ function ClientDashboardContent() {
 
   const handleFirstTimeSetupComplete = async (assets: any[]) => {
     try {
-      // Save business assets to database
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          has_completed_setup: true,
-          business_assets: assets,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', session?.user?.id);
-      
-      if (error) throw error;
-      
+      // TODO: persist to Firestore (client profile)
       setUserBusinessAssets(assets);
       setHasCompletedSetup(true);
       setShowFirstTimePopup(false);
-      
-      toast.success('Business profile setup complete!');
+      toast.success("Business profile setup complete!");
     } catch (error) {
-      console.error('Error saving business assets:', error);
-      toast.error('Failed to save setup. Please try again.');
+      console.error("Error saving business assets:", error);
+      toast.error("Failed to save setup. Please try again.");
     }
   };
 
@@ -3654,7 +3552,7 @@ function ClientDashboardContent() {
           url: clientWebsite?.url || "#",
           status: clientWebsite?.status || "active",
           adminUrl: clientWebsite?.url ? `${clientWebsite.url}/admin` : undefined,
-          techStack: clientWebsite?.techStack || ["React", "Next.js", "TypeScript", "Tailwind CSS", "Supabase"],
+          techStack: clientWebsite?.techStack || ["React", "Next.js", "TypeScript", "Tailwind CSS", "Firebase"],
           githubRepo: clientWebsite?.githubRepo || "https://github.com/client/website",
           traffic: {
             monthlyVisitors: 15000,

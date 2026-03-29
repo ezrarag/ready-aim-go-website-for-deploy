@@ -1,6 +1,6 @@
 import type { DemoVideo, VideoCategory } from "./types/videos"
 
-// This will be replaced with Supabase queries later
+// Data can later be loaded from Firestore or CMS
 export const videoCategories: VideoCategory[] = [
   {
     id: "overview",
@@ -287,7 +287,7 @@ export const demoVideos: DemoVideo[] = [
   },
 ]
 
-// Helper functions that will work with Supabase later
+// Helper functions for local / future persisted data
 export const getVideosByCategory = (categoryId: string): DemoVideo[] => {
   return demoVideos.filter((video) => video.category === categoryId)
 }
@@ -311,7 +311,7 @@ export const getVideoById = (id: string): DemoVideo | undefined => {
 }
 
 export const incrementViewCount = (videoId: string): void => {
-  // This will be replaced with Supabase update later
+  // TODO: persist view counts when backend is wired
   const video = demoVideos.find((v) => v.id === videoId)
   if (video) {
     video.viewCount += 1

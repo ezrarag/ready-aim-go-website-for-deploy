@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAllClientDirectoryEntries, createClientDocument } from "@/lib/firestore"
 import { getDefaultModules } from "@/lib/client-directory"
+import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 
 export async function GET() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? null
@@ -40,6 +41,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isInternalMutationAuthorized(request)) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""

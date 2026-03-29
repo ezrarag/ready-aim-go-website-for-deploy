@@ -105,39 +105,13 @@ export class StripeService {
     }
   }
 
-  // Update Stripe config in Supabase
+  /** TODO: persist Stripe config on client profile in Firestore */
   async updateStripeConfig(clientId: string, config: Partial<StripeConfig>) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          stripe_config: config,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', clientId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating Stripe config:', error);
-      throw error;
-    }
+    console.warn('updateStripeConfig: Firestore not implemented', clientId, config);
   }
 
-  // Get Stripe config from Supabase
-  async getStripeConfig(clientId: string): Promise<StripeConfig | null> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('stripe_config')
-        .eq('id', clientId)
-        .single();
-
-      if (error) throw error;
-      return data?.stripe_config || null;
-    } catch (error) {
-      console.error('Error fetching Stripe config:', error);
-      return null;
-    }
+  async getStripeConfig(_clientId: string): Promise<StripeConfig | null> {
+    return null;
   }
 
   // Create Stripe customer

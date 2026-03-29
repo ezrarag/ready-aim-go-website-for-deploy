@@ -1,5 +1,5 @@
 -- Fix for admin access and profile creation issues
--- Run this in your Supabase SQL editor
+-- Run in your PostgreSQL client
 
 -- First, let's check if the profiles table exists and has the right structure
 -- If not, create it properly

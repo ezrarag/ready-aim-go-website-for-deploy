@@ -1,5 +1,5 @@
 -- Fix clients table by adding missing columns
--- Run this in Supabase SQL Editor
+-- Run in your PostgreSQL client
 
 -- Add missing columns to clients table
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS company_name TEXT;

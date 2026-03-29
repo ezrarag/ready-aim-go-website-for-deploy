@@ -10,8 +10,6 @@ STRIPE_SECRET_KEY=sk_test_... # Your Stripe secret key
 STRIPE_PUBLISHABLE_KEY=pk_test_... # Your Stripe publishable key
 STRIPE_WEBHOOK_SECRET=whsec_... # Your webhook secret
 
-# Supabase Admin Key (for webhook)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 ## Stripe Webhook Setup
@@ -44,7 +42,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 2. **Stripe webhook** → Sends event to `/api/stripe/webhook`
 3. **Webhook handler** → Saves revenue event to `revenue_events` table
 4. **Database trigger** → Automatically updates `revenue_summary` table
-5. **Dashboard** → Real-time updates via Supabase subscriptions
+5. **Dashboard** → Reflect updates via Firestore listeners or refresh, depending on implementation
 
 ### Revenue Display:
 - **Subscription mode**: Shows monthly revenue
@@ -65,11 +63,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 - **Webhook not receiving events**: Check webhook URL and secret
 - **Revenue not showing**: Check client_id in payment metadata
 - **Database errors**: Ensure tables and functions are created
-- **Real-time not working**: Check Supabase subscriptions
+- **Real-time not working**: Check Firestore listeners or polling in the dashboard code path
 
 ### Debug Steps:
 1. Check browser console for errors
 2. Check Stripe webhook logs
-3. Check Supabase logs
+3. Check server logs and Firebase/Firestore rules if writing from webhooks
 4. Verify database tables exist
 5. Test webhook endpoint manually 

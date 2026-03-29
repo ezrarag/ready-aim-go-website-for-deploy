@@ -19,7 +19,12 @@ interface ContributorProjectsResponse {
   total: number;
 }
 
-export function useContributorProjects(contributorEmail: string, supabaseUrl?: string, supabaseKey?: string) {
+/** `externalRestUrl` optional: full URL to PostgREST RPC for cross-stack calls; else uses this app's API. */
+export function useContributorProjects(
+  contributorEmail: string,
+  externalRestUrl?: string,
+  serviceApiKey?: string
+) {
   const [projects, setProjects] = useState<ContributorProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,27 +40,23 @@ export function useContributorProjects(contributorEmail: string, supabaseUrl?: s
         setLoading(true);
         setError(null);
 
-        // If supabaseUrl and supabaseKey are provided, use them (for cross-project fetching)
-        // Otherwise, use the default client (for same-project fetching)
-        const apiUrl = supabaseUrl 
-          ? `${supabaseUrl}/rest/v1/rpc/get_projects_by_contributor`
+        const apiUrl = externalRestUrl
+          ? `${externalRestUrl}/rest/v1/rpc/get_projects_by_contributor`
           : `/api/contributors/${encodeURIComponent(contributorEmail)}/projects`;
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(supabaseKey && {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
+        const response = externalRestUrl
+          ? await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(serviceApiKey && {
+                  apikey: serviceApiKey,
+                  Authorization: `Bearer ${serviceApiKey}`,
+                }),
+              },
+              body: JSON.stringify({ contributor_email: contributorEmail }),
             })
-          },
-          ...(supabaseUrl && {
-            body: JSON.stringify({
-              contributor_email: contributorEmail
-            })
-          })
-        });
+          : await fetch(apiUrl, { method: 'GET' });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -73,7 +74,7 @@ export function useContributorProjects(contributorEmail: string, supabaseUrl?: s
     };
 
     fetchContributorProjects();
-  }, [contributorEmail, supabaseUrl, supabaseKey]);
+  }, [contributorEmail, externalRestUrl, serviceApiKey]);
 
   return { projects, loading, error };
-} 
+}

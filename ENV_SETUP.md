@@ -17,16 +17,13 @@ This guide will help you set up all the necessary environment variables for the 
 
 ### 🔥 Critical (Required for basic functionality)
 
-#### Supabase Configuration
-- **NEXT_PUBLIC_SUPABASE_URL**: Your Supabase project URL
-- **NEXT_PUBLIC_SUPABASE_ANON_KEY**: Your Supabase anonymous key
-- **SUPABASE_SERVICE_ROLE_KEY**: Your Supabase service role key
+#### Firebase / Firestore
+- **FIREBASE_SERVICE_ACCOUNT_KEY**, **NEXT_PUBLIC_FIREBASE_PROJECT_ID**, **NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN**, **FIREBASE_ADMIN_CLIENT_EMAIL**, **FIREBASE_ADMIN_PRIVATE_KEY** — see `env.example` for the full list and shape.
 
 **How to get these:**
-1. Go to your Supabase dashboard
-2. Navigate to Settings → API
-3. Copy the Project URL and anon/public key
-4. For the service role key, use the `service_role` key (keep this secret!)
+1. In [Firebase Console](https://console.firebase.google.com/), open your project
+2. Project settings → Service accounts → Generate new private key (for Admin SDK)
+3. Add the client SDK values (`NEXT_PUBLIC_*`) from the same project settings for web apps
 
 #### Application Configuration
 - **NEXT_PUBLIC_APP_URL**: Your application's base URL (e.g., `http://localhost:3000` for development)
@@ -98,15 +95,15 @@ This guide will help you set up all the necessary environment variables for the 
 
 ### Public Variables (Client-side)
 Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_VAPID_KEY`
 - `NEXT_PUBLIC_APPLE_BUSINESS_ID`
 
 ### Private Variables (Server-side only)
 These are only available on the server and should never be exposed:
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `FIREBASE_ADMIN_PRIVATE_KEY` (and related Admin SDK vars)
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `OPENAI_API_KEY`
@@ -154,7 +151,7 @@ STRIPE_SECRET_KEY=sk_live_...
 
 3. **"CORS errors"**
    - Verify your `NEXT_PUBLIC_APP_URL` is correct
-   - Check your Supabase CORS settings
+   - Check Firebase Authorized domains for Authentication
 
 ### Verification
 

@@ -5,7 +5,7 @@ feat: implement comprehensive mission system with categories
 - Create dynamic mission modal with category selection and form generation
 - Add mission management hook (useMissions) for CRUD operations
 - Update Mission Objectives progress bar to use real data from missions
-- Integrate mission creation with Supabase database
+- Integrate mission creation with Firebase/Firestore
 - Add proper validation and error handling for mission forms
 - Create mission categories configuration with icons and field definitions
 - Implement step-by-step mission creation flow (category selection -> form)

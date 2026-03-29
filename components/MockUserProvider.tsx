@@ -55,92 +55,21 @@ export function MockUserProvider({ children }: { children: React.ReactNode }) {
     async function fetchData() {
       setLoading(true);
       setError(null);
-      
       try {
-        console.log("🔍 Fetching profile for:", CLIENT_EMAIL);
-        
-        // Get profile by email
-        const profile = await getProfileByEmail(CLIENT_EMAIL);
-        if (!profile) {
-          console.log("❌ No profile found for:", CLIENT_EMAIL);
-          setError("Profile not found. Please ensure the user exists in the database.");
-          setLoading(false);
-          return;
-        }
-        
-        console.log("✅ Profile found:", profile);
-        
-        // Fetch projects for this user (client_id = profile.id)
-        console.log("🔍 Fetching projects for client_id:", profile.id);
-        const { data: projects, error: projectsError } = await supabase
-          .from("projects")
-          .select("*")
-          .eq("client_id", profile.id)
-          .order("created_at", { ascending: false });
-          
-        if (projectsError) {
-          console.error("❌ Error fetching projects:", projectsError);
-          setError("Failed to load projects. Please check your database connection.");
-          setLoading(false);
-          return;
-        }
-        
-        console.log("✅ Projects loaded:", projects?.length || 0, "projects");
-        
-        // Fetch activity feed for this user (join with projects.title)
-        let activity: ActivityItem[] = [];
-        try {
-          console.log("🔍 Fetching activity for client_id:", profile.id);
-          const { data: activityData, error: activityError } = await supabase
-            .from("client_activity")
-            .select("*, projects:title")
-            .eq("client_id", profile.id)
-            .order("created_at", { ascending: false });
-            
-          if (!activityError && activityData) {
-            activity = activityData.map((item: any) => ({
-              ...item,
-              project_title: item.projects?.title || undefined,
-            }));
-            console.log("✅ Activity loaded:", activity.length, "items");
-          } else if (activityError) {
-            console.warn("⚠️ Activity fetch error (non-critical):", activityError);
-          }
-        } catch (e) {
-          console.warn("⚠️ Activity fetch failed (non-critical):", e);
-          activity = [];
-        }
-        
-        // Derive stats from real project data
-        const activeProjects = projects.filter((p: Project) => p.status === "active" || p.status === "in-progress").length;
-        const completedProjects = projects.filter((p: Project) => p.status === "completed").length;
-        const totalSpent = projects
-          .filter((p: Project) => p.status === "completed")
-          .reduce((sum: number, p: Project) => sum + (p.budget || 0), 0);
-        const averageRating = 4.8; // Mocked for now - will be replaced with real ratings
-        
-        console.log("📊 Stats calculated:", {
-          activeProjects,
-          completedProjects,
-          totalSpent,
-          averageRating
-        });
-        
+        const projects: Project[] = [];
+        const activity: ActivityItem[] = [];
         setUserData({
-          name: profile.full_name || CLIENT_NAME,
-          email: profile.email,
+          name: CLIENT_NAME,
+          email: CLIENT_EMAIL,
           projects,
           stats: {
-            activeProjects,
-            completedProjects,
-            totalSpent,
-            averageRating,
+            activeProjects: 0,
+            completedProjects: 0,
+            totalSpent: 0,
+            averageRating: 0,
           },
           activity,
         });
-        
-        console.log("✅ User data set successfully");
-        
       } catch (error) {
         console.error("❌ Error in fetchData:", error);
         setError("Failed to load user data. Please try again.");
@@ -148,7 +77,6 @@ export function MockUserProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     }
-    
     fetchData();
   }, []);
 

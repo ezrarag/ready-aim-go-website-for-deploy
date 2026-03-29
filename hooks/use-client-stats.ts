@@ -35,49 +35,13 @@ export function useClientStats(userId: string | undefined) {
         setLoading(true);
         setError(null);
 
-        // Fetch projects for this client
-        const { data: projects, error: projectsError } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('client_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (projectsError) {
-          console.error('Error fetching projects:', projectsError);
-          setError('Failed to load project data');
-          return;
-        }
-
-        // Calculate stats from real project data
-        const activeProjects = projects?.filter(p => 
-          p.status === 'active' || p.status === 'in-progress'
-        ).length || 0;
-
-        const completedProjects = projects?.filter(p => 
-          p.status === 'completed'
-        ).length || 0;
-
-        const totalSpent = projects?.filter(p => 
-          p.status === 'completed'
-        ).reduce((sum, p) => sum + (p.budget || 0), 0) || 0;
-
-        // Calculate average rating (mock for now, will be replaced with real ratings)
-        const averageRating = 4.8;
-
-        // Get recent projects (limit to 3)
-        const recentProjects = (projects || []).slice(0, 3).map(project => ({
-          id: project.id,
-          title: project.title,
-          status: project.status,
-          progress: project.progress || 0
-        }));
-
+        // TODO: project stats from Firestore / API
         setStats({
-          activeProjects,
-          completedProjects,
-          totalSpent,
-          averageRating,
-          recentProjects
+          activeProjects: 0,
+          completedProjects: 0,
+          totalSpent: 0,
+          averageRating: 0,
+          recentProjects: []
         });
 
       } catch (err) {

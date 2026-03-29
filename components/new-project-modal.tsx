@@ -43,7 +43,7 @@ interface UploadedFile {
   url?: string
   uploadProgress: number
   status: "uploading" | "completed" | "error"
-  supabasePath?: string
+  storagePath?: string
 }
 
 const projectTypes = [
@@ -130,27 +130,11 @@ export function NewProjectModal({ open, onOpenChange }: NewProjectModalProps) {
       setUploadedFiles((prev) => [...prev, newFile])
 
       try {
-        // Create file path in Supabase Storage
         const fileExt = file.name.split(".").pop()
         const fileName = `${fileId}.${fileExt}`
         const filePath = `projects/${selectedType}/${fileName}`
-
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage.from("project-files").upload(filePath, file, {
-          onUploadProgress: (progress) => {
-            const percentage = (progress.loaded / progress.total) * 100
-            setUploadedFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, uploadProgress: percentage } : f)))
-          },
-        })
-
-        if (error) throw error
-
-        // Get public URL
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("project-files").getPublicUrl(filePath)
-
-        // Update file status
+        // TODO: Upload to Firebase Storage
+        const publicUrl = URL.createObjectURL(file)
         setUploadedFiles((prev) =>
           prev.map((f) =>
             f.id === fileId
@@ -159,7 +143,7 @@ export function NewProjectModal({ open, onOpenChange }: NewProjectModalProps) {
                   status: "completed",
                   uploadProgress: 100,
                   url: publicUrl,
-                  supabasePath: filePath,
+                  storagePath: filePath,
                 }
               : f,
           ),
@@ -191,11 +175,11 @@ export function NewProjectModal({ open, onOpenChange }: NewProjectModalProps) {
 
   const removeFile = async (fileId: string) => {
     const file = uploadedFiles.find((f) => f.id === fileId)
-    if (file?.supabasePath) {
+    if (file?.url?.startsWith("blob:")) {
       try {
-        await supabase.storage.from("project-files").remove([file.supabasePath])
-      } catch (error) {
-        console.error("Error removing file:", error)
+        URL.revokeObjectURL(file.url)
+      } catch {
+        /* ignore */
       }
     }
     setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId))

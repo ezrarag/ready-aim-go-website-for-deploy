@@ -1,5 +1,5 @@
 -- Complete Database Setup Check for ReadyAimGo
--- Run this in Supabase SQL Editor to verify all tables are properly configured
+-- Run in your PostgreSQL client to verify tables
 
 -- 1. Check if all required tables exist
 SELECT 

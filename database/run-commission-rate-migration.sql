@@ -1,5 +1,5 @@
 -- Add commission_rate column to profiles table
--- Run this in your Supabase SQL Editor
+-- Run in your PostgreSQL client
 
 -- Add the column
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(4,2) DEFAULT 10.0;
