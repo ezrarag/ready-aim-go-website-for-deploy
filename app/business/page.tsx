@@ -33,11 +33,11 @@ export default function BusinessPage() {
     { id: "PLAY", label: "PLAY", href: "/" },
     { id: "FLEET_OPS", label: "FLEET OPS", href: "/fleet" },
     { id: "PROPERTY_OPS", label: "PROPERTY OPS" },
-    { id: "READYAIMGO_STAFF", label: "READYAIMGO STAFF" },
+    { id: "READYAIMGO_STAFF", label: "READYAIMGO STAFF", href: "/beam-participants" },
   ]
 
   const socialItems = [
-    { id: "BEAM_PARTICIPANTS", label: "BEAM PARTICIPANTS" },
+    { id: "BEAM_PARTICIPANTS", label: "BEAM PARTICIPANTS", href: "/beam-participants" },
     { id: "CHALLENGES", label: "CHALLENGES" },
   ]
 
@@ -190,24 +190,44 @@ export default function BusinessPage() {
                 <div className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-6">
                   SOCIAL
                 </div>
-                {socialItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveMenuItem(item.id)}
-                    className={`
-                      block text-left transition-all duration-200 mb-3
-                      ${activeMenuItem === item.id
-                        ? 'text-white text-2xl font-bold tracking-wide'
-                        : 'text-white/60 text-2xl font-normal tracking-wide hover:text-white/80'
-                      }
-                    `}
-                    style={{
-                      fontFamily: 'system-ui, -apple-system, sans-serif',
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                {socialItems.map((item) => {
+                  const socialItemClassName = `
+                    block text-left transition-all duration-200 mb-3
+                    ${activeMenuItem === item.id
+                      ? 'text-white text-2xl font-bold tracking-wide'
+                      : 'text-white/60 text-2xl font-normal tracking-wide hover:text-white/80'
+                    }
+                  `
+
+                  if (item.href) {
+                    return (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        onClick={() => setActiveMenuItem(item.id)}
+                        className={socialItemClassName}
+                        style={{
+                          fontFamily: 'system-ui, -apple-system, sans-serif',
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    )
+                  }
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveMenuItem(item.id)}
+                      className={socialItemClassName}
+                      style={{
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  )
+                })}
               </div>
             </nav>
           </div>
