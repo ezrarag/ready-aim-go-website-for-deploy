@@ -24,6 +24,7 @@ type AreaOperationsPageProps = {
   callout: string
   ctaHref?: string
   ctaLabel?: string
+  children?: React.ReactNode
 }
 
 function emptyAreaSummary(areaId: AdminAreaId): AdminAreaSummary {
@@ -48,6 +49,7 @@ export function AreaOperationsPage({
   callout,
   ctaHref,
   ctaLabel,
+  children,
 }: AreaOperationsPageProps) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -182,6 +184,8 @@ export function AreaOperationsPage({
             )}
           </CardContent>
         </AdminPanel>
+
+        {children}
       </div>
     </DashboardLayout>
   )

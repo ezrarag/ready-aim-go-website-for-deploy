@@ -1,47 +1,147 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import {
+  getRedirectResult,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type Auth,
+} from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Loader2, Shield } from "lucide-react"
 import { toast } from "sonner"
-// TODO: Implement Firebase authentication
+import {
+  createGoogleProvider,
+  ensureAuthPersistence,
+  getClientUserProfile,
+} from "@/lib/firebase-client"
+
+const DEFAULT_ADMIN_REDIRECT = "/dashboard/transportation"
+
+function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
+  const requested = searchParams.get("redirect")
+  const clientPortalUrl =
+    process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || "https://clients.readyaimgo.biz"
+
+  if (!requested) {
+    return DEFAULT_ADMIN_REDIRECT
+  }
+
+  if (requested.startsWith("/")) {
+    return requested
+  }
+
+  if (requested === clientPortalUrl) {
+    return requested
+  }
+
+  return DEFAULT_ADMIN_REDIRECT
+}
+
+function targetRequiresAdmin(redirectTarget: string) {
+  return redirectTarget.startsWith("/admin")
+}
+
+async function assertAuthorized(auth: Auth, uid: string, redirectTarget: string) {
+  const profile = await getClientUserProfile(uid)
+
+  if (targetRequiresAdmin(redirectTarget) && profile?.role !== "admin") {
+    await signOut(auth)
+    throw new Error('Only Firestore users/{uid} docs with role === "admin" can access admin routes.')
+  }
+
+  return profile
+}
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const redirectTarget = useMemo(() => getRedirectTarget(searchParams), [searchParams])
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
 
-  // Check if user is already authenticated
   useEffect(() => {
-    const checkAuth = async () => {
-      // Redirect to client portal
-      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clients.readyaimgo.biz';
-      const redirectTo = searchParams.get('redirect') || clientPortalUrl;
-      if (redirectTo.startsWith('http')) {
-        window.location.href = redirectTo;
-      } else {
-        router.push(redirectTo);
+    let isMounted = true
+
+    const initializeSession = async () => {
+      try {
+        const auth = await ensureAuthPersistence()
+        const redirectResult = await getRedirectResult(auth).catch((error) => {
+          console.error(error)
+          return null
+        })
+        const currentUser = redirectResult?.user ?? auth.currentUser
+
+        if (!currentUser) {
+          return
+        }
+
+        await assertAuthorized(auth, currentUser.uid, redirectTarget)
+
+        if (!isMounted) {
+          return
+        }
+
+        if (redirectTarget.startsWith("http")) {
+          window.location.assign(redirectTarget)
+        } else {
+          router.replace(redirectTarget)
+        }
+      } catch (error: unknown) {
+        console.error(error)
+        toast.error("Unable to continue sign-in", {
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unknown error occurred while checking your account.",
+        })
+      } finally {
+        if (isMounted) {
+          setCheckingSession(false)
+          setIsGoogleLoading(false)
+        }
       }
     }
-    // Skip auth check for now - redirect directly to client portal
-    // checkAuth()
-  }, [router, searchParams])
+
+    void initializeSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [redirectTarget, router])
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
+
     try {
-      // Redirect to client portal
-      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clients.readyaimgo.biz';
-      window.location.href = clientPortalUrl;
+      const auth = await ensureAuthPersistence()
+      const provider = createGoogleProvider()
+
+      try {
+        const credential = await signInWithPopup(auth, provider)
+        await assertAuthorized(auth, credential.user.uid, redirectTarget)
+
+        if (redirectTarget.startsWith("http")) {
+          window.location.assign(redirectTarget)
+        } else {
+          router.replace(redirectTarget)
+        }
+      } catch (error: any) {
+        if (error?.code === "auth/popup-blocked" || error?.code === "auth/web-storage-unsupported") {
+          await signInWithRedirect(auth, provider)
+          return
+        }
+
+        throw error
+      }
     } catch (error: any) {
-      console.error("Redirect error:", error)
-      toast.error("Redirect failed", {
-        description: error.message || "An error occurred during redirect.",
+      console.error("Google sign-in error:", error)
+      toast.error("Sign-in failed", {
+        description: error?.message || "An error occurred during Google sign-in.",
       })
       setIsGoogleLoading(false)
     }
@@ -76,12 +176,12 @@ export default function LoginPage() {
                 type="button"
                 className="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-3 font-semibold shadow-sm h-12"
                 onClick={handleGoogleSignIn}
-                disabled={isGoogleLoading}
+                disabled={isGoogleLoading || checkingSession}
               >
-                {isGoogleLoading ? (
+                {isGoogleLoading || checkingSession ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Signing in with Google...
+                    {checkingSession ? "Checking session..." : "Signing in with Google..."}
                   </>
                 ) : (
                   <>

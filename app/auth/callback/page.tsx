@@ -1,29 +1,65 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { getRedirectResult, signOut } from "firebase/auth"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
+import { ensureAuthPersistence, getClientUserProfile } from "@/lib/firebase-client"
 
-/** OAuth / magic-link landing — wire to Firebase Auth `getRedirectResult` or equivalent. */
+const DEFAULT_REDIRECT = "/dashboard/transportation"
+
+function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
+  const requested = searchParams.get("redirect")
+  return requested && requested.startsWith("/") ? requested : DEFAULT_REDIRECT
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const redirectTarget = useMemo(() => getRedirectTarget(searchParams), [searchParams])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const redirectTo = searchParams.get("redirect") || "/dashboard"
+    let isMounted = true
+
     ;(async () => {
       try {
-        toast.info("Complete Firebase auth handoff in auth/callback")
-        router.replace(redirectTo)
+        const auth = await ensureAuthPersistence()
+        const redirectResult = await getRedirectResult(auth)
+        const currentUser = redirectResult?.user ?? auth.currentUser
+
+        if (!currentUser) {
+          router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
+          return
+        }
+
+        if (redirectTarget.startsWith("/admin")) {
+          const profile = await getClientUserProfile(currentUser.uid)
+          if (profile?.role !== "admin") {
+            await signOut(auth)
+            throw new Error('Only Firestore users/{uid} docs with role === "admin" can access admin routes.')
+          }
+        }
+
+        router.replace(redirectTarget)
       } catch (e) {
         console.error(e)
-        setError("Authentication redirect failed")
-        router.replace("/login")
+        if (isMounted) {
+          const message = e instanceof Error ? e.message : "Authentication redirect failed"
+          setError(message)
+          toast.error("Authentication redirect failed", {
+            description: message,
+          })
+          router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
+        }
       }
     })()
-  }, [router, searchParams])
+
+    return () => {
+      isMounted = false
+    }
+  }, [redirectTarget, router])
 
   if (error) {
     return (

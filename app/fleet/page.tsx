@@ -1,9 +1,10 @@
+import type { Metadata } from "next"
 import { PublicFleetPage } from "@/components/fleet/public-fleet-page"
-import { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "Fleet | ReadyAimGo",
-  description: "Browse ReadyAimGo's BEAM-maintained vehicle fleet. SUVs, cargo trucks, and more across Milwaukee, Chicago, Atlanta, Orlando, and Madison.",
+  description:
+    "Explore ReadyAimGo's live fleet, wishlist, and restore projects maintained by BEAM Transportation cohort participants.",
 }
 
 export default function FleetPage() {

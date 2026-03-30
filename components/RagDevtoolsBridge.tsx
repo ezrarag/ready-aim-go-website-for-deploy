@@ -1,7 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { hasRagDevtoolsFirebaseConfig, ragDevtoolsFirebaseConfig } from "@/lib/devtools/publicConfig"
+import { useEffect } from "react"
+import {
+  hasRagDevtoolsFirebaseConfig,
+  logRagDevtoolsFirebaseConfigValidation,
+  ragDevtoolsFirebaseConfig,
+} from "@/lib/devtools/publicConfig"
 
 type RagDevtoolsWindow = Window &
   typeof globalThis & {
@@ -21,17 +25,38 @@ function resolveAppUrl() {
   return u && u !== "undefined" ? u : ""
 }
 
+function syncDevtoolsState(appUrl: string) {
+  const w = window as RagDevtoolsWindow
+  const locationState = readLocationState()
+
+  w.__RAG_PAGE_DEBUG__ = {
+    siteSlug: "readyaimgo",
+    displayName: "Ready Aim Go",
+    domain: window.location.hostname,
+    origin: window.location.origin,
+    appUrl: appUrl || null,
+    pathname: locationState.pathname,
+    search: locationState.search,
+    checklistCollection: "devChecklists",
+    devtoolsProjectId: ragDevtoolsFirebaseConfig.NEXT_PUBLIC_BEAM_DEVTOOLS_FIREBASE_PROJECT_ID || null,
+    entryChannel: "readyaimgo-devtools",
+    googleDriveFolderSwitcherEnabled: true,
+  }
+  w.__RAG_DEVTOOLS_CONFIG__ = hasRagDevtoolsFirebaseConfig() ? { ...ragDevtoolsFirebaseConfig } : null
+}
+
 /**
  * Development-only: exposes public Firebase env to the Ready Aim Go devtools extension via
  * window.__RAG_DEVTOOLS_CONFIG__ (same keys as NEXT_PUBLIC_* after Next inlines them).
  * Chrome extensions cannot read `.env.local` from disk; the running app is the source of truth.
  */
 export default function RagDevtoolsBridge() {
-  const [locationState, setLocationState] = useState(readLocationState)
   const appUrl = resolveAppUrl()
 
   useEffect(() => {
-    const sync = () => setLocationState(readLocationState())
+    logRagDevtoolsFirebaseConfigValidation("client")
+
+    const sync = () => syncDevtoolsState(appUrl)
     sync()
 
     const push = window.history.pushState.bind(window.history)
@@ -52,25 +77,7 @@ export default function RagDevtoolsBridge() {
       window.removeEventListener("popstate", sync)
       window.removeEventListener("hashchange", sync)
     }
-  }, [])
-
-  useEffect(() => {
-    const w = window as RagDevtoolsWindow
-    w.__RAG_PAGE_DEBUG__ = {
-      siteSlug: "readyaimgo",
-      displayName: "Ready Aim Go",
-      domain: window.location.hostname,
-      origin: window.location.origin,
-      appUrl: appUrl || null,
-      pathname: locationState.pathname,
-      search: locationState.search,
-      checklistCollection: "devChecklists",
-      devtoolsProjectId: ragDevtoolsFirebaseConfig.NEXT_PUBLIC_BEAM_DEVTOOLS_FIREBASE_PROJECT_ID || null,
-      entryChannel: "readyaimgo-devtools",
-      googleDriveFolderSwitcherEnabled: true,
-    }
-    w.__RAG_DEVTOOLS_CONFIG__ = hasRagDevtoolsFirebaseConfig() ? { ...ragDevtoolsFirebaseConfig } : null
-  }, [locationState.pathname, locationState.search, appUrl])
+  }, [appUrl])
 
   return null
 }

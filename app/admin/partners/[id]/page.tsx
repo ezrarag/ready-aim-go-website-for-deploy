@@ -1,18 +1,9 @@
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { getPartnerById, getContributionsByPartnerId, type Contribution } from '@/lib/firestore'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, DollarSign, Mail, User } from 'lucide-react'
-
-async function checkAdmin() {
-  try {
-    // Placeholder - implement proper Firebase Auth check
-    return true
-  } catch (error) {
-    return false
-  }
-}
 
 async function getPartnerDetails(partnerId: string) {
   const partner = await getPartnerById(partnerId)
@@ -34,12 +25,6 @@ export default async function PartnerDetailsPage({
 }: {
   params: { id: string }
 }) {
-  const isAdmin = await checkAdmin()
-  
-  if (!isAdmin) {
-    redirect('/login')
-  }
-
   const data = await getPartnerDetails(params.id)
 
   if (!data) {
@@ -171,4 +156,3 @@ export default async function PartnerDetailsPage({
     </div>
   )
 }
-

@@ -30,14 +30,14 @@ export default function BusinessPage() {
   }, [isMusicEnabled])
 
   const menuItems = [
-    { id: "PLAY", label: "PLAY" },
-    { id: "HEROES", label: "HEROES" },
-    { id: "SHOP", label: "SHOP" },
-    { id: "BATTLE_PASS", label: "BATTLE PASS" },
+    { id: "PLAY", label: "PLAY", href: "/" },
+    { id: "FLEET_OPS", label: "FLEET OPS", href: "/fleet" },
+    { id: "PROPERTY_OPS", label: "PROPERTY OPS" },
+    { id: "READYAIMGO_STAFF", label: "READYAIMGO STAFF" },
   ]
 
   const socialItems = [
-    { id: "CAREER_PROFILE", label: "CAREER PROFILE" },
+    { id: "BEAM_PARTICIPANTS", label: "BEAM PARTICIPANTS" },
     { id: "CHALLENGES", label: "CHALLENGES" },
   ]
 
@@ -145,7 +145,6 @@ export default function BusinessPage() {
             <nav className="flex flex-col space-y-0">
               {/* Primary Menu Items */}
               {menuItems.map((item) => {
-                const isPlay = item.id === "PLAY"
                 const menuItemClassName = `
                   block text-left transition-all duration-300 py-2 cursor-pointer w-full
                   ${activeMenuItem === item.id
@@ -160,11 +159,11 @@ export default function BusinessPage() {
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                 }
 
-                if (isPlay) {
+                if (item.href) {
                   return (
                     <Link 
                       key={item.id} 
-                      href="/" 
+                      href={item.href}
                       onClick={() => setActiveMenuItem(item.id)}
                       className={menuItemClassName}
                       style={menuItemStyle}

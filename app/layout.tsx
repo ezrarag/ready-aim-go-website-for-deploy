@@ -7,6 +7,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner"
 import { NotificationProvider } from "@/contexts/notification-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import RagDevtoolsBridge from "@/components/RagDevtoolsBridge"
+import { logRagDevtoolsFirebaseConfigValidation } from "@/lib/devtools/publicConfig"
 
 const inter = Inter({ subsets: ["latin"] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] })
@@ -36,6 +37,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  if (process.env.NODE_ENV === "development") {
+    logRagDevtoolsFirebaseConfigValidation("server")
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} ${jetbrainsMono.variable}`}>

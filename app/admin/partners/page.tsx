@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { getAllPartners, getContributionsByPartnerSlug } from '@/lib/firestore'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,15 +6,6 @@ import { DollarSign, Users, ArrowRight } from 'lucide-react'
 
 // Force dynamic rendering - this page needs real-time data
 export const dynamic = 'force-dynamic'
-
-async function checkAdmin() {
-  try {
-    // Placeholder - implement proper Firebase Auth check
-    return true
-  } catch (error) {
-    return false
-  }
-}
 
 async function getPartnersData() {
   const partners = await getAllPartners()
@@ -40,12 +30,6 @@ async function getPartnersData() {
 }
 
 export default async function AdminPartnersPage() {
-  const isAdmin = await checkAdmin()
-  
-  if (!isAdmin) {
-    redirect('/login')
-  }
-
   const partnersData = await getPartnersData()
 
   return (
@@ -134,4 +118,3 @@ export default async function AdminPartnersPage() {
     </div>
   )
 }
-

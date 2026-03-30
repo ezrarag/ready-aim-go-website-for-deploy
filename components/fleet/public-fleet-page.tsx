@@ -1,366 +1,269 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { AnimatePresence, motion } from "framer-motion"
+import { ArrowRight, ImageOff, Shield, Wrench } from "lucide-react"
+import { useFleetVehicles } from "@/hooks/use-fleet-vehicles"
+import {
+  FLEET_ANGLE_OPTIONS,
+  buildImaginUrl,
+  getFleetStatusMeta,
+  type FleetAngle,
+  type FleetStatus,
+  type FleetVehicle,
+} from "@/lib/fleet"
+import { cn } from "@/lib/utils"
 
-type VehicleStatus = "available" | "in-use" | "maintenance" | "coming-soon"
-type VehicleType = "suv" | "box_truck" | "van" | "bus" | "aircraft"
+type FleetFilter = "all" | FleetStatus
 
-interface FleetVehicle {
-  id: string
-  name: string
-  make: string
-  model: string
-  year: number
-  type: VehicleType
-  status: VehicleStatus
-  city: string
-  seats?: number
-  cargoCapacity?: string
-  fuelType: string
-  tier: "starter" | "flex" | "pro" | "enterprise"
-  monthlyRate: number
-  imageUrl?: string
-  beamAssigned: boolean
-  description?: string
-}
-
-const MOCK_VEHICLES: FleetVehicle[] = [
-  {
-    id: "v1",
-    name: "LYRIQ EV",
-    make: "Cadillac",
-    model: "LYRIQ",
-    year: 2024,
-    type: "suv",
-    status: "available",
-    city: "Milwaukee",
-    seats: 5,
-    fuelType: "Electric",
-    tier: "pro",
-    monthlyRate: 999,
-    beamAssigned: true,
-    description: "Flagship EV SUV. 326mi range. Premium client transport.",
-  },
-  {
-    id: "v2",
-    name: "Transit 350 HD",
-    make: "Ford",
-    model: "Transit",
-    year: 2023,
-    type: "box_truck",
-    status: "available",
-    city: "Milwaukee",
-    cargoCapacity: "1,600 lbs",
-    fuelType: "Diesel",
-    tier: "flex",
-    monthlyRate: 599,
-    beamAssigned: true,
-    description: "High-roof cargo. Product moves, equipment, last-mile.",
-  },
-  {
-    id: "v3",
-    name: "Sprinter 2500",
-    make: "Mercedes-Benz",
-    model: "Sprinter",
-    year: 2023,
-    type: "van",
-    status: "coming-soon",
-    city: "Chicago",
-    seats: 12,
-    cargoCapacity: "2,000 lbs",
-    fuelType: "Diesel",
-    tier: "flex",
-    monthlyRate: 599,
-    beamAssigned: false,
-    description: "Passenger + cargo config. Chicago expansion — Phase 2.",
-  },
-  {
-    id: "v4",
-    name: "Escalade IQ",
-    make: "Cadillac",
-    model: "Escalade IQ",
-    year: 2025,
-    type: "suv",
-    status: "coming-soon",
-    city: "Atlanta",
-    seats: 7,
-    fuelType: "Electric",
-    tier: "enterprise",
-    monthlyRate: 0,
-    beamAssigned: false,
-    description: "Full-size luxury EV. 450mi range. Atlanta anchor client.",
-  },
-  {
-    id: "v5",
-    name: "Model Y LR",
-    make: "Tesla",
-    model: "Model Y",
-    year: 2024,
-    type: "suv",
-    status: "in-use",
-    city: "Orlando",
-    seats: 5,
-    fuelType: "Electric",
-    tier: "starter",
-    monthlyRate: 299,
-    beamAssigned: true,
-    description: "Efficient EV. Orlando client transport, currently deployed.",
-  },
-  {
-    id: "v6",
-    name: "Promaster 2500",
-    make: "Ram",
-    model: "ProMaster",
-    year: 2022,
-    type: "box_truck",
-    status: "maintenance",
-    city: "Madison",
-    cargoCapacity: "1,400 lbs",
-    fuelType: "Gas",
-    tier: "starter",
-    monthlyRate: 299,
-    beamAssigned: true,
-    description: "In scheduled BEAM maintenance. Back online next week.",
-  },
+const FILTER_OPTIONS: Array<{ value: FleetFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "rag", label: "RAG Fleet" },
+  { value: "want", label: "Wishlist" },
+  { value: "restore", label: "Restore Project" },
 ]
 
-const STATUS_CONFIG: Record<VehicleStatus, { label: string; className: string }> = {
-  available: { label: "AVAILABLE", className: "bg-emerald-500 text-emerald-950 font-bold text-[10px] tracking-widest px-2 py-0.5" },
-  "in-use": { label: "IN USE", className: "bg-amber-400 text-amber-950 font-bold text-[10px] tracking-widest px-2 py-0.5" },
-  maintenance: { label: "MAINTENANCE", className: "bg-orange-500 text-orange-950 font-bold text-[10px] tracking-widest px-2 py-0.5" },
-  "coming-soon": { label: "COMING SOON", className: "bg-sky-400 text-sky-950 font-bold text-[10px] tracking-widest px-2 py-0.5" },
-}
-
-const TYPE_ICON: Record<VehicleType, string> = {
-  suv: "SUV",
-  box_truck: "CARGO",
-  van: "VAN",
-  bus: "BUS",
-  aircraft: "AIR",
-}
-
-const CITY_FILTERS = ["All Cities", "Milwaukee", "Chicago", "Atlanta", "Orlando", "Madison"]
-const TAB_FILTERS = [
-  { key: "all", label: "ALL VEHICLES" },
-  { key: "available", label: "AVAILABLE" },
-  { key: "in-use", label: "IN USE" },
-  { key: "maintenance", label: "MAINTENANCE" },
-]
-
-export function PublicFleetPage() {
-  const [activeTab, setActiveTab] = useState("all")
-  const [activeCity, setActiveCity] = useState("All Cities")
-  const [search, setSearch] = useState("")
-  const [vehicles, setVehicles] = useState<FleetVehicle[]>(MOCK_VEHICLES)
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    // In production: fetch from /api/fleet
-    // fetch('/api/fleet').then(r => r.json()).then(setVehicles)
-    setLoading(false)
-  }, [])
-
-  const filtered = vehicles.filter((v) => {
-    const tabMatch = activeTab === "all" || v.status === activeTab
-    const cityMatch = activeCity === "All Cities" || v.city === activeCity
-    const searchMatch =
-      !search ||
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.make.toLowerCase().includes(search.toLowerCase()) ||
-      v.city.toLowerCase().includes(search.toLowerCase())
-    return tabMatch && cityMatch && searchMatch
-  })
-
+function SummaryCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: number
+  hint: string
+}) {
   return (
-    <div className="min-h-screen bg-[#0e1117] text-white font-mono">
-      {/* Top bar */}
-      <div className="border-b border-white/10 bg-[#0e1117]/95 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-white/40 text-xs tracking-widest uppercase">ReadyAimGo</span>
-            <span className="text-white/20">/</span>
-            <span className="text-white/80 text-xs tracking-widest uppercase">Fleet</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-white/40">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
-            {vehicles.filter((v) => v.status === "available").length} available now
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* Hero heading — Overwatch BROWSE style */}
-        <div className="mb-8">
-          <h1
-            className="text-6xl font-black italic tracking-tight leading-none mb-1"
-            style={{ fontFamily: "'Arial Black', 'Impact', sans-serif", letterSpacing: "-0.02em" }}
-          >
-            FLEET
-          </h1>
-          <p className="text-white/40 text-sm tracking-wider">
-            BEAM-maintained · multi-city · subscription access
-          </p>
-        </div>
-
-        {/* Filter bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-8">
-          {/* Tab filters */}
-          <div className="flex gap-1">
-            {TAB_FILTERS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-2 text-xs font-bold tracking-widest transition-colors border ${
-                  activeTab === tab.key
-                    ? "bg-white text-black border-white"
-                    : "bg-transparent text-white/50 border-white/20 hover:border-white/40 hover:text-white/80"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex gap-2 sm:ml-auto">
-            {/* City filter */}
-            <select
-              value={activeCity}
-              onChange={(e) => setActiveCity(e.target.value)}
-              className="bg-[#1a1f2e] border border-white/20 text-white/70 text-xs px-3 py-2 tracking-wider focus:outline-none focus:border-white/40"
-            >
-              {CITY_FILTERS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-
-            {/* Search */}
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#1a1f2e] border border-white/20 text-white text-xs px-3 py-2 w-40 placeholder:text-white/30 focus:outline-none focus:border-white/50"
-            />
-
-            {/* CTA */}
-            <a
-              href="/contact"
-              className="bg-[#e85d04] hover:bg-[#f87333] text-white text-xs font-black tracking-widest px-5 py-2 flex items-center gap-2 transition-colors"
-            >
-              <span className="text-base leading-none">+</span> REQUEST
-            </a>
-          </div>
-        </div>
-
-        {/* Grid */}
-        {loading ? (
-          <div className="text-white/30 text-sm tracking-widest text-center py-24">LOADING FLEET...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-white/30 text-sm tracking-widest text-center py-24">NO VEHICLES MATCH</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map((v) => (
-              <VehicleCard key={v.id} vehicle={v} />
-            ))}
-          </div>
-        )}
-
-        {/* Footer note */}
-        <div className="mt-16 border-t border-white/10 pt-6 flex flex-col sm:flex-row justify-between gap-4 text-[11px] text-white/25 tracking-widest">
-          <span>BEAM TRANSPORTATION · COHORT MAINTAINED</span>
-          <span>transport.beamthinktank.space</span>
-        </div>
-      </div>
+    <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 shadow-[0_24px_80px_-36px_rgba(249,115,22,0.6)] backdrop-blur-xl">
+      <div className="text-[0.65rem] uppercase tracking-[0.28em] text-orange-300/80">{label}</div>
+      <div className="mt-3 text-4xl font-semibold text-white">{value}</div>
+      <div className="mt-2 text-sm text-white/60">{hint}</div>
     </div>
   )
 }
 
-function VehicleCard({ vehicle: v }: { vehicle: FleetVehicle }) {
-  const status = STATUS_CONFIG[v.status]
-  const isLocked = v.status === "coming-soon" || v.status === "in-use"
+function FleetVehicleCard({ vehicle, index }: { vehicle: FleetVehicle; index: number }) {
+  const [angle, setAngle] = useState<FleetAngle>("01")
+  const [imageFailed, setImageFailed] = useState(false)
+  const statusMeta = getFleetStatusMeta(vehicle.status)
+  const imageUrl = buildImaginUrl(vehicle.make, vehicle.model, vehicle.year, angle)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [imageUrl])
 
   return (
-    <div
-      className={`relative border flex flex-col transition-all duration-150 group ${
-        v.status === "available"
-          ? "border-white/20 bg-[#141922] hover:border-white/50 hover:bg-[#1a2030] cursor-pointer"
-          : "border-white/10 bg-[#0f1318] opacity-80"
-      }`}
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 18, scale: 0.98 }}
+      transition={{
+        duration: 0.42,
+        ease: [0.22, 1, 0.36, 1],
+        delay: index * 0.045,
+        layout: { duration: 0.28 },
+      }}
+      className="group overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.065] p-4 shadow-[0_28px_85px_-45px_rgba(0,0,0,0.95)] backdrop-blur-xl"
     >
-      {/* Vehicle image or placeholder */}
-      <div className="relative h-40 bg-[#0a0d14] overflow-hidden flex items-center justify-center">
-        {v.imageUrl ? (
-          <img src={v.imageUrl} alt={v.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-        ) : (
-          <div className="flex flex-col items-center gap-1 opacity-20">
-            <div
-              className="text-5xl font-black italic tracking-tighter"
-              style={{ fontFamily: "'Arial Black', Impact, sans-serif" }}
-            >
-              {TYPE_ICON[v.type]}
-            </div>
-            <div className="text-xs tracking-widest">{v.year}</div>
-          </div>
-        )}
-
-        {/* Status badge — top right, Overwatch-style */}
-        <div className="absolute top-2 right-2">
-          <span className={status.className}>
-            {status.label}
-          </span>
+      <div className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.18),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]">
+        <div
+          className={cn(
+            "absolute left-4 top-4 z-20 rounded-full border px-3 py-1 text-[0.68rem] uppercase tracking-[0.22em] backdrop-blur-md",
+            statusMeta.pillClassName
+          )}
+        >
+          {vehicle.statusLabel}
         </div>
 
-        {/* BEAM badge — top left */}
-        {v.beamAssigned && (
-          <div className="absolute top-2 left-2">
-            <span className="bg-purple-600/80 text-purple-100 font-bold text-[10px] tracking-widest px-2 py-0.5">
-              BEAM
-            </span>
-          </div>
-        )}
+        <div className="aspect-[4/3] p-6">
+          {imageFailed ? (
+            <div className="flex h-full flex-col items-center justify-center rounded-[1.35rem] border border-dashed border-white/15 bg-black/20 text-center text-white/55">
+              <ImageOff className="h-10 w-10" />
+              <p className="mt-3 text-sm uppercase tracking-[0.22em]">Preview unavailable</p>
+            </div>
+          ) : (
+            <img
+              src={imageUrl}
+              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              className="h-full w-full object-contain transition duration-500 group-hover:scale-[1.02]"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </div>
+
+        <div className="absolute bottom-4 right-4 z-20 flex gap-2 rounded-full border border-white/10 bg-black/55 p-1 backdrop-blur-md">
+          {FLEET_ANGLE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setAngle(option.value)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[0.68rem] uppercase tracking-[0.2em] text-white/70 transition",
+                angle === option.value && "bg-white text-black"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Card body */}
-      <div className="p-4 flex flex-col flex-1 gap-3">
-        {/* Name + make */}
-        <div>
-          <div className="text-white font-black tracking-tight text-base leading-tight">{v.name}</div>
-          <div className="text-white/40 text-xs tracking-wider mt-0.5">
-            {v.make} {v.model} — {v.city.toUpperCase()}
+      <div className="space-y-4 px-1 pb-2 pt-5">
+        <div className="text-[0.72rem] uppercase tracking-[0.26em] text-white/45">
+          {vehicle.year} · {vehicle.config}
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-3xl font-semibold leading-none text-white">
+            {vehicle.make} {vehicle.model}
+          </h2>
+          <div className="font-mono text-sm text-amber-300">{vehicle.priceRange}</div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+            <div className="text-[0.64rem] uppercase tracking-[0.22em] text-white/45">Engine</div>
+            <div className="mt-2 text-sm text-white/85">{vehicle.engine}</div>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+            <div className="text-[0.64rem] uppercase tracking-[0.22em] text-white/45">Payload</div>
+            <div className="mt-2 text-sm text-white/85">{vehicle.payload}</div>
           </div>
         </div>
 
-        {/* Description */}
-        {v.description && (
-          <p className="text-white/50 text-xs leading-relaxed">{v.description}</p>
-        )}
+        <div className="h-px bg-white/10" />
 
-        {/* Specs row */}
-        <div className="flex gap-3 text-[11px] text-white/30 tracking-widest">
-          <span>{v.type.replace("_", " ").toUpperCase()}</span>
-          <span>·</span>
-          <span>{v.fuelType.toUpperCase()}</span>
-          {v.seats && <><span>·</span><span>{v.seats}P</span></>}
-          {v.cargoCapacity && <><span>·</span><span>{v.cargoCapacity}</span></>}
+        <p className="text-sm leading-7 text-white/66">{vehicle.purpose}</p>
+      </div>
+    </motion.article>
+  )
+}
+
+export function PublicFleetPage() {
+  const { vehicles, loading, error } = useFleetVehicles()
+  const [activeFilter, setActiveFilter] = useState<FleetFilter>("all")
+
+  const visibleVehicles = useMemo(() => {
+    if (activeFilter === "all") {
+      return vehicles
+    }
+
+    return vehicles.filter((vehicle) => vehicle.status === activeFilter)
+  }, [activeFilter, vehicles])
+
+  const metrics = useMemo(() => {
+    const activeVehicles = vehicles.filter((vehicle) => vehicle.active)
+
+    return {
+      total: activeVehicles.length,
+      rag: activeVehicles.filter((vehicle) => vehicle.status === "rag").length,
+      want: activeVehicles.filter((vehicle) => vehicle.status === "want").length,
+      restore: activeVehicles.filter((vehicle) => vehicle.status === "restore").length,
+    }
+  }, [vehicles])
+
+  return (
+    <div className="min-h-screen overflow-hidden bg-black text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-[30rem] bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.34),transparent_48%)]" />
+        <div className="absolute right-[-12rem] top-[18rem] h-[28rem] w-[28rem] rounded-full bg-sky-500/10 blur-3xl" />
+        <div className="absolute left-[-10rem] top-[34rem] h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm uppercase tracking-[0.2em] text-white/80 backdrop-blur-md transition hover:bg-white/15 hover:text-white"
+          >
+            <Shield className="h-4 w-4 text-orange-300" />
+            ReadyAimGo
+          </Link>
+
+          <Link
+            href="/dashboard/transportation"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm uppercase tracking-[0.2em] text-black transition hover:bg-orange-200"
+          >
+            Admin Fleet
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
-        {/* Footer: tier + rate + author-style row */}
-        <div className="mt-auto pt-3 border-t border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-white/30 tracking-widest uppercase">TIER</span>
-            <span className="text-[10px] font-bold text-white/60 tracking-widest uppercase">{v.tier}</span>
+        <section className="pb-10 pt-16 sm:pt-20">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-500/10 px-4 py-2 text-[0.72rem] uppercase tracking-[0.28em] text-orange-200">
+            <Wrench className="h-4 w-4" />
+            BEAM Transportation Fleet Cohort
           </div>
-          <div className="text-right">
-            {v.monthlyRate > 0 ? (
-              <span className="text-white/80 text-xs font-bold">
-                from ${v.monthlyRate.toLocaleString()}
-                <span className="text-white/30 font-normal">/mo</span>
-              </span>
-            ) : (
-              <span className="text-white/30 text-xs">contact for pricing</span>
-            )}
+
+          <div className="mt-8 max-w-4xl">
+            <h1 className="text-5xl font-semibold uppercase leading-none tracking-[0.03em] text-white sm:text-6xl lg:text-7xl">
+              RAG Fleet & Wishlist
+            </h1>
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-white/68">
+              ReadyAimGo is BEAM Transportation&apos;s first fleet client, and cohort participants
+              maintain these vehicles weekly as live service assets, wishlist targets, and restore
+              builds.
+            </p>
           </div>
-        </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Total Vehicles" value={metrics.total} hint="Active public inventory" />
+          <SummaryCard label="RAG Fleet" value={metrics.rag} hint="Current operating vehicles" />
+          <SummaryCard label="Wishlist" value={metrics.want} hint="Planned acquisitions" />
+          <SummaryCard
+            label="Restore Projects"
+            value={metrics.restore}
+            hint="Legacy builds in the cohort"
+          />
+        </section>
+
+        <section className="mt-10 flex flex-wrap gap-3">
+          {FILTER_OPTIONS.map((option) => {
+            const isActive = activeFilter === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setActiveFilter(option.value)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm uppercase tracking-[0.22em] transition backdrop-blur-md",
+                  isActive
+                    ? "border-white bg-white text-black"
+                    : "border-white/10 bg-white/8 text-white/70 hover:border-white/30 hover:bg-white/12 hover:text-white"
+                )}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </section>
+
+        <section className="mt-10 flex-1">
+          {loading ? (
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] px-8 py-16 text-center text-white/65 backdrop-blur-xl">
+              Syncing fleet inventory from Firestore...
+            </div>
+          ) : error ? (
+            <div className="rounded-[2rem] border border-rose-500/30 bg-rose-500/10 px-8 py-16 text-center text-rose-100 backdrop-blur-xl">
+              {error}
+            </div>
+          ) : visibleVehicles.length === 0 ? (
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] px-8 py-16 text-center text-white/65 backdrop-blur-xl">
+              No vehicles match the current filter.
+            </div>
+          ) : (
+            <motion.div layout className="grid gap-6 lg:grid-cols-2">
+              <AnimatePresence mode="popLayout">
+                {visibleVehicles.map((vehicle, index) => (
+                  <FleetVehicleCard key={vehicle.id} vehicle={vehicle} index={index} />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </section>
       </div>
     </div>
   )

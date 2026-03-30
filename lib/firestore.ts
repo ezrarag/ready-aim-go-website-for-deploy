@@ -27,33 +27,42 @@ export function getFirestoreDb(): Firestore | null {
 
   // Initialize Firebase Admin if not already initialized
   if (getApps().length === 0) {
-    // Check for service account key in environment variables
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-    
+    // Check for service account key in environment variables first, but fall back
+    // to individual credential fields if the JSON blob is malformed.
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim()
+
     if (serviceAccountKey) {
-      // Parse JSON service account key
       try {
         const serviceAccount = JSON.parse(serviceAccountKey)
         app = initializeApp({
           credential: cert(serviceAccount),
         })
       } catch (error) {
-        console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error)
-        // Return null instead of throwing during build time
-        return null
+        console.error(
+          "Error parsing FIREBASE_SERVICE_ACCOUNT_KEY; falling back to individual Firebase credential fields:",
+          error
+        )
       }
-    } else {
-      // Fallback: use individual credential fields
+    }
+
+    if (!app) {
       const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-      
+      const clientEmail =
+        process.env.FIREBASE_CLIENT_EMAIL ||
+        process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
+        process.env.FIREBASE_AMIN_CLIENT_EMAIL
+      const privateKey = (
+        process.env.FIREBASE_PRIVATE_KEY || process.env.FIREBASE_ADMIN_PRIVATE_KEY
+      )?.replace(/\\n/g, '\n')
+
       // Validate required fields - return null instead of throwing during build time
       if (!projectId || !clientEmail || !privateKey) {
-        // Don't throw during build - return null and let runtime handle it
+        console.warn(
+          "Firebase Admin credentials are incomplete. Set FIREBASE_SERVICE_ACCOUNT_KEY to valid JSON or provide NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL/FIREBASE_AMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY."
+        )
         return null
       }
-      
+
       try {
         app = initializeApp({
           credential: cert({
