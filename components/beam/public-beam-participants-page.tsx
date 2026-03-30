@@ -49,6 +49,17 @@ const ROLE_ICON_MAP = {
   wrench: Wrench,
 } as const
 
+function buildTransportEnrollUrl(role: Pick<DerivedBeamParticipantRole, "id" | "title" | "track">) {
+  const params = new URLSearchParams({
+    role: role.id,
+    from: "rag",
+    title: role.title,
+    track: role.track,
+  })
+
+  return `${TRANSPORTATION_SITE_URL}/cohort/enroll?${params.toString()}`
+}
+
 function formatTimeAgo(timestamp?: string) {
   if (!timestamp) return "Pending refresh"
 
@@ -104,6 +115,7 @@ function RoleCard({
   index: number
 }) {
   const Icon = ROLE_ICON_MAP[role.icon]
+  const applyHref = buildTransportEnrollUrl(role)
 
   return (
     <motion.article
@@ -231,6 +243,19 @@ function RoleCard({
               {role.pulseMentions > 0 ? `${role.pulseMentions} pulse match${role.pulseMentions === 1 ? "" : "es"}` : "Core role lane"}
             </div>
           </div>
+
+          <a
+            href={applyHref}
+            className="flex items-center justify-between rounded-[0.55rem] border border-[#ffb09a] bg-[#df8063]/92 px-4 py-3 text-white shadow-[0_18px_45px_-28px_rgba(223,128,99,0.9)] transition hover:bg-[#e58b6d]"
+          >
+            <span
+              className="text-[0.72rem] uppercase tracking-[0.2em]"
+              style={{ fontFamily: DISPLAY_FONT, fontStyle: "italic", fontWeight: 700 }}
+            >
+              Apply for this role
+            </span>
+            <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
       </div>
     </motion.article>
