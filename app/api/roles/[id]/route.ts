@@ -1,30 +1,33 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from 'next/server'
+import { getRoleById, updateRole } from '@/lib/roles'
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const { id } = await params
-    return NextResponse.json({ error: "Role not found", id }, { status: 404 })
+    const role = await getRoleById(params.id)
+    if (!role) {
+      return NextResponse.json({ error: 'Role not found' }, { status: 404 })
+    }
+    return NextResponse.json({ role })
   } catch (error) {
-    console.error("Error in role GET:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error('GET /api/roles/[id] error:', error)
+    return NextResponse.json({ error: 'Failed to fetch role' }, { status: 500 })
   }
 }
 
-export async function PUT(request: NextRequest, _ctx: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    await request.json()
-    return NextResponse.json({ error: "Role update not implemented" }, { status: 501 })
+    const body = await request.json()
+    await updateRole(params.id, body)
+    const updated = await getRoleById(params.id)
+    return NextResponse.json({ success: true, role: updated })
   } catch (error) {
-    console.error("Error in role PUT:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function DELETE(_request: NextRequest, _ctx: { params: Promise<{ id: string }> }) {
-  try {
-    return NextResponse.json({ error: "Role delete not implemented" }, { status: 501 })
-  } catch (error) {
-    console.error("Error in role DELETE:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error('PATCH /api/roles/[id] error:', error)
+    return NextResponse.json({ error: 'Failed to update role' }, { status: 500 })
   }
 }
