@@ -215,6 +215,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               <div>
                 <div className="text-sm text-white/60 font-medium mb-2">ReadyAimGo</div>
                 <div className="flex flex-col gap-1">
+                  <Link href="/property-ops" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Property Ops</Link>
                   <Link href="/onboarding" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Join the Team</Link>
                   <Link href="/dashboard" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">RAG Service Dashboard</Link>
                 </div>

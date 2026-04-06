@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Users, Trophy, Volume2, VolumeX, Wifi, Battery, Menu, MessageCircle, Mic, Video } from "lucide-react"
+import { BusinessOptionsOverlay } from "@/components/business/business-options-overlay"
 
 export default function BusinessPage() {
   const [activeMenuItem, setActiveMenuItem] = useState("PLAY")
   const [isMusicEnabled, setIsMusicEnabled] = useState(false)
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   // TODO: Replace with your background image URL when ready
   // Example: const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>("https://your-image-url.com/image.jpg")
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null)
@@ -32,13 +34,18 @@ export default function BusinessPage() {
   const menuItems = [
     { id: "PLAY", label: "PLAY", href: "/" },
     { id: "FLEET_OPS", label: "FLEET OPS", href: "/fleet" },
-    { id: "PROPERTY_OPS", label: "PROPERTY OPS" },
-    { id: "READYAIMGO_STAFF", label: "READYAIMGO STAFF", href: "/beam-participants" },
+    { id: "PROPERTY_OPS", label: "PROPERTY OPS", href: "/property-ops" },
   ]
 
   const socialItems = [
     { id: "BEAM_PARTICIPANTS", label: "BEAM PARTICIPANTS", href: "/beam-participants" },
-    { id: "CHALLENGES", label: "CHALLENGES" },
+    { id: "OPTIONS", label: "OPTIONS" },
+  ]
+
+  const businessOptions = [
+    { id: "ABOUT", label: "ABOUT", href: "/about", note: "Company overview and staff" },
+    { id: "PITCH", label: "PITCH DECK", href: "/pitch", note: "Open current presentation" },
+    { id: "MORE_SOON", label: "MORE SOON", disabled: true, note: "Additional entries will land here" },
   ]
 
   return (
@@ -132,7 +139,14 @@ export default function BusinessPage() {
             </div>
 
             {/* Menu Button */}
-            <button className="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white transition-colors">
+            <button
+              onClick={() => {
+                setActiveMenuItem("OPTIONS")
+                setIsOptionsOpen(true)
+              }}
+              className="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white transition-colors"
+              aria-label="Open options"
+            >
               <Menu className="w-6 h-6" />
             </button>
           </div>
@@ -218,7 +232,12 @@ export default function BusinessPage() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveMenuItem(item.id)}
+                      onClick={() => {
+                        setActiveMenuItem(item.id)
+                        if (item.id === "OPTIONS") {
+                          setIsOptionsOpen(true)
+                        }
+                      }}
                       className={socialItemClassName}
                       style={{
                         fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -236,9 +255,9 @@ export default function BusinessPage() {
           <div className="flex-1" />
         </div>
 
-        {/* Bottom Left - Chat */}
-        <div className="absolute bottom-6 left-6">
-          <button className="flex items-center gap-2 bg-black/40 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 hover:bg-black/60 transition-colors">
+      {/* Bottom Left - Chat */}
+      <div className="absolute bottom-6 left-6">
+        <button className="flex items-center gap-2 bg-black/40 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 hover:bg-black/60 transition-colors">
             <MessageCircle className="w-5 h-5 text-white" />
             <span className="text-white text-sm font-semibold uppercase tracking-wide">
               CHAT
@@ -246,6 +265,12 @@ export default function BusinessPage() {
           </button>
         </div>
       </div>
+
+      <BusinessOptionsOverlay
+        isOpen={isOptionsOpen}
+        onClose={() => setIsOptionsOpen(false)}
+        options={businessOptions}
+      />
     </div>
   )
 }

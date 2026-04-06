@@ -39,6 +39,7 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
   /** Module keys to show (only those with key field set on client: websiteUrl, appUrl, rdUrl, etc.). */
   const [storyModuleKeysWithData, setStoryModuleKeysWithData] = useState<ModuleKey[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
+  const isOverlayOpen = showStoryOverlay || showRosterOverlay || showAreaDetail
 
   useEffect(() => {
     const fetchRoster = async () => {
@@ -129,15 +130,23 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
   const videoUrl = getVideoUrl(currentStory)
 
   useEffect(() => {
-    if (videoRef.current && videoUrl) {
-      videoRef.current.play().catch((error) => {
-        console.error('Error auto-playing video:', error)
-      })
+    const video = videoRef.current
+    if (!video || !videoUrl) return
+
+    if (isOverlayOpen) {
+      video.pause()
+      return
     }
-  }, [currentStory, videoUrl])
+
+    video.play().catch((error) => {
+      console.error('Error auto-playing video:', error)
+    })
+  }, [isOverlayOpen, videoUrl])
 
   const handleVideoCanPlay = () => {
-    videoRef.current?.play().catch(() => {})
+    if (!isOverlayOpen) {
+      videoRef.current?.play().catch(() => {})
+    }
   }
 
   // Handle F4 key to exit

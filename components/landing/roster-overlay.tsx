@@ -2,7 +2,6 @@
 
 import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
 
 interface RosterOverlayProps {
   isOpen: boolean
@@ -21,7 +20,8 @@ export interface Hero {
 }
 
 export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, heroes }: RosterOverlayProps) {
-  const router = useRouter()
+  const [previewStoryId, setPreviewStoryId] = React.useState<string | null>(null)
+  const activePreviewStoryId = previewStoryId ?? currentStory
 
   // Handle ESC key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,6 +37,12 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
     }
   }, [isOpen])
 
+  React.useEffect(() => {
+    if (!isOpen) {
+      setPreviewStoryId(null)
+    }
+  }, [isOpen])
+
   const handleHeroClick = (hero: Hero) => {
     // Save to localStorage
     localStorage.setItem('lastViewedStory', hero.storyId)
@@ -46,9 +52,6 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
     
     // Close the overlay
     onClose()
-    
-    // Redirect to home page
-    router.push('/')
   }
 
   return (
@@ -84,38 +87,62 @@ export function RosterOverlay({ isOpen, onClose, currentStory, onHeroSelect, her
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 pb-16 md:pb-0">
                 {heroes.map((hero, index) => {
                   const isSelected = hero.storyId === currentStory
+                  const showPreview = activePreviewStoryId === hero.storyId
+                  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      handleHeroClick(hero)
+                    }
+                  }
                   return (
                     <motion.div
                       key={hero.id}
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: index * 0.1 }}
-                      className="group cursor-pointer relative"
+                      transition={{ duration: 0.28, delay: index * 0.04 }}
+                      className="group cursor-pointer relative outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-lg"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleHeroClick(hero)}
+                      onKeyDown={handleCardKeyDown}
+                      onMouseEnter={() => setPreviewStoryId(hero.storyId)}
+                      onMouseLeave={() => setPreviewStoryId(null)}
+                      onFocus={() => setPreviewStoryId(hero.storyId)}
+                      onBlur={() => setPreviewStoryId((current) => (current === hero.storyId ? null : current))}
                     >
-                      <div className={`h-[220px] sm:h-[260px] md:h-[320px] bg-black/60 backdrop-blur-sm border rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 flex flex-col ${
+                      <div className={`h-[220px] sm:h-[260px] md:h-[320px] bg-black/70 border rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 flex flex-col ${
                         isSelected 
                           ? 'border-orange-500 border-2' 
                           : 'border-white/20 hover:border-white/40'
                       }`}>
                         {/* Top Section - Hero Portrait/Video Preview */}
                         <div className="flex-1 min-h-[60%] bg-gradient-to-br from-blue-600/30 to-purple-600/30 flex items-center justify-center relative overflow-hidden">
-                          {/* Video Preview */}
-                          <video
-                            className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity"
-                            loop
-                            muted
-                            playsInline
-                            autoPlay
-                          >
-                            <source src={hero.videoUrl} type="video/mp4" />
-                          </video>
+                          {showPreview ? (
+                            <video
+                              className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity"
+                              loop
+                              muted
+                              playsInline
+                              autoPlay
+                              preload="metadata"
+                            >
+                              <source src={hero.videoUrl} type="video/mp4" />
+                            </video>
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-slate-700/40 via-slate-900/30 to-black/70" />
+                          )}
+                          <div className="absolute inset-0 bg-black/20" />
                           
                           {/* Hero Name Overlay */}
                           <div className="relative z-10 text-center px-3">
                             <h3 className="text-white font-bold text-lg sm:text-xl md:text-3xl uppercase tracking-wide drop-shadow-lg">
                               {hero.name}
                             </h3>
+                            {!showPreview ? (
+                              <p className="mt-2 text-[10px] sm:text-xs uppercase tracking-[0.24em] text-white/60">
+                                Hover or focus to preview
+                              </p>
+                            ) : null}
                           </div>
                           
                           {/* NEW Badge */}

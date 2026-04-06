@@ -31,7 +31,7 @@ export function getFirestoreDb(): Firestore | null {
     // to individual credential fields if the JSON blob is malformed.
     const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim()
 
-    if (serviceAccountKey) {
+    if (serviceAccountKey?.startsWith("{")) {
       try {
         const serviceAccount = JSON.parse(serviceAccountKey)
         app = initializeApp({
