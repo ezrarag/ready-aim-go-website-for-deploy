@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
+import { getAuth as getAdminAuth, type Auth as AdminAuth } from 'firebase-admin/auth'
 import type {
   ClientDirectoryEntry,
   ClientStatus,
@@ -89,6 +90,15 @@ export function getFirestoreDb(): Firestore | null {
 
   db = getFirestore(app)
   return db
+}
+
+export function getFirebaseAdminAuth(): AdminAuth | null {
+  const firestore = getFirestoreDb()
+  if (!firestore || !app) {
+    return null
+  }
+
+  return getAdminAuth(app)
 }
 
 /** Returns Firebase Storage bucket for uploads (e.g. client update videos). Ensures Firestore app is initialized first. */

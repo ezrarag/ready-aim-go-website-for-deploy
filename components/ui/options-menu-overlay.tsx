@@ -40,7 +40,7 @@ export function OptionsMenuOverlay({ isOpen, onClose }: OptionsMenuOverlayProps)
 
   const signInOptions = [
     { id: "ADMIN", label: "Admin", icon: Shield, color: "text-blue-600", action: () => router.push('/dashboard/admin') },
-    { id: "CLIENTS", label: "Clients", icon: Users, color: "text-green-600", action: () => router.push('/login?redirect=/dashboard/client') },
+    { id: "CLIENTS", label: "Clients", icon: Users, color: "text-green-600", action: () => router.push('/clients?intent=claim') },
     { id: "PARTNERS", label: "Partners", icon: Handshake, color: "text-purple-600", action: () => router.push('/partners') },
   ]
 
@@ -208,4 +208,3 @@ export function OptionsMenuOverlay({ isOpen, onClose }: OptionsMenuOverlayProps)
     </AnimatePresence>
   )
 }
-

@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Server,
   Settings,
   Sun,
   Truck,
@@ -39,6 +40,8 @@ function getNavIcon(itemId: string) {
       return Users
     case "web-development":
       return Globe
+    case "infra-services":
+      return Server
     case "transportation":
       return Truck
     case "real-estate":

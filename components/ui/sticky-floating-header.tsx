@@ -54,7 +54,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
 
   const handleClientSignIn = () => {
     setSignInMenuOpen(false)
-    router.push('/login?redirect=/dashboard/client')
+    router.push('/clients?intent=claim')
   }
 
   const handlePartnerSignIn = () => {
@@ -205,8 +205,8 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
               <div>
                 <div className="text-sm text-white/60 font-medium mb-2">Informations</div>
                 <div className="flex flex-col gap-1">
-                  <Link href="#" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Become a client</Link>
-                  <a href="https://clients.readyaimgo.biz" target="_blank" rel="noopener noreferrer" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Client portal</a>
+                  <Link href="/clients?intent=new" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Become a client</Link>
+                  <Link href="/clients?intent=claim" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Find your business</Link>
                   <Link href="/pricing" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">View Pricing</Link>
                   <Link href="/contact" className="font-semibold text-white text-sm py-1 hover:text-white/80 transition-colors">Contact</Link>
                 </div>

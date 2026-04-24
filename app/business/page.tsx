@@ -6,6 +6,19 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Users, Trophy, Volume2, VolumeX, Wifi, Battery, Menu, MessageCircle, Mic, Video } from "lucide-react"
 import { BusinessOptionsOverlay } from "@/components/business/business-options-overlay"
 
+type BusinessMenuSubItem = {
+  id: string
+  label: string
+  href: string
+}
+
+type BusinessMenuItem = {
+  id: string
+  label: string
+  href?: string
+  subItems?: BusinessMenuSubItem[]
+}
+
 export default function BusinessPage() {
   const [activeMenuItem, setActiveMenuItem] = useState("PLAY")
   const [isMusicEnabled, setIsMusicEnabled] = useState(false)
@@ -31,8 +44,19 @@ export default function BusinessPage() {
     audio.currentTime = 0
   }, [isMusicEnabled])
 
-  const menuItems = [
-    { id: "PLAY", label: "PLAY", href: "/" },
+  const menuItems: BusinessMenuItem[] = [
+    {
+      id: "PLAY",
+      label: "PLAY",
+      href: "/",
+      subItems: [
+        {
+          id: "CREATE_CHARACTER",
+          label: "CREATE A CHARACTER",
+          href: "/clients?intent=claim&tab=new",
+        },
+      ],
+    },
     { id: "FLEET_OPS", label: "FLEET OPS", href: "/fleet" },
     { id: "PROPERTY_OPS", label: "PROPERTY OPS", href: "/property-ops" },
   ]
@@ -173,29 +197,43 @@ export default function BusinessPage() {
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                 }
 
-                if (item.href) {
-                  return (
-                    <Link 
-                      key={item.id} 
-                      href={item.href}
-                      onClick={() => setActiveMenuItem(item.id)}
-                      className={menuItemClassName}
-                      style={menuItemStyle}
-                    >
-                      {item.label}
-                    </Link>
-                  )
-                }
-
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveMenuItem(item.id)}
-                    className={menuItemClassName}
-                    style={menuItemStyle}
-                  >
-                    {item.label}
-                  </button>
+                  <div key={item.id}>
+                    {item.href ? (
+                      <Link
+                        href={item.href}
+                        onClick={() => setActiveMenuItem(item.id)}
+                        className={menuItemClassName}
+                        style={menuItemStyle}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => setActiveMenuItem(item.id)}
+                        className={menuItemClassName}
+                        style={menuItemStyle}
+                      >
+                        {item.label}
+                      </button>
+                    )}
+
+                    {item.subItems?.length && activeMenuItem === item.id ? (
+                      <div className="mt-2 space-y-2 pl-3">
+                        {item.subItems.map((subItem) => (
+                          <Link
+                            key={subItem.id}
+                            href={subItem.href}
+                            onClick={() => setActiveMenuItem(item.id)}
+                            className="block text-sm font-semibold uppercase tracking-[0.35em] text-white/65 transition-colors hover:text-white"
+                            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                          >
+                            {subItem.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 )
               })}
 

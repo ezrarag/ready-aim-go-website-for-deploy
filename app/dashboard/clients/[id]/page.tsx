@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,6 +48,15 @@ import {
 import type { ClientDirectoryEntry, ClientStatus, DeployStatus, StripeStatus } from "@/lib/client-directory"
 import type { ClientUpdate, ModuleKey, UpdateStatus } from "@/lib/client-directory"
 import type { ClientRoleSuggestionSnapshot } from "@/lib/client-role-suggestions"
+import {
+  applyClientEditPayload,
+  buildClientEditPayload,
+  canSaveClientEditForm,
+  createClientEditForm,
+  EMPTY_CLIENT_EDIT_FORM,
+  getClientEditPayloadSignature,
+  type ClientEditPayload,
+} from "@/lib/client-edit-form"
 import { getClientPreferredProductionUrl } from "@/lib/vercel"
 import type {
   ClientWorkspace,
@@ -227,6 +236,20 @@ function sanitizeWorkspaceForSave(workspace: ClientWorkspace): ClientWorkspace {
   }
 }
 
+type EditSaveState = "idle" | "saving" | "saved" | "error"
+
+async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
+  const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.error || "Failed to update client")
+  }
+}
+
 export default function ClientDetailPage() {
   const params = useParams()
   const clientId = params.id as string
@@ -244,36 +267,13 @@ export default function ClientDetailPage() {
     details: "",
     status: "draft" as UpdateStatus,
   })
-  const [editForm, setEditForm] = useState({
-    name: '',
-    storyId: '',
-    brands: [] as string[],
-    status: 'onboarding' as ClientStatus,
-    deployStatus: 'building' as DeployStatus,
-    deployUrl: '',
-    stripeStatus: 'pending' as StripeStatus,
-    revenue: 0,
-    meetings: 0,
-    emails: 0,
-    commits: 0,
-    lastActivity: '',
-    pulseSummary: '',
-    websiteUrl: '',
-    githubRepo: '',
-    githubReposCsv: '',
-    deployHostsCsv: '',
-    appUrl: '',
-    appStoreUrl: '',
-    rdUrl: '',
-    housingUrl: '',
-    transportationUrl: '',
-    insuranceUrl: '',
-    storyVideoUrl: '',
-    showOnFrontend: true,
-    isNewStory: false,
-  })
+  const [editForm, setEditForm] = useState(() => createClientEditForm())
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editSaveState, setEditSaveState] = useState<EditSaveState>("idle")
   const [generatingPulse, setGeneratingPulse] = useState(false)
+  const editAutosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const editLastSavedSignatureRef = useRef("")
+  const editLastErrorSignatureRef = useRef("")
   const [syncingVercel, setSyncingVercel] = useState(false)
   const [roleSuggestionSnapshot, setRoleSuggestionSnapshot] = useState<ClientRoleSuggestionSnapshot | null>(null)
   const [generatingRoleSuggestions, setGeneratingRoleSuggestions] = useState(false)
@@ -297,35 +297,7 @@ export default function ClientDetailPage() {
         if (data?.client) {
           setClient(data.client)
           setRoleSuggestionSnapshot(data.client.roleSuggestionSnapshot || null)
-          // Initialize edit form with client data
-          setEditForm({
-            name: data.client.name,
-            storyId: data.client.storyId,
-            brands: data.client.brands || [],
-            status: data.client.status,
-            deployStatus: data.client.deployStatus,
-            deployUrl: data.client.deployUrl || '',
-            stripeStatus: data.client.stripeStatus,
-            revenue: data.client.revenue || 0,
-            meetings: data.client.meetings || 0,
-            emails: data.client.emails || 0,
-            commits: data.client.commits || 0,
-            lastActivity: data.client.lastActivity || '',
-            pulseSummary: data.client.pulseSummary || '',
-            websiteUrl: data.client.websiteUrl || '',
-            githubRepo: data.client.githubRepo || '',
-            githubReposCsv: Array.isArray(data.client.githubRepos) ? data.client.githubRepos.join(', ') : '',
-            deployHostsCsv: Array.isArray(data.client.deployHosts) ? data.client.deployHosts.join(', ') : '',
-            appUrl: data.client.appUrl || '',
-            appStoreUrl: data.client.appStoreUrl || '',
-            rdUrl: data.client.rdUrl || '',
-            housingUrl: data.client.housingUrl || '',
-            transportationUrl: data.client.transportationUrl || '',
-            insuranceUrl: data.client.insuranceUrl || '',
-            storyVideoUrl: data.client.storyVideoUrl || '',
-            showOnFrontend: data.client.showOnFrontend !== false,
-            isNewStory: data.client.isNewStory || false,
-          })
+          setEditForm(createClientEditForm(data.client))
         }
       })
       .finally(() => {
@@ -487,64 +459,142 @@ export default function ClientDetailPage() {
     }
   }
 
+  const applySavedEdit = (payload: ClientEditPayload) => {
+    const signature = getClientEditPayloadSignature(payload)
+    editLastSavedSignatureRef.current = signature
+    editLastErrorSignatureRef.current = ""
+    setEditSaveState("saved")
+    setClient((prev) => (prev ? applyClientEditPayload(prev, payload) : prev))
+  }
+
+  const handleOpenEditDialog = () => {
+    if (!client) return
+    const nextForm = createClientEditForm(client)
+    if (editAutosaveTimeoutRef.current) {
+      clearTimeout(editAutosaveTimeoutRef.current)
+      editAutosaveTimeoutRef.current = null
+    }
+    setEditForm(nextForm)
+    setEditSaveState("saved")
+    editLastSavedSignatureRef.current = getClientEditPayloadSignature(buildClientEditPayload(nextForm))
+    editLastErrorSignatureRef.current = ""
+    setEditDialogOpen(true)
+  }
+
   const handleSaveEdit = async () => {
-    if (!clientId) return
-    const storyVideoUrl = editForm.storyVideoUrl.trim()
-    if (!storyVideoUrl) {
-      alert('Story Video URL is required')
-      return
+    if (!clientId || !canSaveClientEditForm(editForm)) return
+    const payload = buildClientEditPayload(editForm)
+
+    if (editAutosaveTimeoutRef.current) {
+      clearTimeout(editAutosaveTimeoutRef.current)
+      editAutosaveTimeoutRef.current = null
     }
     setEditSubmitting(true)
+    setEditSaveState("saving")
     try {
-      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editForm.name.trim(),
-          storyId: editForm.storyId.trim(),
-          brands: editForm.brands,
-          status: editForm.status,
-          deployStatus: editForm.deployStatus,
-          deployUrl: editForm.deployUrl.trim() || undefined,
-          stripeStatus: editForm.stripeStatus,
-          revenue: editForm.revenue,
-          meetings: editForm.meetings,
-          emails: editForm.emails,
-          commits: editForm.commits,
-          lastActivity: editForm.lastActivity.trim() || new Date().toISOString(),
-          pulseSummary: editForm.pulseSummary.trim() || undefined,
-          websiteUrl: editForm.websiteUrl.trim() || undefined,
-          githubRepo: editForm.githubRepo.trim() || undefined,
-          githubRepos: editForm.githubReposCsv
-            .split(',')
-            .map((v) => v.trim())
-            .filter(Boolean),
-          deployHosts: editForm.deployHostsCsv
-            .split(',')
-            .map((v) => v.trim())
-            .filter(Boolean),
-          appUrl: editForm.appUrl.trim() || undefined,
-          appStoreUrl: editForm.appStoreUrl.trim() || undefined,
-          rdUrl: editForm.rdUrl.trim() || undefined,
-          housingUrl: editForm.housingUrl.trim() || undefined,
-          transportationUrl: editForm.transportationUrl.trim() || undefined,
-          insuranceUrl: editForm.insuranceUrl.trim() || undefined,
-          storyVideoUrl,
-          showOnFrontend: editForm.showOnFrontend,
-          isNewStory: editForm.isNewStory,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Failed to update client')
-      setEditDialogOpen(false)
-      fetchClient() // Refresh client data
+      await saveClientEdit(clientId, payload)
+      applySavedEdit(payload)
     } catch (e) {
       console.error(e)
+      editLastErrorSignatureRef.current = getClientEditPayloadSignature(payload)
+      setEditSaveState("error")
       alert(e instanceof Error ? e.message : 'Failed to update client')
     } finally {
       setEditSubmitting(false)
     }
   }
+
+  const handleEditDialogOpenChange = async (open: boolean) => {
+    if (open) {
+      setEditDialogOpen(true)
+      return
+    }
+
+    if (editAutosaveTimeoutRef.current) {
+      clearTimeout(editAutosaveTimeoutRef.current)
+      editAutosaveTimeoutRef.current = null
+    }
+
+    if (editSubmitting) {
+      return
+    }
+
+    if (!clientId) {
+      setEditDialogOpen(false)
+      setEditForm(EMPTY_CLIENT_EDIT_FORM)
+      return
+    }
+
+    const payload = buildClientEditPayload(editForm)
+    const signature = getClientEditPayloadSignature(payload)
+
+    if (
+      canSaveClientEditForm(editForm) &&
+      signature !== editLastSavedSignatureRef.current
+    ) {
+      setEditSubmitting(true)
+      setEditSaveState("saving")
+      try {
+        await saveClientEdit(clientId, payload)
+        applySavedEdit(payload)
+      } catch (e) {
+        console.error(e)
+        editLastErrorSignatureRef.current = signature
+        setEditSaveState("error")
+        alert(e instanceof Error ? e.message : "Failed to update client")
+        return
+      } finally {
+        setEditSubmitting(false)
+      }
+    }
+
+    setEditDialogOpen(false)
+    setEditForm(EMPTY_CLIENT_EDIT_FORM)
+  }
+
+  useEffect(() => {
+    if (!editDialogOpen || !clientId) return
+
+    const payload = buildClientEditPayload(editForm)
+    const signature = getClientEditPayloadSignature(payload)
+
+    if (
+      !canSaveClientEditForm(editForm) ||
+      signature === editLastSavedSignatureRef.current ||
+      signature === editLastErrorSignatureRef.current
+    ) {
+      return
+    }
+
+    if (editSubmitting) return
+
+    setEditSaveState("idle")
+    if (editAutosaveTimeoutRef.current) {
+      clearTimeout(editAutosaveTimeoutRef.current)
+    }
+
+    editAutosaveTimeoutRef.current = setTimeout(async () => {
+      setEditSubmitting(true)
+      setEditSaveState("saving")
+      try {
+        await saveClientEdit(clientId, payload)
+        applySavedEdit(payload)
+      } catch (e) {
+        console.error(e)
+        editLastErrorSignatureRef.current = signature
+        setEditSaveState("error")
+      } finally {
+        setEditSubmitting(false)
+      }
+    }, 800)
+
+    return () => {
+      if (editAutosaveTimeoutRef.current) {
+        clearTimeout(editAutosaveTimeoutRef.current)
+        editAutosaveTimeoutRef.current = null
+      }
+    }
+  }, [clientId, editDialogOpen, editForm, editSubmitting])
 
   const handleGeneratePulseSummary = async () => {
     if (!clientId) return
@@ -775,6 +825,19 @@ export default function ClientDetailPage() {
   const pulseWorkItemCount = client.pulseReport?.workItems?.length ?? 0
   const activeRoleSuggestionCount =
     roleSuggestionSnapshot?.roleSuggestions.filter((suggestion) => suggestion.status !== "rejected").length ?? 0
+  const editCanSave = canSaveClientEditForm(editForm)
+  const editHasUnsavedChanges =
+    editDialogOpen &&
+    getClientEditPayloadSignature(buildClientEditPayload(editForm)) !== editLastSavedSignatureRef.current
+  const editStatusMessage = !editCanSave
+    ? "Name and Story ID are required before changes can save."
+    : editSaveState === "error"
+      ? "Autosave failed. Use Save now to retry."
+      : editSubmitting
+        ? "Saving changes…"
+        : editHasUnsavedChanges
+          ? "Changes auto-save after a short pause."
+          : "All changes saved."
 
   return (
     <DashboardLayout>
@@ -804,7 +867,7 @@ export default function ClientDetailPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Sync from Vercel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+              <DropdownMenuItem onClick={handleOpenEditDialog}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Client
               </DropdownMenuItem>
@@ -1758,7 +1821,7 @@ export default function ClientDetailPage() {
       </Dialog>
 
       {/* Edit Client Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <Dialog open={editDialogOpen} onOpenChange={(open) => void handleEditDialogOpenChange(open)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
@@ -2092,16 +2155,23 @@ export default function ClientDetailPage() {
               </Label>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveEdit} 
-              disabled={!editForm.name.trim() || !editForm.storyId.trim() || !editForm.storyVideoUrl.trim() || editSubmitting}
-            >
-              {editSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+          <DialogFooter className="sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">{editStatusMessage}</p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void handleEditDialogOpenChange(false)}
+                disabled={editSubmitting}
+              >
+                Close
+              </Button>
+              <Button 
+                onClick={handleSaveEdit}
+                disabled={!editCanSave || editSubmitting}
+              >
+                {editSubmitting ? 'Saving...' : 'Save now'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

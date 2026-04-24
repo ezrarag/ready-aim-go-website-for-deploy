@@ -78,7 +78,7 @@ export default function PricingPage() {
   const handleSubscribe = async (planId: string, stripePriceId: string) => {
     if (planId === 'free') {
       // Redirect to signup for free plan
-      window.location.href = 'https://clients.readyaimgo.biz/signup';
+      window.location.href = '/clients?intent=new';
       return;
     }
 
@@ -305,4 +305,3 @@ export default function PricingPage() {
     </div>
   );
 }
-

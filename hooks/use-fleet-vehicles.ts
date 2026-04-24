@@ -9,6 +9,10 @@ type UseFleetVehiclesOptions = {
 
 let seedRequest: Promise<void> | null = null
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError"
+}
+
 function ensureFleetSeeded() {
   if (!seedRequest) {
     seedRequest = fetch("/api/fleet/seed", {
@@ -68,6 +72,9 @@ export function useFleetVehicles(options: UseFleetVehiclesOptions = {}) {
         }
         setVehicles(nextVehicles)
       } catch (loadError) {
+        if (isAbortError(loadError) || abortController.signal.aborted) {
+          return
+        }
         console.error(loadError)
         if (!isMounted) {
           return
