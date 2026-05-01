@@ -33,6 +33,7 @@ import {
   FileText,
   Upload,
   CheckCircle,
+  CircleDollarSign,
   Clock,
   ExternalLink,
   Edit,
@@ -863,6 +864,12 @@ export default function ClientDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/clients/${encodeURIComponent(clientId)}/value-profile`}>
+                  <CircleDollarSign className="h-4 w-4 mr-2" />
+                  Value Profile
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSyncFromVercel}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Sync from Vercel

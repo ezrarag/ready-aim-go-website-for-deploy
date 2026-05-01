@@ -22,6 +22,8 @@ export type RAGService = {
   receiptUrl?: string
   notes?: string
   dependentProjects: string[]
+  clientIds?: string[]
+  clientCostAllocations?: Record<string, number>
   createdAt?: string
   updatedAt?: string
 }
@@ -50,6 +52,18 @@ const asNumber = (value: unknown, fallback = 0): number => {
 
 const asStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : []
+
+const asNumberMap = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, rawValue]) => [key.trim(), asNumber(rawValue)] as const)
+      .filter(([key, rawValue]) => key.length > 0 && Number.isFinite(rawValue) && rawValue >= 0)
+  )
+}
 
 function formatDateOnly(date: Date) {
   const year = date.getFullYear()
@@ -175,6 +189,8 @@ export function normalizeRAGService(
     receiptUrl: asString(raw.receiptUrl) || undefined,
     notes: asString(raw.notes) || undefined,
     dependentProjects: asStringArray(raw.dependentProjects),
+    clientIds: asStringArray(raw.clientIds),
+    clientCostAllocations: asNumberMap(raw.clientCostAllocations),
     createdAt: asTimestampString(raw.createdAt),
     updatedAt: asTimestampString(raw.updatedAt),
   }
@@ -384,6 +400,14 @@ export function readRAGServiceMutationFields(raw: Record<string, unknown>) {
 
   if (Array.isArray(raw.dependentProjects)) {
     patch.dependentProjects = asStringArray(raw.dependentProjects).map((project) => project.trim())
+  }
+
+  if (Array.isArray(raw.clientIds)) {
+    patch.clientIds = asStringArray(raw.clientIds).map((clientId) => clientId.trim())
+  }
+
+  if (raw.clientCostAllocations && typeof raw.clientCostAllocations === "object" && !Array.isArray(raw.clientCostAllocations)) {
+    patch.clientCostAllocations = asNumberMap(raw.clientCostAllocations)
   }
 
   return patch

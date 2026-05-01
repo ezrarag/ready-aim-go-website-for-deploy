@@ -1,50 +1,54 @@
 /**
  * /benefit/[slug] — RAG Employer Benefit Partner Portal
  *
- * A white-label landing page for any employer benefit RAG is piloting.
- * The slug maps to a config object below. Add new benefit partners here.
+ * White-label landing page for any employer benefit RAG is piloting.
+ * Fires page-view and CTA-click events to /api/page-events so the
+ * client portal can surface conversions.
  *
  * Current partners:
  *   /benefit/hroshi       — Maia's Bitcoin employer benefit (Hroshi)
- *   /benefit/wellness     — (placeholder for future wellness benefit)
  *
  * To add a new partner: add an entry to BENEFIT_CONFIGS below.
- * The page, steps, and CTA all update automatically.
  */
 
-import { notFound } from "next/navigation";
-import Link from "next/link";
+"use client"
 
-// ── Partner config — add new benefit partners here ───────────────────────────
+import { useEffect } from "react"
+import { useParams, notFound } from "next/navigation"
+import Link from "next/link"
+
+// ── Partner config ────────────────────────────────────────────────────────────
 
 type BenefitStep = {
-  number: string;
-  title: string;
-  description: string;
-};
+  number: string
+  title: string
+  description: string
+}
 
 type BenefitConfig = {
-  slug: string;
-  partnerName: string;
-  partnerUrl: string;
-  tagline: string;
-  headline: string;
-  subheadline: string;
-  whatItIs: string;
-  employerValue: string[];
-  employeeValue: string[];
-  pilotPricing: string;
-  pilotNote: string;
-  steps: BenefitStep[];
-  ctaLabel: string;
-  ctaUrl: string;
-  builtByRAG: boolean;
-  accentColor: string; // Tailwind color class stem e.g. "amber" "teal" "purple"
-};
+  slug: string
+  clientId: string          // Firestore client doc ID — used for event tracking
+  partnerName: string
+  partnerUrl: string
+  tagline: string
+  headline: string
+  subheadline: string
+  whatItIs: string
+  employerValue: string[]
+  employeeValue: string[]
+  pilotPricing: string
+  pilotNote: string
+  steps: BenefitStep[]
+  ctaLabel: string
+  ctaUrl: string
+  builtByRAG: boolean
+  accentColor: string
+}
 
 const BENEFIT_CONFIGS: Record<string, BenefitConfig> = {
   hroshi: {
     slug: "hroshi",
+    clientId: "hroshi",   // update to actual Firestore client doc ID if different
     partnerName: "Hroshi",
     partnerUrl: "https://hroshi.com",
     tagline: "Employee Bitcoin Benefit",
@@ -114,33 +118,60 @@ const BENEFIT_CONFIGS: Record<string, BenefitConfig> = {
   },
 
   // ── Add future benefit partners below ──────────────────────────────────────
-  // wellness: {
-  //   slug: "wellness",
-  //   partnerName: "...",
-  //   ...
-  // },
-};
-
-// ── Page ─────────────────────────────────────────────────────────────────────
-
-export async function generateStaticParams() {
-  return Object.keys(BENEFIT_CONFIGS).map((slug) => ({ slug }));
+  // wellness: { slug: "wellness", clientId: "...", partnerName: "...", ... },
 }
 
-export default function BenefitPartnerPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const config = BENEFIT_CONFIGS[params.slug];
-  if (!config) notFound();
+// ── Event helper ──────────────────────────────────────────────────────────────
 
-  const accent = config.accentColor; // e.g. "amber"
+async function fireEvent(
+  clientId: string,
+  slug: string,
+  event: "view" | "cta_click" | "contact_click"
+) {
+  try {
+    await fetch("/api/page-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageType: "benefit",
+        slug,
+        clientId,
+        event,
+        metadata: { referrer: document.referrer },
+      }),
+    })
+  } catch {
+    // Non-blocking — never let analytics break the page
+  }
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function BenefitPartnerPage() {
+  const params = useParams<{ slug: string }>()
+  const config = BENEFIT_CONFIGS[params.slug]
+
+  if (!config) notFound()
+
+  const accent = config.accentColor
+
+  // Fire view event once on mount
+  useEffect(() => {
+    fireEvent(config.clientId, config.slug, "view")
+  }, [config.clientId, config.slug])
+
+  const handleCtaClick = () => {
+    fireEvent(config.clientId, config.slug, "cta_click")
+  }
+
+  const handleContactClick = () => {
+    fireEvent(config.clientId, config.slug, "contact_click")
+  }
 
   return (
     <div className="min-h-screen bg-white">
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      {/* ── Hero ────────────────────────────────────────────────────────── */}
       <section className={`py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-${accent}-50 to-${accent}-100`}>
         <div className="max-w-4xl mx-auto">
           <p className={`text-sm font-semibold uppercase tracking-widest text-${accent}-700 mb-4`}>
@@ -157,12 +188,14 @@ export default function BenefitPartnerPage({
               href={config.ctaUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleCtaClick}
               className={`inline-flex items-center gap-2 bg-${accent}-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-${accent}-700 transition-colors`}
             >
               {config.ctaLabel} →
             </a>
             <Link
               href="/contact"
+              onClick={handleContactClick}
               className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-8 py-4 rounded-full font-semibold text-lg hover:border-gray-400 transition-colors"
             >
               Talk to ReadyAimGo first
@@ -171,7 +204,7 @@ export default function BenefitPartnerPage({
         </div>
       </section>
 
-      {/* ── What it is ────────────────────────────────────────────────────── */}
+      {/* ── What it is ──────────────────────────────────────────────────── */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">What {config.partnerName} actually is</h2>
@@ -179,7 +212,7 @@ export default function BenefitPartnerPage({
         </div>
       </section>
 
-      {/* ── Value props: employer + employee ──────────────────────────────── */}
+      {/* ── Value props ─────────────────────────────────────────────────── */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-900 mb-10 text-center">What everyone gets</h2>
@@ -210,13 +243,13 @@ export default function BenefitPartnerPage({
         </div>
       </section>
 
-      {/* ── Step-by-step flow ──────────────────────────────────────────────── */}
+      {/* ── Steps ───────────────────────────────────────────────────────── */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">How the pilot works</h2>
           <p className="text-center text-gray-500 mb-12">From handshake to active benefit — six steps.</p>
           <div className="space-y-6">
-            {config.steps.map((step, i) => (
+            {config.steps.map((step) => (
               <div key={step.number} className="flex gap-6 items-start">
                 <div className={`shrink-0 w-12 h-12 rounded-full bg-${accent}-100 flex items-center justify-center`}>
                   <span className={`text-sm font-bold text-${accent}-700`}>{step.number}</span>
@@ -231,7 +264,7 @@ export default function BenefitPartnerPage({
         </div>
       </section>
 
-      {/* ── Pricing ───────────────────────────────────────────────────────── */}
+      {/* ── Pricing ─────────────────────────────────────────────────────── */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Pilot pricing</p>
@@ -241,13 +274,14 @@ export default function BenefitPartnerPage({
             href={config.ctaUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={handleCtaClick}
             className={`inline-flex items-center gap-2 bg-${accent}-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-${accent}-700 transition-colors`}
           >
             {config.ctaLabel} →
           </a>
           <p className="mt-4 text-sm text-gray-400">
             Or{" "}
-            <Link href="/contact" className="underline hover:text-gray-600">
+            <Link href="/contact" onClick={handleContactClick} className="underline hover:text-gray-600">
               contact ReadyAimGo
             </Link>{" "}
             — we'll make the introduction.
@@ -255,7 +289,7 @@ export default function BenefitPartnerPage({
         </div>
       </section>
 
-      {/* ── Built by RAG attribution ───────────────────────────────────────── */}
+      {/* ── RAG attribution ─────────────────────────────────────────────── */}
       {config.builtByRAG && (
         <section className="py-10 px-4 sm:px-6 lg:px-8 border-t border-gray-100">
           <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-4">
@@ -280,5 +314,5 @@ export default function BenefitPartnerPage({
         </section>
       )}
     </div>
-  );
+  )
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getContributionBySessionId, createContribution } from '@/lib/firestore'
+import { handleValueProfileCheckoutCompleted } from '@/lib/value-profile-payments'
 
 export async function POST(req: NextRequest) {
   // Check environment variables at runtime, not build time
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' })
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
   
   const sig = req.headers.get('stripe-signature')
   const body = await req.text()
@@ -25,6 +26,14 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
+
+    if (session.metadata?.purpose === 'value_profile_payment') {
+      try {
+        await handleValueProfileCheckoutCompleted(session)
+      } catch (error) {
+        console.error('Error processing value profile payment:', error)
+      }
+    }
     
     // Handle partner contributions (fleet_contribution)
     if (session.metadata?.purpose === 'fleet_contribution') {
@@ -77,4 +86,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
-

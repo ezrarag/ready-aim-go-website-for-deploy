@@ -2,14 +2,19 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
 import { useTheme } from "next-themes"
 import {
   Bell,
   Building2,
+  CalendarDays,
+  DollarSign,
   Globe,
   LayoutDashboard,
+  Loader2,
   Menu,
+  MessageSquare,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,7 +31,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { ADMIN_NAV_ITEMS, CLIENT_SECTION_ITEMS, type AdminNavItem } from "@/lib/admin-navigation"
+import { ADMIN_NAV_ITEMS, type AdminNavItem } from "@/lib/admin-navigation"
+import { isAdminRoute } from "@/lib/auth-routes"
+import { ensureAuthPersistence } from "@/lib/firebase-client"
+import { useUserWithRole } from "@/hooks/use-user-with-role"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -40,8 +48,14 @@ function getNavIcon(itemId: string) {
       return Users
     case "web-development":
       return Globe
-    case "infra-services":
+    case "operations-systems":
       return Server
+    case "calendar":
+      return CalendarDays
+    case "finance":
+      return DollarSign
+    case "comms":
+      return MessageSquare
     case "transportation":
       return Truck
     case "real-estate":
@@ -73,6 +87,34 @@ function SidebarLinks({
   collapsed: boolean
   onNavigate?: () => void
 }) {
+  const renderChildLinks = (item: AdminNavItem) => {
+    if (collapsed || !item.children?.length) {
+      return null
+    }
+
+    return (
+      <div className="ml-8 space-y-1 border-l border-border pl-3">
+        {item.children.map((child) => {
+          const childActive = isItemActive(pathname, child.href)
+          return (
+            <Link
+              key={child.id}
+              href={child.href}
+              onClick={onNavigate}
+              className={`block rounded-md px-2 py-1.5 text-xs transition-colors ${
+                childActive
+                  ? "bg-orange-500/15 text-orange-400"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              {child.label}
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <nav className="flex-1 space-y-2 px-2 py-4">
       {ADMIN_NAV_ITEMS.map((item) => {
@@ -95,27 +137,7 @@ function SidebarLinks({
               {!collapsed ? item.label : null}
             </Link>
 
-            {!collapsed && item.id === "clients" ? (
-              <div className="ml-8 space-y-1 border-l border-border pl-3">
-                {CLIENT_SECTION_ITEMS.map((child) => {
-                  const childActive = isItemActive(pathname, child.href)
-                  return (
-                    <Link
-                      key={child.id}
-                      href={child.href}
-                      onClick={onNavigate}
-                      className={`block rounded-md px-2 py-1.5 text-xs transition-colors ${
-                        childActive
-                          ? "bg-orange-500/15 text-orange-400"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      }`}
-                    >
-                      {child.label}
-                    </Link>
-                  )
-                })}
-              </div>
-            ) : null}
+            {renderChildLinks(item)}
           </div>
         )
       })}
@@ -128,11 +150,73 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
+  const { session, loading: authLoading, error: authError } = useUserWithRole()
+  const requiresAdmin = isAdminRoute(pathname)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!requiresAdmin || authLoading) {
+      return
+    }
+
+    const redirectToLogin = () => {
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`)
+    }
+
+    if (!session) {
+      redirectToLogin()
+      return
+    }
+
+    if (session.profile?.role !== "admin") {
+      ;(async () => {
+        const auth = await ensureAuthPersistence()
+        await signOut(auth)
+        redirectToLogin()
+      })()
+    }
+  }, [authLoading, pathname, requiresAdmin, router, session])
+
+  if (requiresAdmin && authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Checking administrator access...
+        </div>
+      </div>
+    )
+  }
+
+  if (requiresAdmin && authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <div className="max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
+          <h1 className="text-lg font-semibold">Unable to check access</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{authError}</p>
+          <Button className="mt-4" asChild>
+            <Link href={`/login?redirect=${encodeURIComponent(pathname)}`}>Go to login</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (requiresAdmin && (!session || session.profile?.role !== "admin")) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Redirecting to administrator login...
+        </div>
+      </div>
+    )
+  }
 
   const isDark = mounted && resolvedTheme === "dark"
 

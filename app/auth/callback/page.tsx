@@ -6,12 +6,11 @@ import { getRedirectResult, signOut } from "firebase/auth"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { ensureAuthPersistence, getClientUserProfile } from "@/lib/firebase-client"
-
-const DEFAULT_REDIRECT = "/dashboard/transportation"
+import { DEFAULT_ADMIN_REDIRECT, isAdminRoute } from "@/lib/auth-routes"
 
 function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   const requested = searchParams.get("redirect")
-  return requested && requested.startsWith("/") ? requested : DEFAULT_REDIRECT
+  return requested && requested.startsWith("/") ? requested : DEFAULT_ADMIN_REDIRECT
 }
 
 export default function AuthCallbackPage() {
@@ -34,7 +33,7 @@ export default function AuthCallbackPage() {
           return
         }
 
-        if (redirectTarget.startsWith("/admin")) {
+        if (isAdminRoute(redirectTarget)) {
           const profile = await getClientUserProfile(currentUser.uid)
           if (profile?.role !== "admin") {
             await signOut(auth)

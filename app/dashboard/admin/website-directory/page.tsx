@@ -1,10 +1,5 @@
-import DashboardLayout from "@/components/dashboard-layout"
-import { VercelSyncPanel } from "@/components/admin/vercel-sync-panel"
+import { redirect } from "next/navigation"
 
 export default function AdminWebsiteDirectoryPage() {
-  return (
-    <DashboardLayout>
-      <VercelSyncPanel />
-    </DashboardLayout>
-  )
+  redirect("/dashboard/clients/vercel-sync")
 }

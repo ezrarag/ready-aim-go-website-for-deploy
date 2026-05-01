@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Download
+  Download,
+  CheckCircle
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard-layout';
 

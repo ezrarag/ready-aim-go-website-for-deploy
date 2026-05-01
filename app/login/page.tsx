@@ -22,9 +22,7 @@ import {
   ensureAuthPersistence,
   getClientUserProfile,
 } from "@/lib/firebase-client"
-
-const DEFAULT_ADMIN_REDIRECT = "/dashboard/transportation"
-const DEFAULT_CLIENT_REDIRECT = "/dashboard/client"
+import { DEFAULT_ADMIN_REDIRECT, DEFAULT_CLIENT_REDIRECT, isAdminRoute } from "@/lib/auth-routes"
 
 type LoginPortalMode = "admin" | "client"
 
@@ -64,7 +62,7 @@ function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
 }
 
 function targetRequiresAdmin(redirectTarget: string) {
-  return redirectTarget.startsWith("/admin")
+  return isAdminRoute(redirectTarget)
 }
 
 async function assertAuthorized(auth: Auth, uid: string, redirectTarget: string) {
