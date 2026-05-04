@@ -6,6 +6,7 @@
     "build": "next build",
     "build:extension": "node scripts/buildReadyaimgoDevtoolsExtension.mjs",
     "dev": "next dev",
+    "firebase:seed-admin": "node scripts/upsert-firestore-admin-user.mjs",
     "lint": "next lint",
     "start": "next start"
   },

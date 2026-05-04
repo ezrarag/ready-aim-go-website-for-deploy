@@ -28,9 +28,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
 import Stripe from "stripe"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2024-06-20",
-})
+function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY is required to create payment links.")
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: "2024-06-20",
+  })
+}
 
 // ── Intent classification via Claude API ─────────────────────────────────────
 
@@ -110,6 +117,8 @@ async function handlePaymentIntent(
   let paymentLink: string
 
   if (amount && amount > 0) {
+    const stripe = getStripeClient()
+
     // Create a Stripe Price and Payment Link for the specific amount
     const price = await stripe.prices.create({
       currency: "usd",
