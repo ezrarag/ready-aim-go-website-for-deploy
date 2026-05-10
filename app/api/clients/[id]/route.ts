@@ -85,6 +85,9 @@ export async function PATCH(
       "appStoreConnectSku", "appStoreConnectVersionString", "appStoreConnectBuildNumber",
       "appStoreConnectBuildState", "appStoreConnectBetaGroups", "appStoreConnectUpdatedAt",
       "rdUrl", "housingUrl", "transportationUrl", "insuranceUrl",
+      // ── Public profile ─────────────────────────────────────────────────────
+      // Full object replace. Callers should fetch → merge locally → send back.
+      "publicProfile",
     ] as const
     const updates: Record<string, unknown> = {}
     for (const key of allowed) {

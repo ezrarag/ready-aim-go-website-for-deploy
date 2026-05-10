@@ -38,3 +38,19 @@ export function isInternalMutationAuthorized(
 
   return hasSameOriginHeaders(request)
 }
+
+/**
+ * Read authorization for internal/admin GET routes.
+ * Accepts the same API-key header as mutations OR same-origin requests.
+ * Keeping this separate so read vs. write permissions can diverge later.
+ */
+export function isInternalReadAuthorized(
+  request: Pick<NextRequest, "headers" | "nextUrl">
+): boolean {
+  const expectedKey = getInternalMutationApiKey()
+  if (expectedKey && isBeamRequestAuthorized(request, expectedKey)) {
+    return true
+  }
+
+  return hasSameOriginHeaders(request)
+}

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Globe, Smartphone, FlaskConical, Building2, Truck, Shield, ArrowRight } from "lucide-react"
 import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
 import { getDefaultModules } from "@/lib/client-directory"
+import { resolveDisplayName } from "@/lib/types/client-public-profile"
 
 interface StoryOverlayProps {
   isOpen: boolean
@@ -84,13 +85,25 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
   const storyCards: StoryCard[] = moduleKeys.map((key) => {
     const staticCard = allStoryCards.find((c) => c.id === (moduleKeyToCardId[key] ?? key)) ?? allStoryCards[0]
     const mod = modules[key]
+    // Prefer a matching publicProfile.services entry (by category = module key)
+    const serviceEntry = client?.publicProfile?.services?.find((s) => s.available && s.category === key)
+    const description =
+      serviceEntry?.description ?? mod?.overview ?? staticCard.description
     return {
       ...staticCard,
       id: key,
       title: moduleTitles[key] ?? key.toUpperCase(),
-      description: mod?.overview ?? staticCard.description,
+      description,
     }
   })
+
+  // Resolved identity/taxonomy from publicProfile (with fallbacks)
+  const displayName = client ? resolveDisplayName(client.name, client.publicProfile) : null
+  const tagline = client?.publicProfile?.identity?.tagline
+  const taxonomyPills = [
+    ...(client?.publicProfile?.taxonomy?.industry ? [client.publicProfile.taxonomy.industry] : []),
+    ...(client?.publicProfile?.taxonomy?.services ?? []).slice(0, 3),
+  ]
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -158,11 +171,27 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
               {/* Title - tighter on mobile */}
               <div className="mb-4 md:mb-8 shrink-0">
                 <h2 className="text-3xl sm:text-4xl md:text-7xl font-bold text-white mb-1 md:mb-2">
-                  STORY{client?.name ? `: ${client.name.toUpperCase()}` : ""}
+                  STORY{displayName ? `: ${displayName.toUpperCase()}` : ""}
                 </h2>
-                <p className="text-white/60 text-sm md:text-lg">Select an area to explore</p>
+                {/* tagline from publicProfile.identity, or generic fallback */}
+                <p className="text-white/60 text-sm md:text-lg">
+                  {tagline ?? "Select an area to explore"}
+                </p>
                 {currentStory && (
                   <p className="text-white/40 text-xs md:text-sm mt-0.5 md:mt-1 uppercase">Story: {currentStory}</p>
+                )}
+                {/* taxonomy pills — industry + up to 3 service labels */}
+                {taxonomyPills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {taxonomyPills.map((pill) => (
+                      <span
+                        key={pill}
+                        className="px-2 py-0.5 rounded-full bg-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"
+                      >
+                        {pill}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
 

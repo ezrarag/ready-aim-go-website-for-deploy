@@ -47,7 +47,23 @@ export function getFirestoreDb(): Firestore | null {
     }
 
     if (!app) {
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      // ── Security guard ────────────────────────────────────────────────────────
+      // NEXT_PUBLIC_ vars are inlined into client bundles. A private key must
+      // NEVER carry that prefix. Fail loudly so the misconfiguration is caught
+      // at startup rather than silently leaking credentials to the browser.
+      if (process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY) {
+        console.error(
+          "[SECURITY] NEXT_PUBLIC_FIREBASE_PRIVATE_KEY is set. Firebase Admin private keys " +
+          "must use a server-only variable (FIREBASE_PRIVATE_KEY or FIREBASE_ADMIN_PRIVATE_KEY). " +
+          "Remove NEXT_PUBLIC_FIREBASE_PRIVATE_KEY from your environment immediately."
+        )
+        return null
+      }
+
+      // Prefer the server-only FIREBASE_PROJECT_ID; fall back to the public var
+      // for backward compatibility with existing deployments.
+      const projectId =
+        process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
       const clientEmail =
         process.env.FIREBASE_CLIENT_EMAIL ||
         process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
@@ -59,7 +75,8 @@ export function getFirestoreDb(): Firestore | null {
       // Validate required fields - return null instead of throwing during build time
       if (!projectId || !clientEmail || !privateKey) {
         console.warn(
-          "Firebase Admin credentials are incomplete. Set FIREBASE_SERVICE_ACCOUNT_KEY to valid JSON or provide NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL/FIREBASE_AMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY."
+          "Firebase Admin credentials are incomplete. Set FIREBASE_SERVICE_ACCOUNT_KEY to valid JSON, " +
+          "or set FIREBASE_PROJECT_ID (server-only), FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY."
         )
         return null
       }
@@ -107,11 +124,11 @@ export function getStorageBucket(): ReturnType<ReturnType<typeof import("firebas
   if (getApps().length === 0) return null
   try {
     const { getStorage } = require("firebase-admin/storage") as typeof import("firebase-admin/storage")
+    const projectId =
+      process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
     const bucketName =
       process.env.FIREBASE_STORAGE_BUCKET ||
-      (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-        ? `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.appspot.com`
-        : null)
+      (projectId ? `${projectId}.appspot.com` : null)
     if (!bucketName) return null
     return getStorage().bucket(bucketName)
   } catch {

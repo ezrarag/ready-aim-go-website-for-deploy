@@ -6,11 +6,16 @@ import { Toaster } from "@/components/ui/toaster"
 import { Toaster as Sonner } from "@/components/ui/sonner"
 import { NotificationProvider } from "@/contexts/notification-context"
 import { ThemeProvider } from "@/components/theme-provider"
-import RagDevtoolsBridge from "@/components/RagDevtoolsBridge"
-import { logRagDevtoolsFirebaseConfigValidation } from "@/lib/devtools/publicConfig"
+import {
+  formatRagDevtoolsFirebaseConfigValidation,
+  getRagDevtoolsFirebaseConfigValidation,
+  hasRagDevtoolsFirebaseConfig,
+  logRagDevtoolsFirebaseConfigValidation,
+  ragDevtoolsFirebaseConfig,
+} from "@/lib/devtools/publicConfig"
 
 const inter = Inter({ subsets: ["latin"] })
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] })
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" })
 
 export const metadata: Metadata = {
   title: "ReadyAimGo - C-Suite-as-a-Service Platform",
@@ -32,6 +37,67 @@ export const metadata: Metadata = {
   generator: 'v0.dev'
 }
 
+function escapeScriptJson(value: unknown) {
+  return (JSON.stringify(value) ?? "null").replace(/</g, "\\u003c")
+}
+
+function createRagDevtoolsBridgeScript() {
+  const validation = getRagDevtoolsFirebaseConfigValidation()
+  const warning = validation.isValid ? "" : formatRagDevtoolsFirebaseConfigValidation(validation)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+
+  return `
+(() => {
+  const config = ${escapeScriptJson(hasRagDevtoolsFirebaseConfig() ? ragDevtoolsFirebaseConfig : null)};
+  const appUrl = ${escapeScriptJson(appUrl && appUrl !== "undefined" ? appUrl : "")};
+  const validationWarning = ${escapeScriptJson(warning)};
+
+  if (validationWarning && !window.__RAG_FIREBASE_ENV_LOGGED_CLIENT__) {
+    window.__RAG_FIREBASE_ENV_LOGGED_CLIENT__ = true;
+    console.error("[RAG Firebase Env][client] " + validationWarning);
+  }
+
+  const sync = () => {
+    window.__RAG_PAGE_DEBUG__ = {
+      siteSlug: "readyaimgo",
+      displayName: "Ready Aim Go",
+      domain: window.location.hostname,
+      origin: window.location.origin,
+      appUrl: appUrl || null,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      checklistCollection: "devChecklists",
+      devtoolsProjectId: config?.NEXT_PUBLIC_BEAM_DEVTOOLS_FIREBASE_PROJECT_ID || null,
+      entryChannel: "readyaimgo-devtools",
+      googleDriveFolderSwitcherEnabled: true,
+    };
+    window.__RAG_DEVTOOLS_CONFIG__ = config ? { ...config } : null;
+  };
+
+  sync();
+
+  if (window.__RAG_DEVTOOLS_BRIDGE_INSTALLED__) {
+    return;
+  }
+
+  window.__RAG_DEVTOOLS_BRIDGE_INSTALLED__ = true;
+  const push = window.history.pushState.bind(window.history);
+  const replace = window.history.replaceState.bind(window.history);
+
+  window.history.pushState = (...args) => {
+    push(...args);
+    sync();
+  };
+  window.history.replaceState = (...args) => {
+    replace(...args);
+    sync();
+  };
+  window.addEventListener("popstate", sync);
+  window.addEventListener("hashchange", sync);
+})();
+`
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -44,7 +110,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} ${jetbrainsMono.variable}`}>
-        {process.env.NODE_ENV === "development" ? <RagDevtoolsBridge /> : null}
+        {process.env.NODE_ENV === "development" ? (
+          <script
+            id="rag-devtools-bridge"
+            dangerouslySetInnerHTML={{ __html: createRagDevtoolsBridgeScript() }}
+          />
+        ) : null}
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

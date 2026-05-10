@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAllClientDirectoryEntries, createClientDocument } from "@/lib/firestore"
 import { getDefaultModules } from "@/lib/client-directory"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { provisionClientPortalAccess } from "@/lib/provision-client-portal"
 
 export async function GET() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? null
@@ -50,13 +51,18 @@ export async function POST(request: NextRequest) {
     const name = typeof body.name === "string" ? body.name.trim() : ""
     const storyId = typeof body.storyId === "string" ? body.storyId.trim() : ""
     const storyVideoUrl = typeof body.storyVideoUrl === "string" ? body.storyVideoUrl.trim() : ""
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
+
     if (!name || !storyId || !storyVideoUrl) {
       return NextResponse.json(
         { success: false, error: "name, storyId, and storyVideoUrl are required" },
         { status: 400 }
       )
     }
+
     const modules = body.modules ?? getDefaultModules()
+
+    // 1. Create the client document in the clients collection
     const id = await createClientDocument({
       name,
       storyId,
@@ -74,7 +80,40 @@ export async function POST(request: NextRequest) {
       status: body.status ?? "onboarding",
       modules,
     })
-    return NextResponse.json({ success: true, id })
+
+    // 2. Auto-provision portal access if email was provided
+    let portalProvisioned = false
+    let portalResult = null
+
+    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      try {
+        portalResult = await provisionClientPortalAccess({
+          clientId: id,
+          clientName: name,
+          email,
+          clientSlug: storyId,
+          deliverables: Array.isArray(body.deliverables) ? body.deliverables : [],
+          addedBy: "auto-provision-on-create",
+        })
+        portalProvisioned = true
+      } catch (portalError) {
+        // Non-fatal — client is created, portal provisioning failed
+        // Admin can manually provision from the client detail page
+        console.error("[clients POST] Portal provisioning failed:", portalError)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      id,
+      portalProvisioned,
+      portalResult,
+      message: portalProvisioned
+        ? `Client created and portal access granted to ${email}`
+        : email
+          ? `Client created — portal provisioning failed, use the Invite to Portal button on the client detail page`
+          : `Client created — add email later to grant portal access`,
+    })
   } catch (error) {
     return NextResponse.json(
       {

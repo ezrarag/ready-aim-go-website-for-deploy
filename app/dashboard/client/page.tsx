@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +21,7 @@ import {
   Star,
   Bell,
   ChevronRight,
+  LayoutDashboard,
   Monitor,
   Settings,
   Shield,
@@ -76,28 +78,32 @@ import { FirstTimeUserPopup } from "@/components/first-time-user-popup"
 
 function ClientDashboardContent() {
   const { session, loading, error } = useUserWithRole();
-  const { stats: clientStats, loading: statsLoading, error: statsError } = useClientStats(session?.user?.id);
+  // Use the canonical Firestore clientId (not the Firebase UID) for all
+  // data hooks. session.activeClientId is resolved from users/{uid}.memberships
+  // or users/{uid}.client_id by useUserWithRole → getClientUserProfile.
+  const clientId = session?.activeClientId ?? undefined;
+  const { stats: clientStats, loading: statsLoading, error: statsError } = useClientStats(clientId);
   const { operators, loading: operatorsLoading, error: operatorsError } = useOperators();
-  const { projects: clientProjects, loading: projectsLoading, error: projectsError } = useClientProjects(session?.user?.id);
-  const { website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(session?.user?.id);
-  const { commissionRate, loading: commissionLoading, error: commissionError, updateCommissionRate } = useCommissionRate(session?.user?.id);
-  const { revenueData, loading: revenueLoading, error: revenueError } = useRevenueData(session?.user?.id);
-  const { activities: activityLog, loading: activityLoading, error: activityError } = useActivityLog(session?.user?.id);
-  const { missions, stats: missionStats, loading: missionsLoading, error: missionsError, createMission } = useMissions(session?.user?.id);
-  const { 
-    listings: marketplaceListings, 
-    categories: marketplaceCategories, 
-    myListings, 
-    bookmarks, 
-    userAccess: marketplaceAccess, 
-    loading: marketplaceLoading, 
+  const { projects: clientProjects, loading: projectsLoading, error: projectsError } = useClientProjects(clientId);
+  const { website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(clientId);
+  const { commissionRate, loading: commissionLoading, error: commissionError, updateCommissionRate } = useCommissionRate(clientId);
+  const { revenueData, loading: revenueLoading, error: revenueError } = useRevenueData(clientId);
+  const { activities: activityLog, loading: activityLoading, error: activityError } = useActivityLog(clientId);
+  const { missions, stats: missionStats, loading: missionsLoading, error: missionsError, createMission } = useMissions(clientId);
+  const {
+    listings: marketplaceListings,
+    categories: marketplaceCategories,
+    myListings,
+    bookmarks,
+    userAccess: marketplaceAccess,
+    loading: marketplaceLoading,
     error: marketplaceError,
     createListing,
     updateListing,
     deleteListing,
     toggleBookmark,
     recordInteraction
-  } = useMarketplace(session?.user?.id);
+  } = useMarketplace(clientId);
   const [activeSection, setActiveSection] = useState("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -105,12 +111,12 @@ function ClientDashboardContent() {
   const [showNewOperatorModal, setShowNewOperatorModal] = useState(false);
   const [showMissionDropdown, setShowMissionDropdown] = useState(false);
   const [selectedMissionCategory, setSelectedMissionCategory] = useState<string | null>(null);
-  
+
   // First-time user popup state
   const [showFirstTimePopup, setShowFirstTimePopup] = useState(false);
   const [userBusinessAssets, setUserBusinessAssets] = useState<any[]>([]);
   const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
-  
+
   // Marketplace State
   const [showAddListingModal, setShowAddListingModal] = useState(false);
   const [showListingDetailModal, setShowListingDetailModal] = useState(false);
@@ -167,7 +173,7 @@ function ClientDashboardContent() {
 
   // Commission Rate Modal State
   const [showCommissionModal, setShowCommissionModal] = useState(false);
-  
+
   // Integration Panel State
   const [financesEnabled, setFinancesEnabled] = useState(false);
   const [chatbotEnabled, setChatbotEnabled] = useState(false);
@@ -254,6 +260,29 @@ function ClientDashboardContent() {
     window.location.href = "/api/logout"
   };
 
+  // ── Revocation guard ──────────────────────────────────────────────────────
+  // After the session resolves, verify portal access is still active by calling
+  // /api/portal/me. A 401 means ragAllowlist.active=false or no membership —
+  // redirect to the no-access page immediately.
+  const router = useRouter()
+  useEffect(() => {
+    if (loading || !session?.user) return
+    // If session resolved but no canonical clientId exists, the user is not a
+    // provisioned portal client — redirect to the no-access page.
+    if (!clientId) {
+      router.replace("/no-access")
+      return
+    }
+    // Verify with the server (catches ragAllowlist.active=false revocations
+    // even if the local session looks valid).
+    import("@/lib/portal-client").then(({ portalFetch }) => {
+      portalFetch("/api/portal/me").catch(() => {
+        document.cookie = "portal_revoked=1; path=/"
+        router.replace("/no-access")
+      })
+    })
+  }, [loading, session?.user, clientId, router])
+
   useEffect(() => {
     if (!session?.user) return
     // TODO: client todos from Firestore
@@ -323,7 +352,7 @@ function ClientDashboardContent() {
               color: 'text-yellow-500'
             }
           ];
-          
+
           // If user has existing business assets from profile, use those
           if (profile?.business_assets && profile.business_assets.length > 0) {
             setUserBusinessAssets(profile.business_assets);
@@ -332,7 +361,7 @@ function ClientDashboardContent() {
             // Use the initialized assets with existing data
             console.log('Initial business assets:', initialBusinessAssets);
             setUserBusinessAssets(initialBusinessAssets);
-            
+
             // Check if any assets are completed
             const hasAnyCompleted = initialBusinessAssets.some(asset => asset.status === 'completed');
             console.log('Has any completed assets:', hasAnyCompleted);
@@ -349,7 +378,7 @@ function ClientDashboardContent() {
         }
       }
     };
-    
+
     checkFirstTimeUser();
   }, [session?.user?.id]);
 
@@ -493,9 +522,9 @@ function ClientDashboardContent() {
                     </div>
                     <div className="text-sm text-neutral-300">
                       <span className="text-orange-500 font-mono">
-                        {item.type === 'payment' ? '💰' : 
-                         item.type === 'commission' ? '📈' : 
-                         item.type === 'project' ? '🎯' : 
+                        {item.type === 'payment' ? '💰' :
+                         item.type === 'commission' ? '📈' :
+                         item.type === 'project' ? '🎯' :
                          item.type === 'system' ? '⚙️' : 'Agent'} {item.title}
                       </span>
                       {item.description && (
@@ -536,7 +565,7 @@ function ClientDashboardContent() {
                 <div className="text-blue-500">{'>'} CH#2 | {Math.random().toString().slice(2, 15)} ...xR3</div>
                 <div className="text-green-500">{'>'} KEY LOCKED</div>
                 <div className="text-neutral-300">{'>'} MSG {'>>'} "...mission override initiated ... awaiting delta node clearance"</div>
-                
+
                 {/* AI Assistant Messages */}
                 {revenueData.total_revenue > 0 && (
                   <div className="text-blue-500 mt-4">
@@ -565,7 +594,7 @@ function ClientDashboardContent() {
         </CardContent>
       </Card>
 
-      
+
 
       {/* Integration Panel */}
       <Card className="bg-neutral-800 border-gray-200 h-[400px]">
@@ -601,7 +630,7 @@ function ClientDashboardContent() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div 
+                <div
                   className={`w-12 h-6 rounded-full transition-colors cursor-pointer ${
                     financesEnabled ? 'bg-green-500' : 'bg-neutral-600'
                   }`}
@@ -624,7 +653,7 @@ function ClientDashboardContent() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div 
+                <div
                   className={`w-12 h-6 rounded-full transition-colors cursor-pointer ${
                     chatbotEnabled ? 'bg-green-500' : 'bg-neutral-600'
                   }`}
@@ -707,7 +736,7 @@ function ClientDashboardContent() {
           {/* Mission Categories */}
           <div className="space-y-3">
             <div className="text-sm font-medium text-neutral-300 mb-3">Available Mission Types:</div>
-            
+
             {/* Website Mission */}
             <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200 hover:border-blue-500/50 transition-colors">
               <div className="flex items-center gap-3">
@@ -717,8 +746,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Build or improve websites</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -735,8 +764,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Mobile and web applications</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -753,8 +782,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Strategic planning and analysis</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -771,8 +800,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Property and investment planning</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -789,8 +818,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Logistics and mobility solutions</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-red-600 hover:bg-red-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -807,8 +836,8 @@ function ClientDashboardContent() {
                   <div className="text-xs text-neutral-500">Compliance and documentation</div>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-yellow-600 hover:bg-yellow-700 text-white"
                 onClick={() => setShowNewMissionModal(true)}
               >
@@ -828,7 +857,7 @@ function ClientDashboardContent() {
                 <div className="text-xs text-neutral-500">Automated analysis and planning</div>
               </div>
             </div>
-            <Button 
+            <Button
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
               onClick={() => {
                 // TODO: Implement AI assessment modal
@@ -877,11 +906,11 @@ function ClientDashboardContent() {
                   ))}
                 </div>
               </div>
-              
+
               {/* Chat Input */}
               <form onSubmit={handleChatSubmit} className="flex gap-2">
-                <Input 
-                  placeholder="Type your message..." 
+                <Input
+                  placeholder="Type your message..."
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
                   className="flex-1 bg-neutral-700 border-neutral-600 text-neutral-300 placeholder-neutral-400"
@@ -890,19 +919,19 @@ function ClientDashboardContent() {
                   <MessageSquare className="h-4 w-4" />
                 </Button>
               </form>
-              
+
               {/* Quick Actions */}
               <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
                 >
                   <Globe className="h-4 w-4 mr-2" />
                   Analyze Website
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600"
                 >
@@ -947,7 +976,7 @@ function ClientDashboardContent() {
               </Button>
             </div>
             <div className="relative">
-              <Button 
+              <Button
                 onClick={() => setShowMissionDropdown(!showMissionDropdown)}
                 onMouseEnter={() => setShowMissionDropdown(true)}
                 className="bg-orange-600 hover:bg-orange-700"
@@ -955,16 +984,16 @@ function ClientDashboardContent() {
                 <Plus className="h-4 w-4 mr-2" />
                 New Mission
               </Button>
-              
+
               {/* Mission Category Dropdown */}
               {showMissionDropdown && (
-                <div 
+                <div
                   className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50"
                   onMouseLeave={() => setShowMissionDropdown(false)}
                 >
                   <div className="p-2">
                     <div className="text-xs text-neutral-500 font-mono mb-2 px-2">SELECT MISSION TYPE:</div>
-                    
+
                     {/* Website Mission */}
                     <button
                       onClick={() => {
@@ -1116,7 +1145,7 @@ function ClientDashboardContent() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{mission.description}</p>
-                    
+
                     <div className="space-y-2">
                       {mission.budget && (
                         <div className="flex items-center justify-between text-xs">
@@ -1124,19 +1153,19 @@ function ClientDashboardContent() {
                           <span className="text-green-500 font-mono">${mission.budget}</span>
                         </div>
                       )}
-                      
+
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-neutral-400">Progress:</span>
                         <span className="text-orange-500 font-mono">{mission.progress_percentage}%</span>
                       </div>
-                      
+
                       <div className="w-full bg-neutral-800 rounded-full h-2">
                         <div
                           className="bg-orange-500 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${mission.progress_percentage}%` }}
                         ></div>
                       </div>
-                      
+
                       {mission.due_date && (
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-neutral-400">Due:</span>
@@ -1180,7 +1209,7 @@ function ClientDashboardContent() {
     const filteredListings = marketplaceListings.filter(listing => {
       const matchesSearch = listing.title.toLowerCase().includes(marketplaceSearch.toLowerCase()) ||
                            listing.description.toLowerCase().includes(marketplaceSearch.toLowerCase());
-      const matchesFilter = marketplaceFilter === "all" || 
+      const matchesFilter = marketplaceFilter === "all" ||
                            listing.category_id === marketplaceFilter ||
                            marketplaceCategories.find(cat => cat.id === listing.category_id)?.name.toLowerCase().includes(marketplaceFilter.toLowerCase());
       return matchesSearch && matchesFilter;
@@ -1196,7 +1225,7 @@ function ClientDashboardContent() {
                 <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">MY LISTINGS</CardTitle>
                 <CardDescription className="text-neutral-400">Manage your product and service offerings</CardDescription>
               </div>
-              <Button 
+              <Button
                 onClick={() => setShowAddListingModal(true)}
                 className="bg-orange-600 hover:bg-orange-700"
               >
@@ -1253,13 +1282,13 @@ function ClientDashboardContent() {
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{listing.description}</p>
-                        
+
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Price:</span>
                             <span className="text-green-500 font-mono">${listing.price}</span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Rating:</span>
                             <div className="flex items-center gap-1">
@@ -1267,13 +1296,13 @@ function ClientDashboardContent() {
                               <span className="text-neutral-300 font-mono">{listing.rating.toFixed(1)}</span>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Views:</span>
                             <span className="text-neutral-300 font-mono">{listing.views_count}</span>
                           </div>
                         </div>
-                        
+
                         <div className="flex gap-2 mt-3">
                           <Button size="sm" variant="outline" className="flex-1 bg-neutral-800 border-neutral-600 text-neutral-300 hover:bg-neutral-700">
                             Edit
@@ -1347,7 +1376,7 @@ function ClientDashboardContent() {
                 {filteredListings.map((listing) => {
                   const category = marketplaceCategories.find(cat => cat.id === listing.category_id);
                   const isBookmarked = bookmarks.some(bookmark => bookmark.listing_id === listing.id);
-                  
+
                   return (
                     <Card
                       key={listing.id}
@@ -1399,13 +1428,13 @@ function ClientDashboardContent() {
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-neutral-300 mb-3 line-clamp-2">{listing.description}</p>
-                        
+
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Price:</span>
                             <span className="text-green-500 font-mono">${listing.price}</span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Rating:</span>
                             <div className="flex items-center gap-1">
@@ -1413,15 +1442,15 @@ function ClientDashboardContent() {
                               <span className="text-neutral-300 font-mono">{listing.rating.toFixed(1)}</span>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-400">Views:</span>
                             <span className="text-neutral-300 font-mono">{listing.views_count}</span>
                           </div>
                         </div>
-                        
-                        <Button 
-                          size="sm" 
+
+                        <Button
+                          size="sm"
                           className="w-full mt-3 bg-orange-600 hover:bg-orange-700"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1608,7 +1637,7 @@ function ClientDashboardContent() {
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   <Badge className={
-                    payment.status === 'paid' ? 'bg-green-600' : 
+                    payment.status === 'paid' ? 'bg-green-600' :
                     payment.status === 'pending' ? 'bg-yellow-600' : 'bg-blue-600'
                   }>
                     {payment.status.toUpperCase()}
@@ -1620,7 +1649,7 @@ function ClientDashboardContent() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-neutral-400">PAYMENT HEALTH</span>
                 <span className={`text-sm font-bold font-mono ${
-                  payment.status === 'paid' ? 'text-green-500' : 
+                  payment.status === 'paid' ? 'text-green-500' :
                   payment.status === 'pending' ? 'text-yellow-500' : 'text-blue-500'
                 }`}>
                   ${payment.amount}
@@ -1645,7 +1674,7 @@ function ClientDashboardContent() {
                   <div className="w-full bg-neutral-800 rounded-full h-1 mt-1">
                     <div
                       className={`h-1 rounded-full transition-all duration-300 ${
-                        payment.status === 'paid' ? 'bg-green-500' : 
+                        payment.status === 'paid' ? 'bg-green-500' :
                         payment.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
                       }`}
                       style={{ width: `${payment.status === 'paid' ? 100 : payment.status === 'pending' ? 50 : 0}%` }}
@@ -2350,10 +2379,10 @@ function ClientDashboardContent() {
     const filteredOperators = operators.filter(operator => {
       const matchesType = !operatorFilters.type || operator.type_name === operatorFilters.type;
       const matchesStatus = !operatorFilters.status || operator.status === operatorFilters.status;
-      const matchesSearch = !operatorFilters.search || 
+      const matchesSearch = !operatorFilters.search ||
         operator.name.toLowerCase().includes(operatorFilters.search.toLowerCase()) ||
         operator.email.toLowerCase().includes(operatorFilters.search.toLowerCase());
-      
+
       return matchesType && matchesStatus && matchesSearch;
     });
 
@@ -2468,8 +2497,8 @@ function ClientDashboardContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex gap-2">
-                    <Badge 
-                      className="text-white" 
+                    <Badge
+                      className="text-white"
                       style={{ backgroundColor: operator.color }}
                     >
                       {operator.type_name}
@@ -2485,8 +2514,8 @@ function ClientDashboardContent() {
                       <span className="text-white font-mono">{operator.current_allocation_percentage}%</span>
                     </div>
                     <div className="w-full bg-neutral-700 rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full transition-all duration-300" 
+                      <div
+                        className="bg-orange-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${operator.current_allocation_percentage}%` }}
                       ></div>
                     </div>
@@ -2549,7 +2578,7 @@ function ClientDashboardContent() {
               </DialogClose>
             </div>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Classification */}
             <div>
@@ -2643,14 +2672,14 @@ function ClientDashboardContent() {
   }
 
   // Subscription Payment Modal Component
-  function SubscriptionPaymentModal({ 
-    open, 
-    onClose, 
-    onPayment, 
-    loading 
-  }: { 
-    open: boolean; 
-    onClose: () => void; 
+  function SubscriptionPaymentModal({
+    open,
+    onClose,
+    onPayment,
+    loading
+  }: {
+    open: boolean;
+    onClose: () => void;
     onPayment: () => Promise<void>;
     loading: boolean;
   }) {
@@ -2816,7 +2845,7 @@ function ClientDashboardContent() {
               Add a new operator to your network
             </DialogDescription>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-300">Name</label>
@@ -2942,7 +2971,7 @@ function ClientDashboardContent() {
 
       // For now, simulate successful payment
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       setClientPlan(prev => ({
         ...prev,
         mode: "subscription",
@@ -2974,7 +3003,7 @@ function ClientDashboardContent() {
     try {
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Enable finances after successful payment
       setFinancesEnabled(true);
       setShowPaymentModal(false);
@@ -2988,8 +3017,8 @@ function ClientDashboardContent() {
               // Update website name dynamically when clientWebsite changes
             useEffect(() => {
               if (!websiteLoading && clientWebsite) {
-                setBusinessAssets(prev => prev.map(asset => 
-                  asset.type === 'website' 
+                setBusinessAssets(prev => prev.map(asset =>
+                  asset.type === 'website'
                     ? { ...asset, name: clientWebsite.name, status: clientWebsite.status }
                     : asset
                 ));
@@ -3038,7 +3067,7 @@ function ClientDashboardContent() {
           )}
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             className="bg-orange-500 hover:bg-orange-600 text-white"
             onClick={togglePaymentMode}
           >
@@ -3083,7 +3112,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="bg-white border-gray-200 hover:border-orange-500/50 transition-colors cursor-pointer"
           onClick={() => clientPlan.mode === "revenue_share" && setShowCommissionModal(true)}
         >
@@ -3141,7 +3170,7 @@ function ClientDashboardContent() {
                 </Badge>
               </div>
               <div className="w-full bg-neutral-700 rounded-full h-3">
-                <div 
+                <div
                   className="bg-blue-500 h-3 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min((revenueData.total_revenue / clientPlan.revenue_share_threshold) * 100, 100)}%` }}
                 ></div>
@@ -3153,7 +3182,7 @@ function ClientDashboardContent() {
           </CardContent>
         </Card>
       )}
-      
+
       {/* Blurred placeholder when no revenue yet */}
       {clientPlan.mode === "revenue_share" && !revenueData.has_revenue && (
         <Card className="bg-white/30 border-gray-200/30 backdrop-blur-sm opacity-60">
@@ -3182,8 +3211,8 @@ function ClientDashboardContent() {
                       <Card
               key={asset.id}
               className={`${
-                asset.is_active 
-                  ? "bg-white border-gray-200 hover:border-orange-500/50" 
+                asset.is_active
+                  ? "bg-white border-gray-200 hover:border-orange-500/50"
                   : "bg-white/30 border-gray-200/30 backdrop-blur-sm opacity-60 hover:opacity-80"
               } transition-all duration-300 cursor-pointer relative group`}
               onClick={() => {
@@ -3208,7 +3237,7 @@ function ClientDashboardContent() {
                     <p className="text-sm text-neutral-400 font-mono">INACTIVE</p>
                   </div>
                 </div>
-                
+
                 {/* Hover Button */}
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
@@ -3218,7 +3247,7 @@ function ClientDashboardContent() {
                 </div>
               </>
             )}
-            
+
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -3242,7 +3271,7 @@ function ClientDashboardContent() {
                     <XCircle className="w-4 h-4 text-neutral-500" />
                   )}
                   <Badge className={
-                    asset.is_active 
+                    asset.is_active
                       ? (asset.status === 'live' ? 'bg-green-600' : 'bg-yellow-600')
                       : 'bg-neutral-600'
                   }>
@@ -3319,17 +3348,117 @@ function ClientDashboardContent() {
     return { completed, total, percentage: total > 0 ? (completed / total) * 100 : 0 };
   };
 
+  // ── Tasks section ──────────────────────────────────────────────────────────
+  const renderTasks = () => (
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Tasks</h1>
+          <p className="text-sm text-neutral-400">Action items and deliverables across your projects</p>
+        </div>
+      </div>
+      {todos.length === 0 ? (
+        <Card className="bg-neutral-800 border-gray-200">
+          <CardContent className="p-8 text-center">
+            <CheckCircle className="w-10 h-10 text-neutral-600 mx-auto mb-4" />
+            <p className="text-neutral-400 text-sm">No tasks yet.</p>
+            <p className="text-neutral-600 text-xs mt-1">
+              Tasks from your projects will appear here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {todos.map((todo: any) => (
+            <Card key={todo.id} className="bg-neutral-800 border-gray-200">
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`flex-shrink-0 rounded px-2 py-0.5 text-xs font-mono ${getTodoStatusColor(todo.status)}`}>
+                    {String(todo.status ?? "").toUpperCase()}
+                  </span>
+                  {editingTodo === todo.id ? (
+                    <input
+                      className="min-w-0 flex-1 rounded border border-neutral-600 bg-neutral-700 px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onBlur={() => handleEditSave(todo)}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate text-sm text-neutral-200">{todo.title}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleEdit(todo)}
+                  className="flex-shrink-0 text-xs text-neutral-500 hover:text-orange-500 font-mono transition-colors"
+                >
+                  EDIT
+                </button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // ── Settings section ───────────────────────────────────────────────────────
+  const renderSettings = () => (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-sm text-neutral-400">Account and portal preferences</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+        <Card className="bg-neutral-800 border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">PROFILE</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-xs text-neutral-500 font-mono mb-1">NAME</p>
+              <p className="text-sm text-white">{session?.full_name || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 font-mono mb-1">EMAIL</p>
+              <p className="text-sm text-white">{session?.email || "—"}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-neutral-800 border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-orange-500 font-mono text-sm tracking-wider">PREFERENCES</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-neutral-300 font-mono">THEME</span>
+              <ThemeToggle />
+            </div>
+            <div className="pt-3 border-t border-gray-200">
+              <button
+                onClick={() => setActiveSection("financial")}
+                className="text-sm text-orange-500 hover:text-orange-400 font-mono transition-colors"
+              >
+                VIEW BILLING →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen overflow-hidden bg-white">
       {/* Sidebar */}
       <div
-        className={`${sidebarCollapsed ? "w-16" : "w-70"} bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative z-50 md:z-auto h-full md:h-auto ${!sidebarCollapsed ? "md:block" : ""}`}
+        className={`${sidebarCollapsed ? "w-16" : "w-72"} fixed z-50 flex h-full flex-col overflow-hidden border-r border-gray-200 bg-white transition-all duration-300 md:relative md:z-auto ${!sidebarCollapsed ? "md:block" : ""}`}
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-8">
+        <div className="flex h-full min-h-0 flex-col p-4">
+          <div className="mb-6 flex shrink-0 items-center justify-between">
             <div className={`${sidebarCollapsed ? "hidden" : "block"}`}>
-              <h1 className="text-orange-500 font-bold text-lg tracking-wider font-mono">READY AIM GO</h1>
-              <p className="text-neutral-500 text-xs font-mono">v2.1.7 CLASSIFIED</p>
+              <h1 className="text-orange-500 font-bold text-lg tracking-wider font-mono">ReadyAimGo</h1>
+              <p className="text-neutral-500 text-xs font-mono">Client Portal</p>
             </div>
             <Button
               variant="ghost"
@@ -3343,96 +3472,92 @@ function ClientDashboardContent() {
             </Button>
           </div>
 
-          <nav className="space-y-2">
-            {[
-              { id: "overview", icon: Monitor, label: "COMMAND CENTER" },
-              { id: "projects", icon: Target, label: "MISSIONS" },
-              { id: "roles", icon: Users, label: "AGENT NETWORK", disabled: clientPlan.mode === "revenue_share" },
-              { id: "operators", icon: Shield, label: "OPERATORS", disabled: clientPlan.mode === "revenue_share" },
-              { id: "marketplace", icon: TrendingUp, label: "MARKETPLACE" },
-              { id: "financial", icon: DollarSign, label: "TACTICAL ORDERS" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => !item.disabled && setActiveSection(item.id)}
-                disabled={item.disabled}
-                className={`w-full flex items-center gap-3 p-3 rounded transition-colors ${
-                  activeSection === item.id
-                    ? "bg-orange-500 text-white"
-                    : item.disabled
-                    ? "text-neutral-600 cursor-not-allowed opacity-50"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                }`}
-              >
-                <item.icon className="w-5 h-5 md:w-5 md:h-5 sm:w-6 sm:h-6" />
-                {!sidebarCollapsed && (
-                  <span className="text-sm font-medium font-mono">
-                    {item.label}
-                    {item.disabled && " (LOCKED)"}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+            <nav className="space-y-2">
+              {[
+                { id: "overview",       icon: LayoutDashboard, label: "Dashboard" },
+                { id: "projects",       icon: Target,          label: "Projects" },
+                { id: "marketplace",    icon: FileText,        label: "Files" },
+                { id: "tasks",          icon: CheckCircle,     label: "Tasks" },
+                { id: "financial",      icon: DollarSign,      label: "Billing" },
+                { id: "settings-panel", icon: Settings,        label: "Settings" },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded transition-colors ${
+                    activeSection === item.id
+                      ? "bg-orange-500 text-white"
+                      : "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 md:w-5 md:h-5 sm:w-6 sm:h-6" />
+                  {!sidebarCollapsed && (
+                    <span className="text-sm font-medium font-mono">{item.label}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
 
-          {!sidebarCollapsed && (
-            <div className="mt-8 p-4 bg-neutral-800 border border-gray-200 rounded">
-              {/* Business Assets Checklist */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-white font-mono">BUSINESS CHECKLIST</span>
-              </div>
-              
-              {hasCompletedSetup ? (
-                <div className="space-y-3">
-                  <div className="text-xs text-neutral-500 font-mono">
-                    <div>PROGRESS: {getChecklistProgress().completed}/{getChecklistProgress().total}</div>
-                    <div>COMPLETION: {Math.round(getChecklistProgress().percentage)}%</div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {userBusinessAssets.map((asset, index) => (
-                      <div key={asset.type} className="flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                          asset.status === 'completed' ? 'bg-green-500' : 'bg-neutral-500'
-                        }`}></div>
-                        <span className={`text-xs font-mono ${
-                          asset.status === 'completed' ? 'text-green-400' : 'text-neutral-400'
-                        }`}>
-                          {asset.name.toUpperCase()}
-                        </span>
-                        {asset.status === 'completed' && asset.value && (
-                          <span className="text-xs text-neutral-500 font-mono ml-2">
-                            ({asset.value.length > 20 ? asset.value.substring(0, 20) + '...' : asset.value})
+            {!sidebarCollapsed && (
+              <div className="mt-8 p-4 bg-neutral-800 border border-gray-200 rounded">
+                {/* Business Assets Checklist */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-white font-mono">BUSINESS CHECKLIST</span>
+                </div>
+
+                {hasCompletedSetup ? (
+                  <div className="space-y-3">
+                    <div className="text-xs text-neutral-500 font-mono">
+                      <div>PROGRESS: {getChecklistProgress().completed}/{getChecklistProgress().total}</div>
+                      <div>COMPLETION: {Math.round(getChecklistProgress().percentage)}%</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {userBusinessAssets.map((asset, index) => (
+                        <div key={asset.type} className="flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            asset.status === 'completed' ? 'bg-green-500' : 'bg-neutral-500'
+                          }`}></div>
+                          <span className={`text-xs font-mono ${
+                            asset.status === 'completed' ? 'text-green-400' : 'text-neutral-400'
+                          }`}>
+                            {asset.name.toUpperCase()}
                           </span>
-                        )}
-                      </div>
-                    ))}
+                          {asset.status === 'completed' && asset.value && (
+                            <span className="text-xs text-neutral-500 font-mono ml-2">
+                              ({asset.value.length > 20 ? asset.value.substring(0, 20) + '...' : asset.value})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => setShowFirstTimePopup(true)}
+                        className="text-xs text-orange-500 hover:text-orange-400 font-mono"
+                      >
+                        EDIT ASSETS
+                      </button>
+                    </div>
                   </div>
-                  
-                  <div className="pt-2 border-t border-gray-200">
+                ) : (
+                  <div className="text-xs text-neutral-500 font-mono">
+                    <div>SETUP REQUIRED</div>
+                    <div>CLICK TO CONFIGURE</div>
                     <button
                       onClick={() => setShowFirstTimePopup(true)}
-                      className="text-xs text-orange-500 hover:text-orange-400 font-mono"
+                      className="text-orange-500 hover:text-orange-400 mt-2"
                     >
-                      EDIT ASSETS
+                      START SETUP
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="text-xs text-neutral-500 font-mono">
-                  <div>SETUP REQUIRED</div>
-                  <div>CLICK TO CONFIGURE</div>
-                  <button
-                    onClick={() => setShowFirstTimePopup(true)}
-                    className="text-orange-500 hover:text-orange-400 mt-2"
-                  >
-                    START SETUP
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -3442,12 +3567,12 @@ function ClientDashboardContent() {
       )}
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
+      <div className={`flex min-w-0 flex-1 flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
         {/* Top Toolbar */}
         <div className="h-16 bg-neutral-800 border-b border-gray-200 flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
             <div className="text-sm text-neutral-400 font-mono">
-              TACTICAL COMMAND / <span className="text-orange-500">{session?.full_name?.toUpperCase() || session?.email?.toUpperCase() || 'AGENT'}</span>
+              Dashboard / <span className="text-orange-500">{session?.full_name || session?.email || 'Client'}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -3501,18 +3626,21 @@ function ClientDashboardContent() {
         <div className="flex-1 overflow-auto">
           {activeSection === "overview" && renderOverview()}
           {activeSection === "projects" && renderProjects()}
+          {activeSection === "marketplace" && renderMarketplace()}
+          {activeSection === "tasks" && renderTasks()}
+          {activeSection === "financial" && renderFinancialDashboard()}
+          {activeSection === "settings-panel" && renderSettings()}
+          {/* Legacy sections — kept in case of direct navigation */}
           {activeSection === "roles" && renderAgentNetwork()}
           {activeSection === "operators" && renderOperators()}
-          {activeSection === "marketplace" && renderMarketplace()}
-          {activeSection === "financial" && renderFinancialDashboard()}
         </div>
       </div>
 
       {/* New Project Modal */}
       <NewProjectModal open={showNewProjectModal} onOpenChange={setShowNewProjectModal} />
       {/* New Mission Modal */}
-      <NewMissionModal 
-        open={showNewMissionModal} 
+      <NewMissionModal
+        open={showNewMissionModal}
         onClose={() => {
           setShowNewMissionModal(false);
         }}
@@ -3528,13 +3656,13 @@ function ClientDashboardContent() {
       {/* Create New Operator Modal */}
       <CreateNewOperatorModal open={showNewOperatorModal} onClose={() => setShowNewOperatorModal(false)} />
       {/* Subscription Payment Modal */}
-      <SubscriptionPaymentModal 
-        open={showPaymentModal} 
+      <SubscriptionPaymentModal
+        open={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         onPayment={financesEnabled ? handleIntegrationPayment : handleSubscriptionPayment}
         loading={paymentLoading}
       />
-      
+
       {/* Commission Rate Modal */}
       <CommissionRateModal
         open={showCommissionModal}
@@ -3542,7 +3670,7 @@ function ClientDashboardContent() {
         currentRate={commissionRate}
         onRateChange={updateCommissionRate}
       />
-      
+
       {/* Website Card Modal */}
       <WebsiteCardModal
         open={showWebsiteModal}
@@ -3572,7 +3700,7 @@ function ClientDashboardContent() {
         }}
         clientPlan={clientPlan}
       />
-      
+
       {/* New Mission Modal */}
       <NewMissionModal
         open={showNewMissionModal}

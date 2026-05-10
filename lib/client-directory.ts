@@ -1,5 +1,6 @@
 import type { PulseReport } from "./pulse-report"
 import type { ClientRoleSuggestionSnapshot } from "./client-role-suggestions"
+import type { ClientPublicProfile } from "./types/client-public-profile"
 
 export type ClientStatus = "active" | "inactive" | "onboarding"
 export type DeployStatus = "live" | "building" | "error"
@@ -68,6 +69,12 @@ export interface ClientDirectoryEntry {
   pulseReport?: PulseReport
   /** Unified AI-generated work contexts and draft role suggestions for admin/client review. */
   roleSuggestionSnapshot?: ClientRoleSuggestionSnapshot
+  /**
+   * Public-facing profile: visibility toggles, identity, taxonomy, services,
+   * products, pricing, people, and growth indicators.
+   * Absent on older clients — all consumers must fall back gracefully.
+   */
+  publicProfile?: ClientPublicProfile
 }
 
 /** Baseline modules so front-end never breaks when Firestore has no modules. */

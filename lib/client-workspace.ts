@@ -22,10 +22,15 @@ export const clientWorkspaceNoteKindSchema = z.enum([
 ])
 
 export const clientWorkspaceActionStatusSchema = z.enum([
+  // Legacy workspace action statuses (kept for backward compat)
   "todo",
   "in_progress",
   "blocked",
   "done",
+  // Task lifecycle statuses used by projectTasks and intelligence promote-tasks
+  "proposed",
+  "accepted",
+  "declined",
 ])
 
 export const clientWorkspacePrioritySchema = z.enum([

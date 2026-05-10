@@ -1,3 +1,20 @@
+import type { ClientPublicProfile } from "./client-public-profile"
+
+// Client lifecycle status — additive alongside legacy isActive boolean
+export type ClientLifecycleStatus = "prospect" | "active" | "paused" | "archived"
+
+export interface ClientPrimaryContact {
+  name: string
+  email: string
+  phone?: string
+}
+
+export interface ClientPortalSettings {
+  allowedModules: string[]
+  showBilling: boolean
+  showDeliverables: boolean
+}
+
 export interface Client {
   id: string
   name: string
@@ -10,6 +27,17 @@ export interface Client {
   isActive: boolean
   subscription: SubscriptionTier
   stats: ClientStats
+  // ── Added fields (additive, do not remove legacy fields above) ──
+  status?: ClientLifecycleStatus
+  displayName?: string
+  slug?: string
+  primaryContact?: ClientPrimaryContact
+  portalSettings?: ClientPortalSettings
+  /**
+   * Public-facing profile: visibility, identity, taxonomy, services,
+   * products, pricing, people, and growth indicators.
+   */
+  publicProfile?: ClientPublicProfile
 }
 
 export interface ClientStats {

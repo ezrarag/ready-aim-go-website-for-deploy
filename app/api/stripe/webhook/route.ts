@@ -77,6 +77,69 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Handle deliverable payments
+    if (session.metadata?.purpose === 'deliverable_payment') {
+      const clientId = session.metadata.clientId
+      const deliverableId = session.metadata.deliverableId
+      const stripeSessionId = session.id
+      const amountTotal = session.amount_total || 0
+
+      if (!clientId || !deliverableId) {
+        console.error('Missing clientId or deliverableId in deliverable_payment metadata')
+        return NextResponse.json({ received: true })
+      }
+
+      try {
+        const { getFirestoreDb } = await import('@/lib/firestore')
+        const db = getFirestoreDb()
+        if (!db) throw new Error('Firestore unavailable')
+
+        const deliverableRef = db
+          .collection('clients')
+          .doc(clientId)
+          .collection('deliverables')
+          .doc(deliverableId)
+
+        const deliverableDoc = await deliverableRef.get()
+        if (!deliverableDoc.exists) {
+          console.error('Deliverable not found:', deliverableId)
+          return NextResponse.json({ received: true })
+        }
+
+        const data = deliverableDoc.data() as Record<string, unknown>
+        // Idempotency: skip if already marked paid
+        if (data.status === 'paid') {
+          console.log('Deliverable already marked paid:', deliverableId)
+          return NextResponse.json({ received: true })
+        }
+
+        const now = new Date().toISOString()
+
+        // Mark deliverable as paid
+        await deliverableRef.update({
+          status: 'paid',
+          paidAt: now,
+          stripeSessionId,
+          updatedAt: now,
+        })
+
+        // Write billing record to clients/{clientId}/billingRecords
+        await db.collection('clients').doc(clientId).collection('billingRecords').add({
+          clientId,
+          deliverableId,
+          stripeSessionId,
+          amount: amountTotal,
+          paidAt: now,
+          createdAt: now,
+        })
+
+        console.log('Deliverable payment recorded:', deliverableId)
+      } catch (error) {
+        console.error('Error processing deliverable_payment:', error)
+        // Don't fail the webhook — Stripe already processed the payment
+      }
+    }
+
     // Handle subscription payments (existing logic - keep if needed)
     // Note: This may need to be migrated to Firestore if you have a profiles collection
     // For now, leaving as-is since it's not part of the partner onramp

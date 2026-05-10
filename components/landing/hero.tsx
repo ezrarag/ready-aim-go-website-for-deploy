@@ -8,6 +8,7 @@ import { RosterOverlay } from "./roster-overlay"
 import { StoryAreaDetail } from "./story-area-detail"
 import type { Hero as RosterHero } from "./roster-overlay"
 import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
+import { isVisible } from "@/lib/types/client-public-profile"
 
 interface HeroProps {
   onWatchDemo?: () => void
@@ -53,7 +54,13 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
         setClients(list)
 
         const mapped = list
-          .filter((client) => client.showOnFrontend !== false && Boolean(client.storyVideoUrl))
+          .filter(
+            (client) =>
+              client.showOnFrontend !== false &&
+              Boolean(client.storyVideoUrl) &&
+              // Respect publicProfile.visibility.story — missing = visible
+              isVisible(client.publicProfile, "story")
+          )
           .map((client) => ({
             id: client.id,
             name: client.name.toUpperCase(),

@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ArrowRight, FileText } from "lucide-react"
 import type { ClientUpdate } from "@/lib/client-directory"
+import type { ClientPublicProfile, PublicGrowth } from "@/lib/types/client-public-profile"
+import { computePlatformTenure } from "@/lib/types/client-public-profile"
 
 interface StoryAreaDetailProps {
   isOpen: boolean
@@ -13,6 +15,8 @@ interface StoryAreaDetailProps {
   currentStory: string
   /** When set, fetches and shows Latest updates for this client + module type */
   clientId?: string
+  /** Optional publicProfile from the parent client — drives growth panel + services. */
+  publicProfile?: ClientPublicProfile
 }
 
 const areaTabs: Record<string, string[]> = {
@@ -25,7 +29,31 @@ const areaTabs: Record<string, string[]> = {
   insurance: ["Coverage", "Claims", "Support"],
 }
 
-export function StoryAreaDetail({ isOpen, onClose, areaId, areaTitle, currentStory, clientId }: StoryAreaDetailProps) {
+/** Render a compact growth stat chip. */
+function GrowthStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 min-w-[80px]">
+      <span className="text-lg md:text-2xl font-bold text-white">{value}</span>
+      <span className="text-[10px] md:text-xs text-white/50 text-center uppercase tracking-wide leading-tight">{label}</span>
+    </div>
+  )
+}
+
+/** Build the list of growth stat chips from a PublicGrowth object. */
+function buildGrowthStats(growth: PublicGrowth): Array<{ label: string; value: string | number }> {
+  const stats: Array<{ label: string; value: string | number }> = []
+  if (growth.projectsCompleted !== undefined) stats.push({ label: "Projects", value: growth.projectsCompleted })
+  if (growth.activeProjects !== undefined) stats.push({ label: "Active", value: growth.activeProjects })
+  if (growth.activeFleetSize !== undefined) stats.push({ label: "Fleet", value: growth.activeFleetSize })
+  if (growth.propertiesManaged !== undefined) stats.push({ label: "Properties", value: growth.propertiesManaged })
+  if (growth.updatesPublished !== undefined) stats.push({ label: "Updates", value: growth.updatesPublished })
+  if (growth.beamParticipantsSupported !== undefined) stats.push({ label: "BEAM", value: growth.beamParticipantsSupported })
+  const tenure = computePlatformTenure(growth.platformTenureStart)
+  if (tenure) stats.push({ label: "On Platform", value: tenure })
+  return stats
+}
+
+export function StoryAreaDetail({ isOpen, onClose, areaId, areaTitle, currentStory, clientId, publicProfile }: StoryAreaDetailProps) {
   const [activeTab, setActiveTab] = useState(0)
   const [updates, setUpdates] = useState<ClientUpdate[]>([])
   const [updatesLoading, setUpdatesLoading] = useState(false)
@@ -135,6 +163,54 @@ export function StoryAreaDetail({ isOpen, onClose, areaId, areaTitle, currentSto
 
               {/* Content Area - scrollable */}
               <div className="p-4 md:p-8 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                {/* Growth indicators — only shown when publicProfile.growth has data */}
+                {(() => {
+                  const growth = publicProfile?.growth
+                  if (!growth) return null
+                  const stats = buildGrowthStats(growth)
+                  if (stats.length === 0) return null
+                  return (
+                    <div className="mb-6">
+                      <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+                        Growth indicators
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {stats.map((s) => (
+                          <GrowthStat key={s.label} label={s.label} value={s.value} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Area-filtered services — publicProfile.services matching this module key */}
+                {(() => {
+                  const services = publicProfile?.services?.filter(
+                    (s) => s.available && (!s.category || s.category === areaId || s.category === (areaId === "website" ? "web" : areaId))
+                  )
+                  if (!services?.length) return null
+                  return (
+                    <div className="mb-6">
+                      <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+                        Services
+                      </h3>
+                      <ul className="space-y-2">
+                        {services.map((svc) => (
+                          <li key={svc.id} className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-white text-sm">{svc.title}</p>
+                              <p className="text-white/60 text-xs mt-0.5">{svc.description}</p>
+                              {svc.priceHint && (
+                                <p className="text-orange-400 text-xs mt-1">{svc.priceHint}</p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })()}
+
                 {/* Latest updates (GitHub-style feed) */}
                 {clientId && (
                   <div className="mb-8">

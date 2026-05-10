@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { normalizeClientServiceInterests } from "@/lib/client-onboarding"
 import { getFirebaseAdminAuth, getFirestoreDb } from "@/lib/firestore"
+import { buildOwnerMembership } from "@/lib/types/client-membership"
 
 function readTrimmedString(value: unknown, maxLength = 280) {
   if (typeof value !== "string") {
@@ -187,6 +188,20 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     )
+
+    // ── Write membership contract if a claimedClientId is available ──────────
+    // This ensures portal-auth can resolve the full multi-client contract from
+    // users/{uid} immediately after account setup completes.
+    if (claimedClientId) {
+      await userRef.set(
+        {
+          clientIds: [claimedClientId],
+          userRole: "owner",
+          memberships: buildOwnerMembership(claimedClientId),
+        },
+        { merge: true }
+      )
+    }
 
     if (handoffRef) {
       await handoffRef.set(

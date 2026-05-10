@@ -3,15 +3,26 @@
 import { useEffect, useState } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { ensureAuthPersistence, getClientUserProfile, type ClientUserProfile } from "@/lib/firebase-client"
+import type { ClientMembership, UserRole } from "@/lib/types/client-membership"
 
 type UserWithId = User & { id: string }
 
 interface UserSession {
   user: UserWithId
   profile: ClientUserProfile | null
+  // ── Convenience fields (unchanged) ────────────────────────────────────────
   avatar_url?: string
   full_name?: string
   email?: string
+  // ── Membership contract (additive — safe to read; null when not resolved) ─
+  /** All clientIds this user may access. Empty for non-client users. */
+  clientIds: string[]
+  /** Primary active clientId (first in list, or null for admins/unauthenticated). */
+  activeClientId: string | null
+  /** Canonical role for the activeClientId. Null for admins or when no membership exists. */
+  userRole: UserRole | null
+  /** Full per-client membership map. */
+  memberships: Record<string, ClientMembership>
 }
 
 export function useUserWithRole() {
@@ -52,6 +63,11 @@ export function useUserWithRole() {
               avatar_url: profile?.avatar_url || user.photoURL || undefined,
               full_name: profile?.full_name || user.displayName || undefined,
               email: profile?.email || user.email || undefined,
+              // ── Membership contract ──────────────────────────────────────
+              clientIds: profile?.clientIds ?? [],
+              activeClientId: profile?.clientIds?.[0] ?? null,
+              userRole: profile?.userRole ?? null,
+              memberships: profile?.memberships ?? {},
             })
             setError(null)
           } catch (profileError) {
@@ -68,6 +84,10 @@ export function useUserWithRole() {
               avatar_url: user.photoURL || undefined,
               full_name: user.displayName || undefined,
               email: user.email || undefined,
+              clientIds: [],
+              activeClientId: null,
+              userRole: null,
+              memberships: {},
             })
             setError(
               profileError instanceof Error ? profileError.message : "Unable to load user profile."
