@@ -16,6 +16,7 @@
 
 import { NextResponse } from "next/server"
 import { getAdminDb } from "@/lib/firebase/admin"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 
 // How far back/forward to look for calendar events
 const PAST_HOURS = 2
@@ -77,16 +78,16 @@ export async function GET() {
     ])
 
     // ── Process tasks ─────────────────────────────────────────────────────
-    const tasks = tasksSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const tasks = tasksSnap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
     const ragTasks = tasks.filter((t: any) => !t.segment || t.segment === "rag")
     const beamTasks = tasks.filter((t: any) => t.segment === "beam")
     const personalTasks = tasks.filter((t: any) => t.segment === "personal")
 
     // ── Process messages ──────────────────────────────────────────────────
-    const messages = messagesSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const messages = messagesSnap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
 
     // ── Process calendar events ───────────────────────────────────────────
-    const events = eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const events = eventsSnap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
     const todayEvents = events.filter((e: any) => {
       const start = new Date(e.start)
       return start >= todayStart && start <= todayEnd
@@ -143,10 +144,7 @@ export async function GET() {
     }
 
     // ── Pending payments ──────────────────────────────────────────────────
-    const pendingPayments = pendingActionsSnap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }))
+    const pendingPayments = pendingActionsSnap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
 
     // ── Summary counts ────────────────────────────────────────────────────
     const summary = {

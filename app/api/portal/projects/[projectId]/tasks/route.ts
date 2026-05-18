@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { resolvePortalIdentity, isClientAllowed } from "@/lib/portal-auth"
 
 type Params = { params: Promise<{ projectId: string }> }
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest, context: Params) {
 
     return NextResponse.json({
       success: true,
-      data: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      data: snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data())),
     })
   } catch (err) {
     console.error("GET /api/portal/projects/[projectId]/tasks:", err)

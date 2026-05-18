@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getStorageBucket } from "@/lib/firestore"
 import { getClientUpdateById, updateClientUpdate } from "@/lib/firestore"
+import { decodeRouteParam } from "@/lib/route-params"
 
 /** Upload video for an update. Stores at clients/{clientId}/updates/{updateId}/video.mp4 and saves public URL to Firestore. */
 export async function POST(
@@ -9,7 +10,7 @@ export async function POST(
 ) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const updateId = params.updateId
 
     const existing = await getClientUpdateById(clientId, updateId)

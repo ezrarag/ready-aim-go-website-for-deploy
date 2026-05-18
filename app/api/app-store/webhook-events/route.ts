@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 
 export const dynamic = "force-dynamic"
@@ -17,10 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const snapshot = await db.collection("appStoreWebhookEvents").orderBy("createdAt", "desc").limit(20).get()
-    const events = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }))
+    const events = snapshot.docs.map((doc) => serializeFirestoreDocument(doc.id, doc.data()))
 
     return NextResponse.json({
       success: true,
@@ -32,10 +30,7 @@ export async function GET(request: NextRequest) {
     try {
       const snapshot = await db.collection("appStoreWebhookEvents").get()
       const events = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+        .map((doc) => serializeFirestoreDocument(doc.id, doc.data()))
         .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
         .slice(0, 20)
 

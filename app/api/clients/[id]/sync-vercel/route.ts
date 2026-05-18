@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getClientDirectoryEntryById, getFirestoreDb } from "@/lib/firestore"
 import { buildClientUpdatesFromVercelProject, listVercelProjects, matchVercelProjectToClient } from "@/lib/vercel"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!isInternalMutationAuthorized(request)) {
@@ -9,7 +10,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   }
 
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })

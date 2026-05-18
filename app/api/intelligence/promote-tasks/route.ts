@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
         sourceIntelligenceId: intelligenceId,
         relatedClientId: intelData.relatedClientId ?? null,
         relatedProjectId: intelData.relatedProjectId ?? null,
+        workspaceId: typeof intelData.workspaceId === "string" ? intelData.workspaceId : null,
         createdAt: now,
         updatedAt: now,
       })

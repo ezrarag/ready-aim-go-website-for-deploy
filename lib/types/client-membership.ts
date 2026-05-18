@@ -15,7 +15,13 @@
  */
 
 /** Role a user holds for a specific client engagement. */
-export type UserRole = "owner" | "collaborator" | "admin"
+export type UserRole =
+  | "owner"
+  | "developer"
+  | "collaborator"
+  | "employee-of-client"
+  | "beam-participant"
+  | "admin"
 
 /** Lifecycle status of a membership entry. */
 export type MembershipStatus = "active" | "suspended" | "pending"
@@ -145,7 +151,14 @@ export function contractFromUserDoc(
 // ---------------------------------------------------------------------------
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === "owner" || v === "collaborator" || v === "admin"
+  return (
+    v === "owner" ||
+    v === "developer" ||
+    v === "collaborator" ||
+    v === "employee-of-client" ||
+    v === "beam-participant" ||
+    v === "admin"
+  )
 }
 
 function isMembershipStatus(v: unknown): v is MembershipStatus {

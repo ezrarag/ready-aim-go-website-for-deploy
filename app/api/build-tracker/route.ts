@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { FieldValue } from "firebase-admin/firestore"
 
 const SEED_PROJECTS = [
@@ -167,9 +168,8 @@ export async function GET() {
     projectsSnap.docs.map(async (doc) => {
       const tasksSnap = await doc.ref.collection("tasks").orderBy("createdAt").get()
       return {
-        id: doc.id,
-        ...doc.data(),
-        tasks: tasksSnap.docs.map((t) => ({ id: t.id, ...t.data() })),
+        ...serializeFirestoreDocument(doc.id, doc.data()),
+        tasks: tasksSnap.docs.map((t) => serializeFirestoreDocument(t.id, t.data())),
       }
     })
   )

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 
@@ -21,10 +22,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get("projectId")
     const clientId = searchParams.get("clientId")
+    const workspaceId = searchParams.get("workspaceId")
     const status = searchParams.get("status")
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200)
 
     let query: FirebaseFirestore.Query = db.collection("projectTasks")
+    if (workspaceId) query = query.where("workspaceId", "==", workspaceId)
     if (projectId) query = query.where("projectId", "==", projectId)
     if (clientId) query = query.where("clientId", "==", clientId)
     if (status && VALID_STATUSES.has(status)) query = query.where("status", "==", status)
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      data: snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data())),
     })
   } catch (err) {
     console.error("GET /api/admin/tasks:", err)
@@ -62,7 +65,14 @@ export async function POST(request: NextRequest) {
     const status = VALID_STATUSES.has(rawStatus) ? rawStatus : "proposed"
 
     const now = new Date().toISOString()
-    const payload = { ...body, title, status, createdAt: now, updatedAt: now }
+    const payload = {
+      ...body,
+      title,
+      status,
+      workspaceId: typeof body.workspaceId === "string" ? body.workspaceId.trim() : body.workspaceId,
+      createdAt: now,
+      updatedAt: now,
+    }
     const ref = await db.collection("projectTasks").add(payload)
 
     await writeAuditLog({
@@ -70,7 +80,7 @@ export async function POST(request: NextRequest) {
       docId: ref.id,
       action: "create",
       actorKey: extractActorKey(request.headers.get("authorization")),
-      payload: { title, status, projectId: body.projectId, clientId: body.clientId },
+      payload: { title, status, projectId: body.projectId, clientId: body.clientId, workspaceId: body.workspaceId },
     })
 
     return NextResponse.json({ success: true, data: { id: ref.id, ...payload } })

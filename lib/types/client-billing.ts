@@ -7,6 +7,8 @@ import type { Timestamp } from "firebase-admin/firestore"
 export interface ClientDeliverable {
   id: string
   clientId: string
+  workspaceId?: string | null
+  projectId?: string | null
   title: string
   summary: string
   liveUrl: string
@@ -22,6 +24,8 @@ export interface ClientDeliverable {
 
 export interface ClientBillingRecord {
   clientId: string
+  workspaceId?: string | null
+  projectId?: string | null
   deliverableId: string
   stripeSessionId: string
   paidAt: Timestamp

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
 
 type Params = { params: Promise<{ intelligenceId: string }> }
@@ -35,12 +36,14 @@ export async function GET(request: NextRequest, context: Params) {
         .orderBy("createdAt", "desc")
         .limit(50)
         .get()
-      events = eventsSnap.docs.map((e) => ({ id: e.id, ...e.data() }))
+      events = eventsSnap.docs.map((eventDoc) => serializeFirestoreDocument(eventDoc.id, eventDoc.data()))
     }
+
+    const data = serializeFirestoreDocument(doc.id, doc.data())
 
     return NextResponse.json({
       success: true,
-      data: { id: doc.id, ...doc.data(), ...(includeEvents ? { events } : {}) },
+      data: includeEvents ? { ...data, events } : data,
     })
   } catch (err) {
     console.error("GET /api/admin/intelligence/[intelligenceId]:", err)

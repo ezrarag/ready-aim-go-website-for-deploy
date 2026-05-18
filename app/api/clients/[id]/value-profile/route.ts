@@ -9,6 +9,7 @@ import {
 } from "@/lib/firestore"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { normalizeRAGService, RAG_SERVICES_COLLECTION } from "@/lib/rag-services"
+import { decodeRouteParam } from "@/lib/route-params"
 import {
   VALUE_PROFILE_COLLECTION,
   VALUE_PROFILE_PAYMENTS_COLLECTION,
@@ -209,7 +210,7 @@ export async function GET(
     }
 
     const params = await context.params
-    const requestedClientId = params.id
+    const requestedClientId = decodeRouteParam(params.id)
     const resolvedClientId = await resolveClientDocumentId(requestedClientId)
     if (!resolvedClientId) {
       return NextResponse.json({ success: false, error: "Client not found." }, { status: 404 })
@@ -292,7 +293,7 @@ export async function PATCH(
     }
 
     const params = await context.params
-    const resolvedClientId = await resolveClientDocumentId(params.id)
+    const resolvedClientId = await resolveClientDocumentId(decodeRouteParam(params.id))
     if (!resolvedClientId) {
       return NextResponse.json({ success: false, error: "Client not found." }, { status: 404 })
     }

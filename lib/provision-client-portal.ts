@@ -17,9 +17,17 @@
  *   - Any future intake/onboarding flow that creates a client record
  */
 
-import { getFirestoreDb } from "@/lib/firestore"
+import { FieldValue } from "firebase-admin/firestore"
+import { getFirebaseAdminAuth, getFirestoreDb } from "@/lib/firestore"
 import { emailToDocId, generateSlug } from "@/lib/beam-access-shared"
-import { buildOwnerMembership } from "@/lib/types/client-membership"
+import type { ClientMembership, UserRole } from "@/lib/types/client-membership"
+import {
+  assignUserToWorkspace,
+  ensureCanonicalWorkspace,
+  recordPendingWorkspaceInvite,
+} from "@/lib/workspace-access"
+
+export type PortalAccessRole = Exclude<UserRole, "admin">
 
 export type PortalProvisionInput = {
   clientId: string           // Firestore document ID in clients collection
@@ -30,6 +38,7 @@ export type PortalProvisionInput = {
   sourceNgo?: string         // BEAM NGO scope if applicable
   notes?: string             // Admin notes
   addedBy?: string           // Admin UID or identifier
+  role?: PortalAccessRole    // Client workspace role
 }
 
 export type PortalProvisionResult = {
@@ -39,10 +48,59 @@ export type PortalProvisionResult = {
   clientSlug: string
   allowlistDocId: string
   projectDocId: string
+  workspaceId: string
   alreadyExisted: {
     allowlist: boolean
     project: boolean
   }
+  assignedUserIds: string[]
+}
+
+function buildMembership(role: PortalAccessRole, createdAt?: unknown): ClientMembership {
+  const now = new Date().toISOString()
+  return {
+    role,
+    status: "active",
+    createdAt: typeof createdAt === "string" && createdAt.trim() ? createdAt : now,
+    updatedAt: now,
+  }
+}
+
+function readMembershipCreatedAt(data: Record<string, unknown> | undefined, clientId: string) {
+  const memberships =
+    data?.memberships && typeof data.memberships === "object" && !Array.isArray(data.memberships)
+      ? (data.memberships as Record<string, unknown>)
+      : null
+  const membership =
+    memberships?.[clientId] && typeof memberships[clientId] === "object" && !Array.isArray(memberships[clientId])
+      ? (memberships[clientId] as Record<string, unknown>)
+      : null
+
+  return membership?.createdAt
+}
+
+async function findExistingUserIdsByEmail(email: string): Promise<string[]> {
+  const db = getFirestoreDb()
+  if (!db) return []
+
+  const ids = new Set<string>()
+  const adminAuth = getFirebaseAdminAuth()
+
+  if (adminAuth) {
+    try {
+      const user = await adminAuth.getUserByEmail(email)
+      if (user.uid) ids.add(user.uid)
+    } catch {
+      // No Firebase Auth user exists yet for this email.
+    }
+  }
+
+  const usersByEmail = await db.collection("users").where("email", "==", email).limit(20).get()
+  for (const doc of usersByEmail.docs) {
+    ids.add(doc.id)
+  }
+
+  return Array.from(ids)
 }
 
 export async function provisionClientPortalAccess(
@@ -58,6 +116,14 @@ export async function provisionClientPortalAccess(
   const allowlistDocId = emailToDocId(email)
   const now = new Date().toISOString()
   const addedBy = input.addedBy?.trim() || "system-auto-provision"
+  const role: PortalAccessRole =
+    input.role === "owner" ||
+    input.role === "developer" ||
+    input.role === "collaborator" ||
+    input.role === "employee-of-client" ||
+    input.role === "beam-participant"
+      ? input.role
+      : "collaborator"
 
   // ── Check what already exists ─────────────────────────────────────────────
   const [allowlistDoc, projectDoc] = await Promise.all([
@@ -65,8 +131,19 @@ export async function provisionClientPortalAccess(
     db.collection("projects").doc(clientId).get(),
   ])
 
+  const allowlistData = allowlistDoc.data() as Record<string, unknown> | undefined
+  const projectData = projectDoc.data() as Record<string, unknown> | undefined
   const allowlistExists = allowlistDoc.exists
   const projectExists = projectDoc.exists
+  const membership = buildMembership(role, readMembershipCreatedAt(allowlistData, clientId))
+  const assignedUserIds = await findExistingUserIdsByEmail(email)
+  const workspaceId = await ensureCanonicalWorkspace({
+    db,
+    clientId,
+    clientName,
+    clientEmail: email,
+    projectId: clientId,
+  })
 
   // ── Write both in parallel ────────────────────────────────────────────────
   await Promise.all([
@@ -79,10 +156,13 @@ export async function provisionClientPortalAccess(
         clientName,
         clientSlug,
         clientId,           // legacy single-clientId — kept for backward compat
-        clientIds: [clientId],
-        memberships: buildOwnerMembership(clientId),
+        clientIds: FieldValue.arrayUnion(clientId),
+        workspaceIds: FieldValue.arrayUnion(workspaceId),
+        memberships: {
+          [clientId]: membership,
+        },
         addedBy,
-        addedAt: allowlistExists ? allowlistDoc.data()?.addedAt ?? now : now,
+        addedAt: allowlistExists ? allowlistData?.addedAt ?? now : now,
         updatedAt: now,
         active: true,
         notes: input.notes?.trim() ?? "",
@@ -94,20 +174,77 @@ export async function provisionClientPortalAccess(
     db.collection("projects").doc(clientId).set(
       {
         clientId,
+        workspaceId,
         clientName,
         clientSlug,
-        clientPortalEmail: email,     // KEY FIELD: portal resolves by this
+        clientPortalEmail:
+          typeof projectData?.clientPortalEmail === "string" && projectData.clientPortalEmail
+            ? projectData.clientPortalEmail
+            : email,
+        clientPortalEmails: FieldValue.arrayUnion(email),
         sourceNgo: input.sourceNgo?.trim() || "readyaimgo",
         status: "active",
         deliverables: input.deliverables ?? [],
         allowlistRef: allowlistDocId, // cross-reference to ragAllowlist
-        provisionedAt: projectExists ? projectDoc.data()?.provisionedAt ?? now : now,
+        provisionedAt: projectExists ? projectData?.provisionedAt ?? now : now,
         updatedAt: now,
         provisionedBy: addedBy,
       },
       { merge: true }
     ),
+    ...assignedUserIds.flatMap((uid) => [
+      db.collection("users").doc(uid).set(
+        {
+          email,
+          client_id: clientId,
+          clientIds: FieldValue.arrayUnion(clientId),
+          workspaceIds: FieldValue.arrayUnion(workspaceId),
+          memberships: {
+            [clientId]: membership,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      ),
+      db.collection("clients").doc(clientId).collection("members").doc(uid).set(
+        {
+          uid,
+          email,
+          workspaceId,
+          role,
+          status: "active",
+          source: "manual-workspace-assignment",
+          assignedBy: addedBy,
+          approvedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      ),
+    ]),
   ])
+
+  await Promise.all(
+    assignedUserIds.length > 0
+      ? assignedUserIds.map((uid) =>
+          assignUserToWorkspace({
+            db,
+            workspaceId,
+            uid,
+            email,
+            role,
+            source: "manual-workspace-assignment",
+          })
+        )
+      : [
+          recordPendingWorkspaceInvite({
+            db,
+            workspaceId,
+            email,
+            role,
+            invitedBy: addedBy,
+          }),
+        ]
+  )
 
   return {
     success: true,
@@ -116,10 +253,12 @@ export async function provisionClientPortalAccess(
     clientSlug,
     allowlistDocId,
     projectDocId: clientId,
+    workspaceId,
     alreadyExisted: {
       allowlist: allowlistExists,
       project: projectExists,
     },
+    assignedUserIds,
   }
 }
 

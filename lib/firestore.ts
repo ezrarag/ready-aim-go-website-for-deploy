@@ -17,6 +17,7 @@ import { collectClientDeployHosts, collectClientGithubRepos, parseRepoSlug } fro
 import { pulseReportSchema } from './pulse-report'
 import { clientRoleSuggestionSnapshotSchema } from './client-role-suggestions'
 import { clientWorkspaceSchema, type ClientWorkspace } from './client-workspace'
+import type { ClientPublicProfile } from './types/client-public-profile'
 
 let app: App | null = null
 let db: Firestore | null = null
@@ -206,6 +207,7 @@ type FirestoreClientDoc = {
   transportationUrl?: unknown
   insuranceUrl?: unknown
   modules?: unknown
+  publicProfile?: unknown
 }
 
 async function getClientDocumentByRef(
@@ -260,6 +262,11 @@ const asStripeStatus = (value: unknown): StripeStatus =>
 
 const asBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === "boolean" ? value : fallback
+
+const asPublicProfile = (value: unknown): ClientPublicProfile | undefined =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as ClientPublicProfile)
+    : undefined
 
 const MODULE_KEYS: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
 
@@ -353,6 +360,7 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     modules: asModules(doc.modules),
     pulseReport: parsedPulseReport.success ? parsedPulseReport.data : undefined,
     roleSuggestionSnapshot: parsedRoleSuggestionSnapshot.success ? parsedRoleSuggestionSnapshot.data : undefined,
+    publicProfile: asPublicProfile(doc.publicProfile),
   }
 }
 

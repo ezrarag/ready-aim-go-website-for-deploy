@@ -13,9 +13,21 @@ import {
   provisionClientPortalAccess,
   revokeClientPortalAccess,
   getClientPortalAccessStatus,
+  type PortalAccessRole,
 } from "@/lib/provision-client-portal"
+import { decodeRouteParam } from "@/lib/route-params"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function readPortalAccessRole(value: unknown): PortalAccessRole {
+  return value === "owner" ||
+    value === "developer" ||
+    value === "collaborator" ||
+    value === "employee-of-client" ||
+    value === "beam-participant"
+    ? value
+    : "collaborator"
+}
 
 function getAdminUid(request: NextRequest): string {
   return (
@@ -32,7 +44,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: clientId } = await context.params
+    const { id } = await context.params
+    const clientId = decodeRouteParam(id)
     const status = await getClientPortalAccessStatus(clientId)
     return NextResponse.json({ success: true, ...status })
   } catch (error) {
@@ -54,9 +67,11 @@ export async function POST(
   }
 
   try {
-    const { id: clientId } = await context.params
+    const { id } = await context.params
+    const clientId = decodeRouteParam(id)
     const body = await request.json()
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
+    const role = readPortalAccessRole(body.role)
 
     if (!EMAIL_PATTERN.test(email)) {
       return NextResponse.json(
@@ -82,14 +97,15 @@ export async function POST(
       deliverables: Array.isArray(body.deliverables) ? body.deliverables : [],
       notes: typeof body.notes === "string" ? body.notes : "",
       addedBy: getAdminUid(request),
+      role,
     })
 
     return NextResponse.json({
       success: true,
       result,
       message: result.alreadyExisted.allowlist
-        ? `Portal access updated for ${email}`
-        : `Portal access granted to ${email} — they can now log into clients.readyaimgo.biz`,
+        ? `Portal access updated for ${email} as ${role}`
+        : `Portal access granted to ${email} as ${role} — they can now log into clients.readyaimgo.biz`,
     })
   } catch (error) {
     console.error("[portal-access POST]", error)
@@ -111,7 +127,8 @@ export async function DELETE(
   }
 
   try {
-    const { id: clientId } = await context.params
+    const { id } = await context.params
+    const clientId = decodeRouteParam(id)
     const body = await request.json()
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
 

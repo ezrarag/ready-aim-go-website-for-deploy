@@ -13,6 +13,7 @@ import {
 } from "@/lib/client-role-suggestions"
 import { collectClientDeployHosts, collectClientGithubRepos } from "@/lib/pulse-selectors"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 
 function clientLooksBeamRelated(client: {
   name: string
@@ -263,7 +264,8 @@ async function persistSnapshot(clientId: string, snapshot: ClientRoleSuggestionS
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })
@@ -294,7 +296,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   }
 
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })

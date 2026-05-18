@@ -9,13 +9,15 @@ import {
   normalizeClientWorkspace,
 } from "@/lib/client-workspace"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })
@@ -53,7 +55,8 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })

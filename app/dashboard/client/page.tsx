@@ -39,6 +39,7 @@ import {
   Percent,
   MapPin,
   MoreHorizontal,
+  ExternalLink,
   XCircle,
   AlertTriangle,
   Eye,
@@ -50,6 +51,7 @@ import {
   Building2,
   Scale,
   Zap,
+  GitBranch,
 } from "lucide-react"
 import { NewProjectModal } from "@/components/new-project-modal"
 import { RolesManager } from "@/components/roles-manager"
@@ -620,6 +622,23 @@ function ClientDashboardContent() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
+              <div className="flex min-w-0 items-center gap-3">
+                <GitBranch className="w-5 h-5 text-orange-500" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-neutral-300">GitHub</div>
+                  <div className="truncate text-xs text-neutral-500">
+                    {clientWebsite?.githubRepos?.length
+                      ? clientWebsite.githubRepos.join(", ")
+                      : "No repository linked yet"}
+                  </div>
+                </div>
+              </div>
+              <Badge className={clientWebsite?.githubRepos?.length ? "bg-green-600" : "bg-neutral-600"}>
+                {clientWebsite?.githubRepos?.length ? "LINKED" : "PENDING"}
+              </Badge>
+            </div>
+
             {/* Payment Integration */}
             <div className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
               <div className="flex items-center gap-3">
@@ -952,7 +971,23 @@ function ClientDashboardContent() {
     </div>
   );
 
-  const renderProjects = () => (
+  const renderProjects = () => {
+    const linkedProjectCards = clientProjects.length > 0
+      ? clientProjects
+      : clientWebsite
+        ? [{
+            id: "client-linked-website",
+            title: clientWebsite.name,
+            description: clientWebsite.pulseSummary || "Linked directly from the client record.",
+            status: clientWebsite.status,
+            clientId: clientId || "",
+            liveUrl: clientWebsite.url,
+            githubRepo: clientWebsite.githubRepos?.[0] || clientWebsite.githubRepo,
+            githubRepos: clientWebsite.githubRepos,
+          }]
+        : []
+
+    return (
     <div className="p-6">
       <Card className="bg-neutral-800 border-gray-200">
         <CardHeader>
@@ -1095,6 +1130,77 @@ function ClientDashboardContent() {
             </div>
           </div>
 
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {projectsLoading ? (
+              <Card className="bg-white border-gray-200">
+                <CardContent className="p-4 text-sm text-neutral-500">Loading linked project data...</CardContent>
+              </Card>
+            ) : projectsError ? (
+              <Card className="bg-white border-gray-200">
+                <CardContent className="p-4 text-sm text-red-500">Unable to load linked project data.</CardContent>
+              </Card>
+            ) : linkedProjectCards.length === 0 ? (
+              <Card className="bg-white border-gray-200">
+                <CardContent className="p-4 text-sm text-neutral-500">
+                  No GitHub or deployment project is linked to this portal yet.
+                </CardContent>
+              </Card>
+            ) : (
+              linkedProjectCards.map((project) => {
+                const repo = project.githubRepos?.[0] || project.githubRepo || project.repoSlug
+                const liveUrl = project.liveUrl || project.live_url || project.deployUrl
+
+                return (
+                  <Card key={project.id} className="bg-white border-gray-200">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <CardTitle className="truncate text-sm font-bold tracking-wider text-white">
+                            {project.title}
+                          </CardTitle>
+                          <p className="mt-1 line-clamp-2 text-xs text-neutral-400">
+                            {project.description || project.pulseSummary || "Linked project"}
+                          </p>
+                        </div>
+                        <Badge className={project.status === "live" || project.status === "active" ? "bg-green-600" : "bg-neutral-600"}>
+                          {String(project.status || "linked").toUpperCase()}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-xs">
+                      <div>
+                        <div className="mb-1 text-neutral-400">GITHUB</div>
+                        <div className="truncate text-white font-mono">{repo || "No repo linked"}</div>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-neutral-400">DEPLOY</div>
+                        <div className="truncate text-white font-mono">{liveUrl || "No deploy host linked"}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {repo ? (
+                          <Button variant="outline" size="sm" className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600" asChild>
+                            <a href={repo.startsWith("http") ? repo : `https://github.com/${repo}`} target="_blank" rel="noopener noreferrer">
+                              <GitBranch className="mr-2 h-4 w-4" />
+                              Repository
+                            </a>
+                          </Button>
+                        ) : null}
+                        {liveUrl ? (
+                          <Button variant="outline" size="sm" className="bg-neutral-700 border-neutral-600 text-neutral-300 hover:bg-neutral-600" asChild>
+                            <a href={liveUrl} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Open
+                            </a>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
+          </div>
+
           {/* Missions List */}
           {missionsLoading ? (
             <div className="text-center py-12 text-neutral-500">
@@ -1181,7 +1287,8 @@ function ClientDashboardContent() {
         </CardContent>
       </Card>
     </div>
-  );
+    )
+  };
 
   const renderMarketplace = () => {
     // Check marketplace access
@@ -3014,16 +3121,20 @@ function ClientDashboardContent() {
     }
   };
 
-              // Update website name dynamically when clientWebsite changes
-            useEffect(() => {
-              if (!websiteLoading && clientWebsite) {
-                setBusinessAssets(prev => prev.map(asset =>
-                  asset.type === 'website'
-                    ? { ...asset, name: clientWebsite.name, status: clientWebsite.status }
-                    : asset
-                ));
-              }
-            }, [clientWebsite, websiteLoading]);
+  useEffect(() => {
+    if (websiteLoading) return
+
+    setBusinessAssets(prev => prev.map(asset =>
+      asset.type === 'website'
+        ? {
+            ...asset,
+            name: clientWebsite?.name || "Business Website",
+            status: clientWebsite?.status || "inactive",
+            is_active: Boolean(clientWebsite),
+          }
+        : asset
+    ));
+  }, [clientWebsite, websiteLoading]);
 
   // Calculate financial metrics
   const totalRevenue = businessAssets.reduce((sum, asset) => sum + asset.revenue, 0);
@@ -3291,6 +3402,19 @@ function ClientDashboardContent() {
                     </span>
                   </div>
                   <Progress value={asset.revenue_health} className="h-2" />
+
+                  {asset.type === 'website' && clientWebsite ? (
+                    <div className="rounded border border-gray-200 bg-neutral-900/40 p-3 text-xs">
+                      <div className="mb-1 text-neutral-400">LINKED REPO</div>
+                      <div className="truncate text-white font-mono">
+                        {clientWebsite.githubRepos?.[0] || "No GitHub repo linked"}
+                      </div>
+                      <div className="mt-2 mb-1 text-neutral-400">DEPLOY HOST</div>
+                      <div className="truncate text-white font-mono">
+                        {clientWebsite.deployHosts?.[0] || clientWebsite.url || "No deploy host linked"}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
@@ -3681,7 +3805,7 @@ function ClientDashboardContent() {
           status: clientWebsite?.status || "active",
           adminUrl: clientWebsite?.url ? `${clientWebsite.url}/admin` : undefined,
           techStack: clientWebsite?.techStack || ["React", "Next.js", "TypeScript", "Tailwind CSS", "Firebase"],
-          githubRepo: clientWebsite?.githubRepo || "https://github.com/client/website",
+          githubRepo: clientWebsite?.githubRepo || "",
           traffic: {
             monthlyVisitors: 15000,
             growthRate: 12,

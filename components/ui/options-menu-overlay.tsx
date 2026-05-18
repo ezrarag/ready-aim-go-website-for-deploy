@@ -14,6 +14,9 @@ interface OptionsMenuOverlayProps {
 export function OptionsMenuOverlay({ isOpen, onClose }: OptionsMenuOverlayProps) {
   const router = useRouter()
   const [activeMenuItem, setActiveMenuItem] = React.useState<string | null>(null)
+  const clientPortalLoginUrl = `${(
+    process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || "https://clients.readyaimgo.biz"
+  ).replace(/\/$/, "")}/login`
 
   // Handle ESC key to close
   React.useEffect(() => {
@@ -40,7 +43,7 @@ export function OptionsMenuOverlay({ isOpen, onClose }: OptionsMenuOverlayProps)
 
   const signInOptions = [
     { id: "ADMIN", label: "Admin", icon: Shield, color: "text-blue-600", action: () => router.push('/dashboard/admin') },
-    { id: "CLIENTS", label: "Clients", icon: Users, color: "text-green-600", action: () => router.push('/clients?intent=claim') },
+    { id: "CLIENTS", label: "Clients", icon: Users, color: "text-green-600", action: () => { window.location.href = clientPortalLoginUrl } },
     { id: "PARTNERS", label: "Partners", icon: Handshake, color: "text-purple-600", action: () => router.push('/partners') },
   ]
 

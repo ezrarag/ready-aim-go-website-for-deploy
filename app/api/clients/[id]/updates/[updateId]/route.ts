@@ -4,6 +4,7 @@ import {
   updateClientUpdate,
 } from "@/lib/firestore"
 import type { ModuleKey, UpdateStatus } from "@/lib/client-directory"
+import { decodeRouteParam } from "@/lib/route-params"
 
 const MODULE_KEYS: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
 
@@ -13,7 +14,7 @@ export async function GET(
 ) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const updateId = params.updateId
 
     const update = await getClientUpdateById(clientId, updateId)
@@ -47,7 +48,7 @@ export async function PATCH(
 ) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const updateId = params.updateId
     const body = await request.json()
 

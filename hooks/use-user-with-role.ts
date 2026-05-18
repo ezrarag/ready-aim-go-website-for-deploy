@@ -6,6 +6,7 @@ import { ensureAuthPersistence, getClientUserProfile, type ClientUserProfile } f
 import type { ClientMembership, UserRole } from "@/lib/types/client-membership"
 
 type UserWithId = User & { id: string }
+const PROFILE_READ_TIMEOUT_MS = 10000
 
 interface UserSession {
   user: UserWithId
@@ -23,6 +24,17 @@ interface UserSession {
   userRole: UserRole | null
   /** Full per-client membership map. */
   memberships: Record<string, ClientMembership>
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout))
+  })
 }
 
 export function useUserWithRole() {
@@ -50,7 +62,11 @@ export function useUserWithRole() {
           }
 
           try {
-            const profile = await getClientUserProfile(user.uid)
+            const profile = await withTimeout(
+              getClientUserProfile(user.uid),
+              PROFILE_READ_TIMEOUT_MS,
+              "Timed out while reading users/{uid}. Check Firebase config, Firestore rules, and network access."
+            )
             if (!isMounted) {
               return
             }

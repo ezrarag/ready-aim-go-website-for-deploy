@@ -6,11 +6,12 @@ import {
 import type { ModuleKey } from "@/lib/client-directory"
 import { collectClientDeployHosts, collectClientGithubRepos } from "@/lib/pulse-selectors"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const { searchParams } = new URL(request.url)
     const latestUpdates = searchParams.get("latestUpdates") === "true"
 
@@ -60,7 +61,7 @@ export async function PATCH(
 
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const db = (await import("@/lib/firestore")).getFirestoreDb()
     if (!db) {
       return NextResponse.json(

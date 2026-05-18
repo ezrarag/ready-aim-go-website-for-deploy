@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      data: snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data())),
     })
   } catch (err) {
     console.error("GET /api/admin/repos:", err)

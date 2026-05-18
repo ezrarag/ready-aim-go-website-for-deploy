@@ -38,6 +38,7 @@ import {
   getClientEditPayloadSignature,
   type ClientEditPayload,
 } from "@/lib/client-edit-form"
+import { serializeFirestoreValue } from "@/lib/firestore-json"
 import { getClientPreferredProductionUrl } from "@/lib/vercel"
 
 type Client = ClientDirectoryEntry
@@ -53,6 +54,14 @@ async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
   if (!response.ok) {
     throw new Error(data?.error || "Failed to update client")
   }
+}
+
+function formatClientActivity(value: unknown) {
+  const serialized = serializeFirestoreValue(value)
+  if (serialized instanceof Date) return serialized.toLocaleString()
+  if (typeof serialized === "string" && serialized.trim()) return serialized
+  if (typeof serialized === "number") return String(serialized)
+  return "Recently updated"
 }
 
 export default function ClientsPage() {
@@ -124,9 +133,12 @@ export default function ClientsPage() {
       filtered = filtered.filter((client) => !client.websiteUrl?.trim() && !client.deployUrl?.trim())
     }
 
-    const toTs = (value?: string): number => {
-      if (!value) return 0
-      const timestamp = new Date(value).getTime()
+    const toTs = (value?: unknown): number => {
+      const serialized = serializeFirestoreValue(value)
+      if (!serialized) return 0
+      if (serialized instanceof Date) return Number.isNaN(serialized.getTime()) ? 0 : serialized.getTime()
+      if (typeof serialized !== "string" && typeof serialized !== "number") return 0
+      const timestamp = new Date(serialized).getTime()
       return Number.isNaN(timestamp) ? 0 : timestamp
     }
 
@@ -524,17 +536,23 @@ export default function ClientsPage() {
                   ) : null}
 
                   <div className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Last activity:</strong> {client.lastActivity}
+                    <strong className="text-foreground">Last activity:</strong> {formatClientActivity(client.lastActivity)}
                   </div>
 
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1" asChild>
-                      <Link href={`/dashboard/clients/${client.id}`}>
+                      <Link href={`/dashboard/clients/${encodeURIComponent(client.id)}`}>
                         <FileText className="mr-2 h-4 w-4" />
                         View Details
                       </Link>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleEditClient(client)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditClient(client)}
+                      aria-label={`Edit ${client.name}`}
+                      title={`Edit ${client.name}`}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     {preferredProductionUrl ? (

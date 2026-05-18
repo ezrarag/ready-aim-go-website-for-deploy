@@ -23,6 +23,9 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
   const signInMenuRef = useRef<HTMLDivElement>(null)
   const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(320)
   const router = useRouter()
+  const clientPortalLoginUrl = `${(
+    process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || "https://clients.readyaimgo.biz"
+  ).replace(/\/$/, "")}/login`
 
   useEffect(() => {
     // TODO: Firebase Auth session
@@ -54,7 +57,7 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
 
   const handleClientSignIn = () => {
     setSignInMenuOpen(false)
-    router.push('/clients?intent=claim')
+    window.location.href = clientPortalLoginUrl
   }
 
   const handlePartnerSignIn = () => {

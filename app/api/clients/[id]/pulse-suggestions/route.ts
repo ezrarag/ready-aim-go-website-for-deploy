@@ -10,6 +10,7 @@ import {
 import { buildClientUpdatesFromVercelProject, listVercelProjects, matchVercelProjectToClient } from "@/lib/vercel"
 import { pulseReportSchema, summarizePulseReport } from "@/lib/pulse-report"
 import type { PulseReport } from "@/lib/pulse-report"
+import { decodeRouteParam } from "@/lib/route-params"
 
 type PulseEvent = {
   source: "github" | "vercel"
@@ -247,7 +248,8 @@ async function persistPulseReport(clientId: string, pulseReport: PulseReport, su
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await context.params
+    const { id: rawId } = await context.params
+    const id = decodeRouteParam(rawId)
     let client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })

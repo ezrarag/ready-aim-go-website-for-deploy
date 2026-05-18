@@ -26,6 +26,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import DashboardLayout from "@/components/dashboard-layout"
+import { ClientPortalAccessPanel } from "@/components/admin/client-portal-access-panel"
+import { WorkspacePortalAssignmentCard } from "@/components/admin/workspace-portal-assignment-card"
+import { WorkspaceProjectControlCenter } from "@/components/admin/workspace-project-control-center"
 import {
   ArrowLeft,
   Brain,
@@ -58,6 +61,8 @@ import {
   getClientEditPayloadSignature,
   type ClientEditPayload,
 } from "@/lib/client-edit-form"
+import { serializeFirestoreValue } from "@/lib/firestore-json"
+import { decodeRouteParam } from "@/lib/route-params"
 import { getClientPreferredProductionUrl } from "@/lib/vercel"
 import type {
   ClientWorkspace,
@@ -188,10 +193,15 @@ function createEmptyWorkspaceCanvasBlock(): ClientWorkspaceCanvasBlock {
   }
 }
 
-function formatTimestamp(value?: string): string {
-  if (!value) return "Not saved yet"
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+function formatTimestamp(value?: unknown, fallback = "Not saved yet"): string {
+  const serialized = serializeFirestoreValue(value)
+  if (!serialized) return fallback
+  if (serialized instanceof Date) return Number.isNaN(serialized.getTime()) ? fallback : serialized.toLocaleString()
+  if (typeof serialized !== "string" && typeof serialized !== "number") return fallback
+
+  const text = String(serialized)
+  const date = new Date(text)
+  return Number.isNaN(date.getTime()) ? text : date.toLocaleString()
 }
 
 function sanitizeWorkspaceForSave(workspace: ClientWorkspace): ClientWorkspace {
@@ -253,7 +263,7 @@ async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
 
 export default function ClientDetailPage() {
   const params = useParams()
-  const clientId = params.id as string
+  const clientId = decodeRouteParam(params.id)
   const [client, setClient] = useState<ClientDirectoryEntry | null>(null)
   const [updates, setUpdates] = useState<ClientUpdate[]>([])
   const [loading, setLoading] = useState(true)
@@ -890,6 +900,8 @@ export default function ClientDetailPage() {
             <TabsTrigger value="updates">Updates</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="space-y-4">
+            <ClientPortalAccessPanel clientId={clientId} clientName={client.name} />
+
             <Card>
               <CardHeader>
                 <CardTitle>Client info</CardTitle>
@@ -897,7 +909,7 @@ export default function ClientDetailPage() {
               <CardContent className="space-y-2">
                 <p><strong>Story ID:</strong> {client.storyId}</p>
                 <p><strong>Status:</strong> {client.status}</p>
-                <p><strong>Last activity:</strong> {client.lastActivity}</p>
+                <p><strong>Last activity:</strong> {formatTimestamp(client.lastActivity, "Recently updated")}</p>
                 <div className="pt-2">
                   <Button variant="outline" size="sm" onClick={handleSyncFromVercel} disabled={syncingVercel}>
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncingVercel ? "animate-spin" : ""}`} />
@@ -1096,6 +1108,9 @@ export default function ClientDetailPage() {
                 <CardContent className="py-6 text-sm text-amber-600">{workspaceError}</CardContent>
               </Card>
             ) : null}
+
+            <WorkspacePortalAssignmentCard clientId={clientId} clientName={client.name} />
+            <WorkspaceProjectControlCenter clientId={clientId} workspaceId={client.workspaceId} />
 
             {workspaceLoading && !workspace ? (
               <Card>

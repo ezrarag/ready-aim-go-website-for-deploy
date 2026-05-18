@@ -23,7 +23,8 @@ export function parseRepoSlug(raw: string): string | null {
   if (!value) return null
 
   if (/^[^/\s]+\/[^/\s]+$/.test(value)) {
-    return value.toLowerCase()
+    const [owner, repo] = value.split("/")
+    return `${owner}/${repo.replace(/\.git$/i, "")}`.toLowerCase()
   }
 
   try {

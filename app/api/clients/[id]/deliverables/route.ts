@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 import type { ClientDeliverable } from "@/lib/types/client-billing"
 
 // Firestore: clients/{clientId}/deliverables/{deliverableId}
@@ -12,7 +14,8 @@ export async function GET(request: NextRequest, context: Params) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const { id: clientId } = await context.params
+  const { id } = await context.params
+  const clientId = decodeRouteParam(id)
 
   try {
     const db = getFirestoreDb()
@@ -28,10 +31,9 @@ export async function GET(request: NextRequest, context: Params) {
     if (status) query = query.where("status", "==", status)
 
     const snap = await query.get()
-    const data: ClientDeliverable[] = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<ClientDeliverable, "id">),
-    }))
+    const data = snap.docs.map((d) =>
+      serializeFirestoreDocument(d.id, d.data())
+    ) as unknown as ClientDeliverable[]
 
     return NextResponse.json({ success: true, data })
   } catch (err) {
@@ -48,7 +50,8 @@ export async function POST(request: NextRequest, context: Params) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const { id: clientId } = await context.params
+  const { id } = await context.params
+  const clientId = decodeRouteParam(id)
 
   try {
     const db = getFirestoreDb()
@@ -60,10 +63,17 @@ export async function POST(request: NextRequest, context: Params) {
       return NextResponse.json({ success: false, error: "title is required" }, { status: 400 })
     }
     const amount = typeof body.amount === "number" && body.amount >= 0 ? body.amount : 0
+    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    const workspaceId =
+      typeof body.workspaceId === "string"
+        ? body.workspaceId.trim()
+        : ""
 
     const now = new Date().toISOString()
     const payload: Omit<ClientDeliverable, "id"> = {
       clientId,
+      workspaceId: workspaceId || null,
+      projectId: projectId || null,
       title,
       summary: typeof body.summary === "string" ? body.summary : "",
       liveUrl: typeof body.liveUrl === "string" ? body.liveUrl : "",

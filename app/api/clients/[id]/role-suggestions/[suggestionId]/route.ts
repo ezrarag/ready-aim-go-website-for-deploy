@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getClientDirectoryEntryById, getFirestoreDb } from "@/lib/firestore"
 import { clientRoleSuggestionSnapshotSchema } from "@/lib/client-role-suggestions"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 
 export async function PATCH(
   request: NextRequest,
@@ -12,7 +13,8 @@ export async function PATCH(
   }
 
   try {
-    const { id, suggestionId } = await context.params
+    const { id: rawId, suggestionId } = await context.params
+    const id = decodeRouteParam(rawId)
     const client = await getClientDirectoryEntryById(id)
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })

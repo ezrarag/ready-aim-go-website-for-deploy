@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { getFirestoreDb } from "@/lib/firestore"
+import { decodeRouteParam } from "@/lib/route-params"
 
 interface SOWLineItem {
   description: string
@@ -22,7 +23,8 @@ export async function POST(
   }
 
   try {
-    const { id: clientId } = await context.params
+    const { id } = await context.params
+    const clientId = decodeRouteParam(id)
     const body = await request.json().catch(() => ({}))
     const { notes, projectIds, draftTitle } = body as {
       notes?: string

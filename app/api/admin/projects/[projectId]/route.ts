@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest, context: Params) {
     if (!doc.exists) {
       return NextResponse.json({ success: false, error: "Project not found" }, { status: 404 })
     }
-    return NextResponse.json({ success: true, data: { id: doc.id, ...doc.data() } })
+    return NextResponse.json({ success: true, data: serializeFirestoreDocument(doc.id, doc.data()) })
   } catch (err) {
     console.error("GET /api/admin/projects/[projectId]:", err)
     return NextResponse.json(
@@ -42,7 +43,7 @@ export async function PATCH(request: NextRequest, context: Params) {
     if (!db) return NextResponse.json({ success: false, error: "DB unavailable" }, { status: 503 })
 
     const body = (await request.json()) as Record<string, unknown>
-    const patch = { ...body, updatedAt: new Date().toISOString() }
+    const patch: Record<string, unknown> = { ...body, updatedAt: new Date().toISOString() }
     delete patch.id
     delete patch.createdAt
 
@@ -62,7 +63,7 @@ export async function PATCH(request: NextRequest, context: Params) {
     })
 
     const updated = await ref.get()
-    return NextResponse.json({ success: true, data: { id: updated.id, ...updated.data() } })
+    return NextResponse.json({ success: true, data: serializeFirestoreDocument(updated.id, updated.data()) })
   } catch (err) {
     console.error("PATCH /api/admin/projects/[projectId]:", err)
     return NextResponse.json(

@@ -103,6 +103,20 @@ function matchClient(addresses: string[], map: Map<string, string>): string | nu
   return null
 }
 
+async function getClientWorkspaceId(clientId: string): Promise<string | null> {
+  const db = getFirestoreDb()
+  if (!db) return null
+
+  const [clientSnap, projectSnap] = await Promise.all([
+    db.collection("clients").doc(clientId).get(),
+    db.collection("projects").doc(clientId).get(),
+  ])
+  const clientData = clientSnap.exists ? (clientSnap.data() as Record<string, unknown>) : undefined
+  const projectData = projectSnap.exists ? (projectSnap.data() as Record<string, unknown>) : undefined
+  const workspaceId = clientData?.workspaceId ?? projectData?.workspaceId
+  return typeof workspaceId === "string" && workspaceId.trim() ? workspaceId.trim() : null
+}
+
 // ── Main sync handler ─────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -152,6 +166,7 @@ export async function POST(req: NextRequest) {
 
       const clientId = matchClient(allAddresses, clientMap)
       if (!clientId) continue
+      const workspaceId = await getClientWorkspaceId(clientId)
 
       await db
         .collection("clientComms")
@@ -160,6 +175,7 @@ export async function POST(req: NextRequest) {
         .doc(thread.id!)
         .set(
           {
+            workspaceId,
             subject,
             snippet: first.snippet ?? "",
             from,
@@ -194,6 +210,7 @@ export async function POST(req: NextRequest) {
 
       const clientId = matchClient(attendees, clientMap)
       if (!clientId) continue
+      const workspaceId = await getClientWorkspaceId(clientId)
 
       await db
         .collection("clientComms")
@@ -202,6 +219,7 @@ export async function POST(req: NextRequest) {
         .doc(event.id!)
         .set(
           {
+            workspaceId,
             title: event.summary ?? "(No title)",
             start: event.start?.dateTime ?? event.start?.date ?? "",
             end: event.end?.dateTime ?? event.end?.date ?? "",

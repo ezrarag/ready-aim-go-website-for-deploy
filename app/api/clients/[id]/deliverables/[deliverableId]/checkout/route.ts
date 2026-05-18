@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getFirestoreDb } from "@/lib/firestore"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
+import { decodeRouteParam } from "@/lib/route-params"
 import type { ClientDeliverable } from "@/lib/types/client-billing"
 
 // POST /api/clients/[id]/deliverables/[deliverableId]/checkout
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest, context: Params) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const { id: clientId, deliverableId } = await context.params
+  const { id, deliverableId } = await context.params
+  const clientId = decodeRouteParam(id)
 
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ success: false, error: "Stripe not configured" }, { status: 503 })

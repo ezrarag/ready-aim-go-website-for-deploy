@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getClientUpdates, createClientUpdate } from "@/lib/firestore"
 import type { ModuleKey, UpdateStatus } from "@/lib/client-directory"
+import { decodeRouteParam } from "@/lib/route-params"
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +9,7 @@ export async function GET(
 ) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") as ModuleKey | null
     const status = searchParams.get("status") as UpdateStatus | null
@@ -45,7 +46,7 @@ export async function POST(
 ) {
   try {
     const params = await context.params
-    const clientId = params.id
+    const clientId = decodeRouteParam(params.id)
     const body = await request.json()
 
     const type = body.type as string

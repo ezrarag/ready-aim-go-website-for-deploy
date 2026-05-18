@@ -37,6 +37,7 @@ import {
   type ValueProfileResponse,
   type ValueThreshold,
 } from "@/lib/value-profile"
+import { decodeRouteParam } from "@/lib/route-params"
 
 type ThresholdDraft = {
   id: string
@@ -105,7 +106,7 @@ function draftToThreshold(draft: ThresholdDraft, index: number): ValueThreshold 
 
 export default function AdminClientValueProfilePage() {
   const params = useParams()
-  const clientId = params.id as string
+  const clientId = decodeRouteParam(params.id)
   const [data, setData] = useState<ValueProfileResponse | null>(null)
   const [drafts, setDrafts] = useState<ThresholdDraft[]>([])
   const [loading, setLoading] = useState(true)

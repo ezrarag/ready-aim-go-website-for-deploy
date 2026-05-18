@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
+import { WorkspacePresencePanel } from "@/components/admin/workspace-presence-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
@@ -534,6 +535,13 @@ export function CommandCenter() {
 
         </div>
       )}
+
+      {/* Workspace presence — full-width below the main grid */}
+      <AdminPanel>
+        <CardContent className="pt-6">
+          <WorkspacePresencePanel />
+        </CardContent>
+      </AdminPanel>
 
       {data && (
         <p className="text-xs text-muted-foreground text-right">

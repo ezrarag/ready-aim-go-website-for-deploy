@@ -12,7 +12,13 @@ export interface ClientProject {
   description?: string
   status: string
   clientId: string
+  workspaceId?: string | null
   liveUrl?: string
+  deployUrl?: string
+  githubRepo?: string
+  githubRepos?: string[]
+  repoSlug?: string
+  pulseSummary?: string
   /** Legacy snake_case fields kept for backward compat with dashboard UI */
   live_url?: string
   image_url?: string

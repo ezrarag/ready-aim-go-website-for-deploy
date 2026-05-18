@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ShieldOff,
   UserPlus,
+  Users,
 } from "lucide-react"
 import { AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
 import { Badge } from "@/components/ui/badge"
@@ -40,6 +41,18 @@ type AccessStatus = {
   provisionedAt: string | null
 }
 
+type PortalMember = {
+  uid: string
+  email: string | null
+  displayName: string | null
+  role: string
+  status: string
+  source: string
+  approvedAt: string | null
+  updatedAt: string | null
+  lastLoginAt: string | null
+}
+
 type Props = {
   clientId: string
   clientName: string
@@ -54,6 +67,8 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [revoking, setRevoking] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [members, setMembers] = useState<PortalMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(true)
 
   const fetchStatus = async () => {
     setLoading(true)
@@ -78,7 +93,26 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
     }
   }
 
-  useEffect(() => { void fetchStatus() }, [clientId])
+  const fetchMembers = async () => {
+    setMembersLoading(true)
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/portal-members`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      if (data.success) {
+        setMembers(Array.isArray(data.members) ? (data.members as PortalMember[]) : [])
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void Promise.all([fetchStatus(), fetchMembers()])
+  }, [clientId])
 
   const handleProvision = async () => {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -99,7 +133,7 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
       toast({ title: "Portal access granted", description: data.message })
       setShowForm(false)
       setNotes("")
-      await fetchStatus()
+      await Promise.all([fetchStatus(), fetchMembers()])
     } catch (e) {
       toast({
         title: "Failed to grant access",
@@ -125,7 +159,7 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to revoke")
       toast({ title: "Access revoked", description: data.message })
-      await fetchStatus()
+      await Promise.all([fetchStatus(), fetchMembers()])
     } catch (e) {
       toast({
         title: "Failed to revoke",
@@ -206,7 +240,7 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                   <a
-                    href={`https://clients.readyaimgo.biz/portal/${clientId}`}
+                    href={`https://clients.readyaimgo.biz/portal/${encodeURIComponent(clientId)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -234,6 +268,80 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
                 </Button>
               </div>
             )}
+
+            <AdminPanelInset className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium text-foreground">Known Portal People</div>
+                    <div className="text-xs text-muted-foreground">
+                      Users currently associated through users/{`{uid}`}.clientIds or the client members mirror.
+                    </div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => void fetchMembers()}>
+                  Refresh
+                </Button>
+              </div>
+
+              {membersLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading associated people...
+                </div>
+              ) : members.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No signed-in portal users are associated with this client yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {members.map((member) => (
+                    <div
+                      key={member.uid}
+                      className="flex flex-col gap-3 rounded-lg border border-border/60 bg-background/40 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {member.displayName || member.email || member.uid}
+                          </span>
+                          <Badge className="border border-slate-500/30 bg-slate-500/10 text-slate-300">
+                            {member.role}
+                          </Badge>
+                          <Badge
+                            className={
+                              member.status === "active"
+                                ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                                : "border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                            }
+                          >
+                            {member.status}
+                          </Badge>
+                        </div>
+                        {member.email ? (
+                          <div className="mt-1 font-mono text-xs text-muted-foreground">{member.email}</div>
+                        ) : null}
+                        <div className="mt-1 text-xs text-muted-foreground">Source: {member.source}</div>
+                      </div>
+                      {member.email ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setEmail(member.email ?? "")
+                            setShowForm(true)
+                          }}
+                        >
+                          Use email
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AdminPanelInset>
 
             {/* Grant / re-grant button */}
             {(!status.hasAccess || !status.active || showForm) && (

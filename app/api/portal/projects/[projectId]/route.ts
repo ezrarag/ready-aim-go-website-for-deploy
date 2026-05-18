@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { resolvePortalIdentity, isClientAllowed } from "@/lib/portal-auth"
 
 type Params = { params: Promise<{ projectId: string }> }
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, context: Params) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 })
     }
 
-    return NextResponse.json({ success: true, data: { id: doc.id, ...data } })
+    return NextResponse.json({ success: true, data: serializeFirestoreDocument(doc.id, data) })
   } catch (err) {
     console.error("GET /api/portal/projects/[projectId]:", err)
     return NextResponse.json(

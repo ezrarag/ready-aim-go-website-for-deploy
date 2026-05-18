@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,9 @@ import {
   EyeOff
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard-layout';
+import { ADVANCED_ADMIN_TOOLS } from '@/lib/admin-navigation';
+import { ragDevtoolsFirebaseConfig } from '@/lib/devtools/publicConfig';
+import { useUserWithRole } from '@/hooks/use-user-with-role';
 
 interface ApiKey {
   name: string;
@@ -30,6 +34,7 @@ interface ApiKey {
 }
 
 export default function SettingsPage() {
+  const { session, loading: authLoading, error: authError } = useUserWithRole();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -202,6 +207,45 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Admin Diagnostics */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Admin Diagnostics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Firebase Project</p>
+              <p className="mt-1 break-all font-mono text-sm text-gray-900">
+                {ragDevtoolsFirebaseConfig.NEXT_PUBLIC_BEAM_DEVTOOLS_FIREBASE_PROJECT_ID || "Missing"}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Current User</p>
+              <p className="mt-1 break-all text-sm text-gray-900">{session?.email || "Not signed in"}</p>
+              <p className="mt-1 break-all font-mono text-xs text-gray-500">{session?.user.uid || "No uid"}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Admin Role</p>
+              <div className="mt-1 flex items-center gap-2">
+                <Badge className={session?.profile?.role === "admin" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                  {authLoading ? "checking" : session?.profile?.role || "missing"}
+                </Badge>
+                <span className="text-xs text-gray-500">users/&#123;uid&#125;.role</span>
+              </div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Profile Read</p>
+              <Badge className={authError ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}>
+                {authError ? "error" : authLoading ? "checking" : "available"}
+              </Badge>
+              {authError ? <p className="mt-2 text-xs text-red-700">{authError}</p> : null}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Configuration Status */}
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardHeader>
@@ -227,6 +271,25 @@ export default function SettingsPage() {
                 <div className="text-sm text-blue-700">System Ready</div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Advanced Tools */}
+        <Card>
+          <CardHeader>
+            <CardTitle>System Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {ADVANCED_ADMIN_TOOLS.map((tool) => (
+              <Link
+                key={`${tool.id}-${tool.href}`}
+                href={tool.href}
+                className="rounded-lg border p-3 transition-colors hover:bg-gray-50"
+              >
+                <p className="font-medium text-gray-900">{tool.label}</p>
+                <p className="mt-1 break-all font-mono text-xs text-gray-500">{tool.href}</p>
+              </Link>
+            ))}
           </CardContent>
         </Card>
 

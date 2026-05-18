@@ -1,394 +1,303 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, ArrowRight, Brain, RefreshCw, ShieldCheck, Siren, Waves, Workflow } from "lucide-react"
-import { useRouter } from "next/navigation"
+import {
+  AlertTriangle,
+  ArrowRight,
+  FolderOpen,
+  ListTodo,
+  RefreshCw,
+  Users,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
-import type { ClientDirectoryEntry } from "@/lib/client-directory"
-import {
-  ADMIN_AREAS,
-  countPulseEventsForArea,
-  getAreaSummary,
-  getOperationalAlerts,
-  getClientsForArea,
-  type AdminPulseEvent,
-  type AdminVercelProject,
-} from "@/lib/admin-operations"
+import { ClientClaimRequestsPanel } from "@/components/admin/client-claim-requests-panel"
 
-type PulseSourceResponse = {
-  source?: string
-  totalEvents?: number
-  events?: AdminPulseEvent[]
-  error?: string
-}
-
-type SourceHealth = {
+type ClientRecord = {
   id: string
-  label: string
-  totalEvents: number
-  error?: string
+  name?: string
+  status?: string
+  updatedAt?: unknown
+  lastActivity?: unknown
 }
 
-type OperationsState = {
-  totalClients: number
-  linkedProjects: number
-  totalProjects: number
-  unlinkedProjects: number
-  sourceStatuses: SourceHealth[]
-  sourceEventTotal: number
-  alerts: string[]
-  webSummary: ReturnType<typeof getAreaSummary>
-  beamSummary: ReturnType<typeof getAreaSummary>
-  allAreaSummaries: Array<ReturnType<typeof getAreaSummary>>
-  webNotifications: number
-  beamNotifications: number
-  beamStoryGaps: number
-  webCoverageGaps: number
+type ProjectRecord = {
+  id: string
+  clientId?: string
+  workspaceId?: string
+  clientPortalEmail?: string
+  status?: string
+  updatedAt?: unknown
+}
+
+type TaskRecord = {
+  id: string
+  title?: string
+  status?: string
+  clientId?: string
+  workspaceId?: string
+  projectId?: string
+  updatedAt?: unknown
+}
+
+type DashboardState = {
+  clients: ClientRecord[]
+  projects: ProjectRecord[]
+  tasks: TaskRecord[]
+  errors: string[]
   lastUpdated: string
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  slack: "Slack",
-  github: "GitHub",
-  vercel: "Vercel Pulse",
-}
-
-function emptyAreaSummary(areaId: Parameters<typeof getAreaSummary>[2]) {
-  return getAreaSummary([], [], areaId)
-}
-
-function createEmptyOperationsState(): OperationsState {
+function emptyDashboardState(): DashboardState {
   return {
-    totalClients: 0,
-    linkedProjects: 0,
-    totalProjects: 0,
-    unlinkedProjects: 0,
-    sourceStatuses: [],
-    sourceEventTotal: 0,
-    alerts: [],
-    webSummary: emptyAreaSummary("web-development"),
-    beamSummary: emptyAreaSummary("beam-participants"),
-    allAreaSummaries: ADMIN_AREAS.map((area) => getAreaSummary([], [], area.id)),
-    webNotifications: 0,
-    beamNotifications: 0,
-    beamStoryGaps: 0,
-    webCoverageGaps: 0,
+    clients: [],
+    projects: [],
+    tasks: [],
+    errors: [],
     lastUpdated: new Date().toISOString(),
   }
 }
 
-export default function DashboardPage() {
-  const router = useRouter()
-  const [authChecked, setAuthChecked] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [operations, setOperations] = useState<OperationsState>(createEmptyOperationsState)
+async function readAdminList<T>(url: string, label: string): Promise<{ data: T[]; error?: string }> {
+  try {
+    const response = await fetch(url, { cache: "no-store" })
+    const payload = await response.json().catch(() => ({}))
 
-  useEffect(() => {
-    // TODO: Firebase Auth session check
-    setAuthChecked(true)
-  }, [router])
+    if (!response.ok || payload.success === false) {
+      return { data: [], error: payload.error || `${label} returned ${response.status}` }
+    }
 
-  useEffect(() => {
-    if (!authChecked) return
-    void fetchOperations()
-  }, [authChecked])
+    const data = Array.isArray(payload.data)
+      ? payload.data
+      : Array.isArray(payload.clients)
+        ? payload.clients
+        : []
 
-  const fetchOperations = async () => {
-    try {
-      setRefreshing(true)
-      setLoading(true)
-
-      const [clientsResponse, vercelProjectsResponse, ...sourceResponses] = await Promise.allSettled([
-        fetch("/api/clients", { cache: "no-store" }),
-        fetch("/api/vercel/projects", { cache: "no-store" }),
-        fetch("/api/pulse/slack", { cache: "no-store" }),
-        fetch("/api/pulse/github", { cache: "no-store" }),
-        fetch("/api/pulse/vercel", { cache: "no-store" }),
-      ])
-
-      let clients: ClientDirectoryEntry[] = []
-      if (clientsResponse.status === "fulfilled" && clientsResponse.value.ok) {
-        const payload = await clientsResponse.value.json()
-        clients = Array.isArray(payload.clients) ? (payload.clients as ClientDirectoryEntry[]) : []
-      }
-
-      let vercelProjects: AdminVercelProject[] = []
-      if (vercelProjectsResponse.status === "fulfilled" && vercelProjectsResponse.value.ok) {
-        const payload = await vercelProjectsResponse.value.json()
-        vercelProjects = Array.isArray(payload.projects) ? (payload.projects as AdminVercelProject[]) : []
-      }
-
-      const sourceStatuses: SourceHealth[] = []
-      const pulseEvents: AdminPulseEvent[] = []
-
-      for (const response of sourceResponses) {
-        if (response.status !== "fulfilled") continue
-
-        const payload = (await response.value.json()) as PulseSourceResponse
-        const totalEvents = typeof payload.totalEvents === "number" ? payload.totalEvents : 0
-        const id = payload.source ?? "source"
-
-        sourceStatuses.push({
-          id,
-          label: SOURCE_LABELS[id] ?? id,
-          totalEvents,
-          error: payload.error,
-        })
-
-        if (Array.isArray(payload.events)) {
-          pulseEvents.push(...payload.events.map((event) => ({ ...event, source: payload.source ?? event.source })))
-        }
-      }
-
-      const webSummary = getAreaSummary(clients, vercelProjects, "web-development")
-      const beamSummary = getAreaSummary(clients, vercelProjects, "beam-participants")
-      const linkedProjects = vercelProjects.filter((project) => project.linkedClientId).length
-      const allAreaSummaries = ADMIN_AREAS.map((area) => getAreaSummary(clients, vercelProjects, area.id))
-      const beamClients = getClientsForArea(clients, "beam-participants")
-
-      setOperations({
-        totalClients: clients.length,
-        linkedProjects,
-        totalProjects: vercelProjects.length,
-        unlinkedProjects: vercelProjects.filter((project) => !project.linkedClientId).length,
-        sourceStatuses,
-        sourceEventTotal: sourceStatuses.reduce((sum, source) => sum + source.totalEvents, 0),
-        alerts: getOperationalAlerts(clients, vercelProjects),
-        webSummary,
-        beamSummary,
-        allAreaSummaries,
-        webNotifications: countPulseEventsForArea(pulseEvents, "web-development"),
-        beamNotifications: countPulseEventsForArea(pulseEvents, "beam-participants"),
-        beamStoryGaps: beamClients.filter((client) => !client.storyVideoUrl?.trim()).length,
-        webCoverageGaps: webSummary.trackedRecords - webSummary.websiteCount,
-        lastUpdated: new Date().toISOString(),
-      })
-    } catch (error) {
-      console.error("Error fetching dashboard operations:", error)
-      setOperations(createEmptyOperationsState())
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    return { data: data as T[] }
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : `Unable to load ${label}`,
     }
   }
+}
 
-  if (!authChecked) {
-    return (
-      <DashboardLayout>
-        <div className="flex min-h-[400px] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
-            <p className="text-muted-foreground">Checking authentication...</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    )
+function timestampLikeToDate(value: unknown): Date | null {
+  if (!value || typeof value !== "object") return null
+  const timestamp = value as {
+    _nanoseconds?: number
+    _seconds?: number
+    nanoseconds?: number
+    seconds?: number
   }
+  const seconds = timestamp._seconds ?? timestamp.seconds
+  const nanoseconds = timestamp._nanoseconds ?? timestamp.nanoseconds ?? 0
+  if (typeof seconds !== "number") return null
+
+  const date = new Date(seconds * 1000 + Math.floor(nanoseconds / 1_000_000))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function toTimestampMillis(value?: unknown) {
+  if (!value) return 0
+  const timestampDate = timestampLikeToDate(value)
+  if (timestampDate) return timestampDate.getTime()
+
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? 0 : value.getTime()
+  if (typeof value !== "string" && typeof value !== "number") return 0
+
+  const timestamp = new Date(value).getTime()
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+function formatWhen(value?: unknown) {
+  if (!value) return "No timestamp"
+  const timestampDate = timestampLikeToDate(value)
+  if (timestampDate) return timestampDate.toLocaleString()
+
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "No timestamp" : value.toLocaleString()
+  if (typeof value !== "string" && typeof value !== "number") return "No timestamp"
+
+  const text = String(value)
+  const date = new Date(text)
+  return Number.isNaN(date.getTime()) ? text : date.toLocaleString()
+}
+
+export default function DashboardPage() {
+  const [state, setState] = useState<DashboardState>(emptyDashboardState)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchDashboard = async () => {
+    setRefreshing(true)
+    setLoading(true)
+
+    const [clientsResult, projectsResult, tasksResult] = await Promise.all([
+      readAdminList<ClientRecord>("/api/admin/clients?limit=200", "clients"),
+      readAdminList<ProjectRecord>("/api/admin/projects?limit=200", "projects"),
+      readAdminList<TaskRecord>("/api/admin/tasks?limit=200", "tasks"),
+    ])
+
+    setState({
+      clients: clientsResult.data,
+      projects: projectsResult.data,
+      tasks: tasksResult.data,
+      errors: [clientsResult.error, projectsResult.error, tasksResult.error].filter(
+        (error): error is string => Boolean(error)
+      ),
+      lastUpdated: new Date().toISOString(),
+    })
+    setLoading(false)
+    setRefreshing(false)
+  }
+
+  useEffect(() => {
+    void fetchDashboard()
+  }, [])
+
+  const openTasks = state.tasks.filter((task) => !["done", "declined"].includes(task.status ?? "")).length
+  const activeProjects = state.projects.filter((project) => project.status !== "archived").length
+  const projectClientIds = new Set(state.projects.map((project) => project.clientId || project.id).filter(Boolean))
+  const portalWarnings = state.clients.filter((client) => !projectClientIds.has(client.id)).length
+  const recentClients = useMemo(
+    () =>
+      [...state.clients]
+        .sort((a, b) => {
+          const aTime = toTimestampMillis(a.updatedAt) || toTimestampMillis(a.lastActivity)
+          const bTime = toTimestampMillis(b.updatedAt) || toTimestampMillis(b.lastActivity)
+          return bTime - aTime
+        })
+        .slice(0, 5),
+    [state.clients]
+  )
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Operations Dashboard</h1>
+            <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
             <p className="text-muted-foreground">
-              Sync health, website aggregation, BEAM participant aggregation, assignment gaps, and source health.
+              Lightweight recovery view for clients, projects, tasks, and portal access readiness.
             </p>
           </div>
           <Button
             variant="outline"
             className="border-border/70 bg-card/80"
-            onClick={() => void fetchOperations()}
+            onClick={() => void fetchDashboard()}
             disabled={refreshing}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh Operations
+            Refresh
           </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
           <AdminMetricTile
-            label="Sync Health"
-            value={operations.totalProjects === 0 ? "0" : `${operations.linkedProjects}/${operations.totalProjects}`}
-            hint="Linked Vercel projects to client records"
+            label="Clients"
+            value={loading ? "..." : state.clients.length}
+            hint="Records in clients"
+            trailing={<Users className="h-5 w-5 text-muted-foreground" />}
           />
           <AdminMetricTile
-            label="Website Aggregation"
-            value={
-              operations.webSummary.trackedRecords === 0
-                ? "0"
-                : `${operations.webSummary.websiteCount}/${operations.webSummary.trackedRecords}`
-            }
-            hint={`${operations.webNotifications} website-oriented notification(s)`}
+            label="Projects"
+            value={loading ? "..." : activeProjects}
+            hint="Shared projects collection"
+            trailing={<FolderOpen className="h-5 w-5 text-muted-foreground" />}
           />
           <AdminMetricTile
-            label="BEAM Aggregation"
-            value={
-              operations.beamSummary.trackedRecords === 0
-                ? "0"
-                : `${operations.beamSummary.storyCount}/${operations.beamSummary.trackedRecords}`
-            }
-            hint={`${operations.beamNotifications} BEAM-oriented notification(s)`}
+            label="Open Tasks"
+            value={loading ? "..." : openTasks}
+            hint="projectTasks not done or declined"
+            trailing={<ListTodo className="h-5 w-5 text-muted-foreground" />}
           />
           <AdminMetricTile
-            label="Alerts / Warnings"
-            value={operations.alerts.length}
-            hint={`${operations.unlinkedProjects} unmapped Vercel project(s)`}
+            label="Portal Warnings"
+            value={loading ? "..." : portalWarnings}
+            hint="Clients without a linked portal project"
+            trailing={<AlertTriangle className="h-5 w-5 text-muted-foreground" />}
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel>
-            <CardHeader>
-              <AdminPanelTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5" />
-                Sync Health
-              </AdminPanelTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <AdminMetricTile label="Linked Projects" value={operations.linkedProjects} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              <AdminMetricTile label="Unmapped Projects" value={operations.unlinkedProjects} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              <AdminMetricTile label="Clients Tracked" value={operations.totalClients} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              <AdminMetricTile label="Source Events" value={operations.sourceEventTotal} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-            </CardContent>
-          </AdminPanel>
-
-          <AdminPanel>
-            <CardHeader>
-              <AdminPanelTitle className="flex items-center gap-2">
-                <Workflow className="h-5 w-5" />
-                Website Aggregation Status
-              </AdminPanelTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <AdminMetricTile label="Tracked Web Records" value={operations.webSummary.trackedRecords} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-                <AdminMetricTile label="Website Signals" value={operations.webSummary.websiteCount} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-                <AdminMetricTile label="Coverage Gaps" value={operations.webCoverageGaps} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              </div>
-              <Button variant="outline" asChild className="border-border/70 bg-card/80">
-                <Link href="/dashboard/web-development">
-                  Open Web Development
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </AdminPanel>
-
-          <AdminPanel>
-            <CardHeader>
-              <AdminPanelTitle className="flex items-center gap-2">
-                <Waves className="h-5 w-5" />
-                BEAM Participant Aggregation Status
-              </AdminPanelTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <AdminMetricTile label="Tracked Participants" value={operations.beamSummary.trackedRecords} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-                <AdminMetricTile label="Story Coverage" value={operations.beamSummary.storyCount} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-                <AdminMetricTile label="Participant Gaps" value={operations.beamStoryGaps} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              </div>
-              <Button variant="outline" asChild className="border-border/70 bg-card/80">
-                <Link href="/dashboard/beam-participants">
-                  Open BEAM Participants
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </AdminPanel>
-
-          <AdminPanel>
-            <CardHeader>
-              <AdminPanelTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Ingestion / Source Health
-              </AdminPanelTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {operations.sourceStatuses.map((source) => (
-                <AdminPanelInset key={source.id}>
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">{source.label}</p>
-                    <p className="text-sm text-muted-foreground">{source.totalEvents}</p>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{source.error ? source.error : "Source responding"}</p>
-                </AdminPanelInset>
-              ))}
-            </CardContent>
-          </AdminPanel>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-2">
+        {state.errors.length > 0 ? (
           <AdminPanel>
             <CardHeader>
               <AdminPanelTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
-                Assignment Gaps
+                Load Warnings
               </AdminPanelTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
-              <AdminMetricTile label="Missing Client Assignments" value={operations.unlinkedProjects} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              <AdminMetricTile label="Missing Website Assignments" value={operations.webCoverageGaps} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
-              <AdminMetricTile label="Missing Participant Assignments" value={operations.beamSummary.missingAssignments} labelClassName="text-xs uppercase tracking-[0.2em]" valueClassName="text-2xl" />
+            <CardContent className="space-y-2">
+              {state.errors.map((error) => (
+                <div key={error} className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
+                  {error}
+                </div>
+              ))}
+            </CardContent>
+          </AdminPanel>
+        ) : null}
+
+        <ClientClaimRequestsPanel />
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <AdminPanel>
+            <CardHeader>
+              <AdminPanelTitle>Primary Work Areas</AdminPanelTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["Clients", "/dashboard/clients", "Directory, portal access, and public profile controls."],
+                ["Portal Requests", "/dashboard/clients/access", "Approve client portal workspace claims."],
+                ["Projects", "/dashboard/web-development", "Project records and delivery visibility."],
+                ["Files", "/dashboard/clients/assets", "Client-owned assets, story media, and links."],
+                ["Tasks", "/dashboard/command", "Command center and task queues."],
+              ].map(([label, href, description]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="rounded-xl border border-border bg-background p-4 transition-colors hover:bg-accent"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-foreground">{label}</p>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+                </Link>
+              ))}
             </CardContent>
           </AdminPanel>
 
           <AdminPanel>
             <CardHeader>
-              <AdminPanelTitle className="flex items-center gap-2">
-                <Siren className="h-5 w-5" />
-                Alerts / Warnings
-              </AdminPanelTitle>
+              <AdminPanelTitle>Recent Client Activity</AdminPanelTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {operations.alerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active warnings detected from the current heuristics.</p>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Loading client records...</p>
+              ) : recentClients.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No client records loaded yet.</p>
               ) : (
-                operations.alerts.map((alert) => (
-                  <div key={alert} className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-200">
-                    {alert}
-                  </div>
+                recentClients.map((client) => (
+                  <AdminPanelInset key={client.id} className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">{client.name || client.id}</p>
+                      <p className="text-xs text-muted-foreground">{formatWhen(client.updatedAt || client.lastActivity)}</p>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/clients/${encodeURIComponent(client.id)}`}>Open</Link>
+                    </Button>
+                  </AdminPanelInset>
                 ))
               )}
               <p className="text-xs text-muted-foreground">
-                Last refreshed {new Date(operations.lastUpdated).toLocaleString()}
+                Last refreshed {new Date(state.lastUpdated).toLocaleString()}
               </p>
             </CardContent>
           </AdminPanel>
         </div>
-
-        <AdminPanel>
-          <CardHeader>
-            <AdminPanelTitle>Area Coverage</AdminPanelTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {operations.allAreaSummaries.map((summary) => (
-              <AdminPanelInset key={summary.id}>
-                <p className="font-medium text-foreground">{summary.label}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{summary.description}</p>
-                <div className="mt-4 space-y-1 text-sm text-foreground/80">
-                  <p>Records: {summary.trackedRecords}</p>
-                  <p>Websites: {summary.websiteCount}</p>
-                  <p>Stories: {summary.storyCount}</p>
-                  <p>Unmapped: {summary.missingAssignments}</p>
-                </div>
-              </AdminPanelInset>
-            ))}
-          </CardContent>
-        </AdminPanel>
-
-        {!loading && operations.totalClients === 0 ? (
-          <AdminPanel>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              There are no client records loaded yet, so this operations overview is currently showing empty-state health only.
-            </CardContent>
-          </AdminPanel>
-        ) : null}
       </div>
     </DashboardLayout>
   )

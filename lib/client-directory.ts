@@ -17,6 +17,7 @@ export interface ClientModule {
 
 export interface ClientDirectoryEntry {
   id: string
+  workspaceId?: string
   storyId: string
   name: string
   brands: string[]

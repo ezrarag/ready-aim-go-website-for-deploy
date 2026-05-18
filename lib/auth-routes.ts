@@ -1,4 +1,4 @@
-export const DEFAULT_ADMIN_REDIRECT = "/dashboard/transportation"
+export const DEFAULT_ADMIN_REDIRECT = "/dashboard"
 export const DEFAULT_CLIENT_REDIRECT = "/dashboard/client"
 
 export function isAdminRoute(pathname: string) {

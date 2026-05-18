@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 
@@ -16,15 +17,17 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get("clientId")
+    const workspaceId = searchParams.get("workspaceId")
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200)
 
     let query: FirebaseFirestore.Query = db.collection("projects")
+    if (workspaceId) query = query.where("workspaceId", "==", workspaceId)
     if (clientId) query = query.where("clientId", "==", clientId)
     const snap = await query.limit(limit).get()
 
     return NextResponse.json({
       success: true,
-      data: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      data: snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data())),
     })
   } catch (err) {
     console.error("GET /api/admin/projects:", err)

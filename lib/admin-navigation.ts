@@ -11,7 +11,7 @@ export const CLIENT_SECTION_ITEMS: AdminNavItem[] = [
   { id: "clients-all",        label: "All Clients",   href: "/dashboard/clients" },
   { id: "clients-onboarding", label: "Onboarding",    href: "/dashboard/clients/onboarding" },
   { id: "clients-contracts",  label: "Contracts",     href: "/dashboard/clients/contracts" },
-  { id: "clients-team",       label: "Team & Access", href: "/dashboard/clients/access" },
+  { id: "clients-team",       label: "Portal Requests", href: "/dashboard/clients/access" },
   { id: "clients-assets",     label: "Assets",        href: "/dashboard/clients/assets" },
   { id: "clients-activity",   label: "Activity",      href: "/dashboard/clients/activity" },
 ]
@@ -50,14 +50,17 @@ export const OPERATIONS_SYSTEM_ITEMS: AdminNavItem[] = SYSTEM_SECTION_ITEMS
 // ── Primary navigation tree ───────────────────────────────────────────────────
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
-  // Core
-  { id: "dashboard", label: "Dashboard",        href: "/dashboard" },
-  { id: "clients",   label: "Clients",          href: "/dashboard/clients",        children: CLIENT_SECTION_ITEMS },
-  { id: "projects",  label: "Projects",         href: "/dashboard/web-development", children: PROJECTS_SECTION_ITEMS },
-  { id: "files",     label: "Files & Assets",   href: "/dashboard/clients/assets" },
-  { id: "tasks",     label: "Tasks",            href: "/dashboard/command" },
-  { id: "billing",   label: "Services & Billing", href: "/dashboard/finance",       children: BILLING_SECTION_ITEMS },
-  { id: "settings",  label: "Settings",         href: "/dashboard/settings" },
-  // Admin-only advanced tools
-  { id: "system",    label: "System",           href: "/dashboard/admin",           children: SYSTEM_SECTION_ITEMS },
+  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
+  { id: "clients", label: "Clients", href: "/dashboard/clients" },
+  { id: "projects", label: "Projects", href: "/dashboard/web-development" },
+  { id: "files", label: "Files", href: "/dashboard/clients/assets" },
+  { id: "tasks", label: "Tasks", href: "/dashboard/command" },
+  { id: "settings", label: "Settings", href: "/dashboard/settings" },
+]
+
+export const ADVANCED_ADMIN_TOOLS: AdminNavItem[] = [
+  ...CLIENT_SECTION_ITEMS.filter((item) => item.href !== "/dashboard/clients/assets"),
+  ...PROJECTS_SECTION_ITEMS.filter((item) => item.href !== "/dashboard/web-development"),
+  ...BILLING_SECTION_ITEMS,
+  ...SYSTEM_SECTION_ITEMS,
 ]

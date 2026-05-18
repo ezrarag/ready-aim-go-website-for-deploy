@@ -19,9 +19,16 @@ import type { DiscoveredAppStoreApp } from "@/lib/app-store"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
 
 type Client = ClientDirectoryEntry
+type FirestoreTimestampShape = {
+  _nanoseconds?: number
+  _seconds?: number
+  nanoseconds?: number
+  seconds?: number
+  toDate?: () => Date
+}
 type AppStoreWebhookEvent = {
   id: string
-  createdAt?: string
+  createdAt?: string | FirestoreTimestampShape | null
   summary?: {
     eventType?: string
     appId?: string
@@ -32,6 +39,27 @@ type AppStoreWebhookEvent = {
   syncMode?: string
   syncError?: string | null
   syncedClientIds?: string[]
+}
+
+function formatWebhookEventTime(value: AppStoreWebhookEvent["createdAt"]) {
+  if (!value) return "Unknown time"
+  if (typeof value === "string") {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString()
+  }
+
+  let date: Date | null = null
+  if (typeof value.toDate === "function") {
+    date = value.toDate()
+  } else {
+    const seconds = value._seconds ?? value.seconds
+    const nanoseconds = value._nanoseconds ?? value.nanoseconds ?? 0
+    if (typeof seconds === "number") {
+      date = new Date(seconds * 1000 + Math.floor(nanoseconds / 1_000_000))
+    }
+  }
+
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : "Unknown time"
 }
 
 export function AppStoreSyncPanel() {
@@ -371,7 +399,7 @@ export function AppStoreSyncPanel() {
                     </div>
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    {event.createdAt || "Unknown time"}
+                    {formatWebhookEventTime(event.createdAt)}
                     {event.summary?.appId ? ` · app ${event.summary.appId}` : ""}
                   </p>
                   {event.syncError ? (

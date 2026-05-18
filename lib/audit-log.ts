@@ -11,6 +11,8 @@ export type AuditAction =
   | "archive"
   | "promote"
   | "ingest"
+  | "approve"
+  | "reject"
 
 export type AuditEntry = {
   collection: string

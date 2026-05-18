@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getFirestoreDb } from "@/lib/firestore"
+import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { resolvePortalIdentity } from "@/lib/portal-auth"
 
 // GET /api/portal/me — return the authenticated client's own profile
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     const data = doc.data() as Record<string, unknown>
     const { portalUid: _p, ...safeData } = data
 
-    return NextResponse.json({ success: true, data: { id: doc.id, ...safeData } })
+    return NextResponse.json({ success: true, data: serializeFirestoreDocument(doc.id, safeData) })
   } catch (err) {
     console.error("GET /api/portal/me:", err)
     return NextResponse.json(

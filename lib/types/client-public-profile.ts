@@ -175,6 +175,25 @@ export interface PublicGrowth {
 }
 
 // ---------------------------------------------------------------------------
+// Discovery flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Public engagement metadata for video-led discovery and custom CTAs.
+ * These fields are optional so older clients can be backfilled safely before
+ * public pages start rendering them.
+ */
+export interface PublicDiscoveryFlow {
+  introVideoUrl?: string
+  demoVideoUrl?: string
+  caseStudyVideoUrl?: string
+  primaryCtaLabel?: string
+  primaryCtaUrl?: string
+  secondaryCtaLabel?: string
+  secondaryCtaUrl?: string
+}
+
+// ---------------------------------------------------------------------------
 // Root contract
 // ---------------------------------------------------------------------------
 
@@ -192,6 +211,7 @@ export interface ClientPublicProfile {
   pricing?: PublicPricingTier[]
   people?: PublicPerson[]
   growth?: PublicGrowth
+  discoveryFlow?: PublicDiscoveryFlow
 }
 
 // ---------------------------------------------------------------------------
