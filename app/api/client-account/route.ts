@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { normalizeClientServiceInterests } from "@/lib/client-onboarding"
 import { getFirebaseAdminAuth, getFirestoreDb } from "@/lib/firestore"
 import { buildOwnerMembership } from "@/lib/types/client-membership"
+import { generateSlug } from "@/lib/beam-access-shared"
 
 function readTrimmedString(value: unknown, maxLength = 280) {
   if (typeof value !== "string") {
@@ -25,6 +26,148 @@ function readBearerToken(request: NextRequest) {
 
   const token = header.slice("Bearer ".length).trim()
   return token || null
+}
+
+function fallbackCompanyName(email: string) {
+  const domain = email.split("@")[1]?.split(".")[0] ?? ""
+  return domain.replace(/[-_]+/g, " ").trim() || "New Client"
+}
+
+async function ensureUniqueStoryId(db: FirebaseFirestore.Firestore, baseName: string) {
+  const base = generateSlug(baseName) || "client"
+  let candidate = base
+  let suffix = 2
+
+  while (true) {
+    const snapshot = await db
+      .collection("clients")
+      .where("storyId", "==", candidate)
+      .limit(1)
+      .get()
+
+    if (snapshot.empty) return candidate
+
+    candidate = `${base}-${suffix}`
+    suffix += 1
+  }
+}
+
+async function findExistingSignupClientId(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  email: string
+) {
+  const byUid = await db
+    .collection("clients")
+    .where("portalSignup.uid", "==", uid)
+    .limit(1)
+    .get()
+
+  if (!byUid.empty) return byUid.docs[0].id
+
+  const byEmail = await db
+    .collection("clients")
+    .where("clientPortalEmail", "==", email)
+    .limit(1)
+    .get()
+
+  return byEmail.empty ? null : byEmail.docs[0].id
+}
+
+async function createClientSignupRecord(input: {
+  db: FirebaseFirestore.Firestore
+  uid: string
+  email: string
+  fullName: string
+  companyName: string
+  organizationType: string
+  phone: string | null
+  role: string
+  handoffId: string
+  mode: "claim" | "new"
+  notes: string
+  serviceInterests: string[]
+}) {
+  const existingClientId = await findExistingSignupClientId(input.db, input.uid, input.email)
+  const now = new Date().toISOString()
+  const portalSignup = {
+    uid: input.uid,
+    email: input.email,
+    fullName: input.fullName,
+    role: input.role || null,
+    handoffId: input.handoffId || null,
+    mode: input.mode,
+    serviceInterests: input.serviceInterests,
+    notes: input.notes || null,
+    accessStatus: "pending_manual_provision",
+    updatedAt: now,
+  }
+
+  if (existingClientId) {
+    await input.db.collection("clients").doc(existingClientId).set(
+      {
+        name: input.companyName,
+        clientPortalEmail: input.email,
+        contactEmail: input.email,
+        contactName: input.fullName,
+        contactPhone: input.phone,
+        organizationType: input.organizationType || null,
+        portalAccessStatus: "pending_manual_provision",
+        status: "onboarding",
+        lastActivity: "Client signed up; portal access pending",
+        updatedAt: now,
+        portalSignup,
+      },
+      { merge: true }
+    )
+    return existingClientId
+  }
+
+  const storyId = await ensureUniqueStoryId(input.db, input.companyName)
+  const ref = input.db.collection("clients").doc()
+
+  await ref.set({
+    storyId,
+    name: input.companyName,
+    brands: [],
+    status: "onboarding",
+    lastActivity: "Client signed up; portal access pending",
+    updatedAt: now,
+    pulseSummary: "Client signup record created automatically. Portal access has not been provisioned yet.",
+    deployStatus: "building",
+    deployUrl: null,
+    githubRepo: null,
+    githubRepos: [],
+    deployHosts: [],
+    stripeStatus: "pending",
+    revenue: 0,
+    meetings: 0,
+    emails: 0,
+    commits: 0,
+    lastDeploy: null,
+    storyVideoUrl: null,
+    showOnFrontend: false,
+    isNewStory: true,
+    websiteUrl: null,
+    appUrl: null,
+    appStoreUrl: null,
+    rdUrl: null,
+    housingUrl: null,
+    transportationUrl: null,
+    insuranceUrl: null,
+    clientPortalEmail: input.email,
+    contactEmail: input.email,
+    contactName: input.fullName,
+    contactPhone: input.phone,
+    organizationType: input.organizationType || null,
+    portalAccessStatus: "pending_manual_provision",
+    portalSignup: {
+      ...portalSignup,
+      createdAt: now,
+    },
+  })
+
+  return ref.id
 }
 
 export async function POST(request: NextRequest) {
@@ -56,12 +199,15 @@ export async function POST(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(token)
     const body = await request.json()
 
-    const fullName = readTrimmedString(body?.fullName, 160)
+    const tokenName =
+      typeof decodedToken.name === "string" ? decodedToken.name.trim() : ""
+    const fullName = readTrimmedString(body?.fullName, 160) || tokenName
     const emailInput = readTrimmedString(body?.email, 200).toLowerCase()
     const phone = readOptionalTrimmedString(body?.phone, 40)
     const companyNameInput = readTrimmedString(body?.companyName, 160)
     const organizationTypeInput = readTrimmedString(body?.organizationType, 120)
     const notesInput = readTrimmedString(body?.notes, 2000)
+    const roleInput = readTrimmedString(body?.role, 120)
     const handoffId = readTrimmedString(body?.handoffId, 120)
     const serviceInterestsInput = normalizeClientServiceInterests(body?.serviceInterests)
 
@@ -123,7 +269,8 @@ export async function POST(request: NextRequest) {
 
     const companyName =
       companyNameInput ||
-      (typeof handoffData?.companyName === "string" ? handoffData.companyName : "")
+      (typeof handoffData?.companyName === "string" ? handoffData.companyName : "") ||
+      fallbackCompanyName(email)
 
     if (!companyName) {
       return NextResponse.json(
@@ -147,6 +294,9 @@ export async function POST(request: NextRequest) {
       serviceInterestsInput.length > 0
         ? serviceInterestsInput
         : normalizeClientServiceInterests(handoffData?.serviceInterests)
+    const role =
+      roleInput ||
+      (typeof handoffData?.role === "string" ? handoffData.role : "")
 
     const now = new Date().toISOString()
     const claimedClientId =
@@ -162,6 +312,26 @@ export async function POST(request: NextRequest) {
     const existingUserData = existingUserSnapshot.data() ?? {}
     const createdAt =
       typeof existingUserData.created_at === "string" ? existingUserData.created_at : now
+    const existingLinkedClientId =
+      typeof existingUserData.client_id === "string" ? existingUserData.client_id : ""
+
+    const signupClientId =
+      claimedClientId || existingLinkedClientId
+        ? null
+        : await createClientSignupRecord({
+            db,
+            uid: decodedToken.uid,
+            email,
+            fullName,
+            companyName,
+            organizationType,
+            phone,
+            role,
+            handoffId,
+            mode,
+            notes,
+            serviceInterests,
+          })
 
     await userRef.set(
       {
@@ -171,7 +341,10 @@ export async function POST(request: NextRequest) {
         phone,
         company_name: companyName,
         organization_type: organizationType || null,
-        client_id: claimedClientId,
+        client_id:
+          claimedClientId ||
+          existingLinkedClientId ||
+          null,
         client_portal: {
           mode,
           handoff_id: handoffId || null,
@@ -183,6 +356,11 @@ export async function POST(request: NextRequest) {
           notes: notes || null,
           completed_at: now,
         },
+        pending_client_id: signupClientId,
+        portal_access_status:
+          claimedClientId || existingLinkedClientId
+            ? "active"
+            : "pending_manual_provision",
         updated_at: now,
         created_at: createdAt,
       },
@@ -222,6 +400,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      clientRecordId: claimedClientId || existingLinkedClientId || signupClientId,
+      portalAccessStatus:
+        claimedClientId || existingLinkedClientId ? "active" : "pending_manual_provision",
       redirectUrl: "/dashboard/client",
     })
   } catch (error) {
