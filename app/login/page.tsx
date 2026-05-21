@@ -10,6 +10,7 @@ import {
   signInWithRedirect,
   signOut,
   type Auth,
+  type User,
 } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,6 +75,27 @@ async function assertAuthorized(auth: Auth, uid: string, redirectTarget: string)
   }
 
   return profile
+}
+
+async function finalizeClientAccount(user: User, handoffId: string | null, fullName?: string) {
+  const idToken = await user.getIdToken()
+  const response = await fetch("/api/client-account", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      handoffId,
+      fullName: fullName || user.displayName || user.email?.split("@")[0] || "Client",
+      email: user.email || "",
+    }),
+  })
+  const payload = await response.json()
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.error || "Unable to complete client account setup.")
+  }
+  return payload
 }
 
 export default function LoginPage() {
@@ -148,7 +170,10 @@ export default function LoginPage() {
           return
         }
 
-        await assertAuthorized(auth, currentUser.uid, redirectTarget)
+        const profile = await assertAuthorized(auth, currentUser.uid, redirectTarget)
+        if (portalMode === "client") {
+          await finalizeClientAccount(currentUser, handoffId, profile?.full_name)
+        }
 
         if (!isMounted) {
           return
@@ -181,7 +206,7 @@ export default function LoginPage() {
     return () => {
       isMounted = false
     }
-  }, [redirectTarget, router])
+  }, [handoffId, portalMode, redirectTarget, router])
 
   const handleClientSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -190,7 +215,10 @@ export default function LoginPage() {
     try {
       const auth = await ensureAuthPersistence()
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password)
-      await assertAuthorized(auth, credential.user.uid, redirectTarget)
+      const profile = await assertAuthorized(auth, credential.user.uid, redirectTarget)
+      if (portalMode === "client") {
+        await finalizeClientAccount(credential.user, handoffId, profile?.full_name)
+      }
 
       if (redirectTarget.startsWith("http")) {
         window.location.assign(redirectTarget)
@@ -215,7 +243,10 @@ export default function LoginPage() {
 
       try {
         const credential = await signInWithPopup(auth, provider)
-        await assertAuthorized(auth, credential.user.uid, redirectTarget)
+        const profile = await assertAuthorized(auth, credential.user.uid, redirectTarget)
+        if (portalMode === "client") {
+          await finalizeClientAccount(credential.user, handoffId, profile?.full_name)
+        }
 
         if (redirectTarget.startsWith("http")) {
           window.location.assign(redirectTarget)
