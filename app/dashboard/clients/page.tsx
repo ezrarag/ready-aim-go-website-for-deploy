@@ -43,7 +43,7 @@ import { getClientPreferredProductionUrl } from "@/lib/vercel"
 
 type Client = ClientDirectoryEntry
 type EditSaveState = "idle" | "saving" | "saved" | "error"
-type RosterView = "relationships" | "internal" | "all"
+type RosterView = "relationships" | "people" | "internal" | "all"
 
 async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
   const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
@@ -81,6 +81,22 @@ function isInternalTeamRecord(client: Client): boolean {
     .toLowerCase()
 
   return identityText.includes("readyaimgo") || identityText.includes("ready aim go")
+}
+
+function looksLikeEmail(value: string | undefined): boolean {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+}
+
+function isPortalPersonRecord(client: Client): boolean {
+  return Boolean(
+    client.isPortalPersonRecord ||
+    client.adminApprovalPending ||
+    client.assignedClientId ||
+    client.portalAccessStatus === "pending_manual_provision" ||
+    client.portalAccessStatus === "assigned" ||
+    looksLikeEmail(client.id) ||
+    looksLikeEmail(client.storyId)
+  )
 }
 
 function getActivityTimestamp(client: Client): number {
@@ -184,7 +200,11 @@ export default function ClientsPage() {
     let filtered = [...clients]
 
     if (rosterView === "relationships") {
-      filtered = filtered.filter((client) => !isInternalTeamRecord(client))
+      filtered = filtered.filter((client) => !isInternalTeamRecord(client) && !isPortalPersonRecord(client))
+    }
+
+    if (rosterView === "people") {
+      filtered = filtered.filter((client) => isPortalPersonRecord(client))
     }
 
     if (rosterView === "internal") {
@@ -425,10 +445,10 @@ export default function ClientsPage() {
     }
   }
 
-  const relationshipClients = clients.filter((client) => !isInternalTeamRecord(client))
+  const relationshipClients = clients.filter((client) => !isInternalTeamRecord(client) && !isPortalPersonRecord(client))
+  const portalPersonRecords = clients.filter((client) => isPortalPersonRecord(client))
   const internalTeamRecords = clients.filter((client) => isInternalTeamRecord(client))
   const activeClients = relationshipClients.filter((client) => client.status === "active").length
-  const onboardingClients = relationshipClients.filter((client) => client.status === "onboarding").length
   const storyCoverage = relationshipClients.filter((client) => Boolean(client.storyVideoUrl?.trim())).length
   const websiteCoverage = relationshipClients.filter((client) => clientHasWebsiteSignal(client)).length
   const followUpClients = relationshipClients.filter((client) => getRelationshipHealth(client).label === "Follow Up").length
@@ -510,9 +530,9 @@ export default function ClientsPage() {
             hint={`${activeClients} active`}
           />
           <AdminMetricTile
-            label="Onboarding"
-            value={onboardingClients}
-            hint="Still moving into delivery"
+            label="Portal People"
+            value={portalPersonRecords.length}
+            hint="Hidden from client roster"
           />
           <AdminMetricTile
             label="Follow-Up"
@@ -564,6 +584,13 @@ export default function ClientsPage() {
                   Relationships
                 </Button>
                 <Button
+                  variant={rosterView === "people" ? "default" : "outline"}
+                  onClick={() => setRosterView("people")}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Portal People
+                </Button>
+                <Button
                   variant={rosterView === "internal" ? "default" : "outline"}
                   onClick={() => setRosterView("internal")}
                 >
@@ -596,7 +623,7 @@ export default function ClientsPage() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Internal ReadyAimGo records are hidden from the relationship view by default. Technical discovery stays in <Link href="/dashboard/clients/vercel-sync" className="text-orange-600 underline-offset-4 hover:underline dark:text-orange-400">Vercel Sync</Link> and card-level Assets & Infra drawers.
+              Portal people such as Rick or Solana are hidden from the relationship view by default. Assign them from the client Workspace tab so they appear under the business, not beside it.
             </p>
           </CardContent>
         </AdminPanel>
@@ -627,7 +654,9 @@ export default function ClientsPage() {
                       <Badge className={getRelationshipHealthClass(relationshipHealth.tone)}>
                         {relationshipHealth.label}
                       </Badge>
-                      <Badge variant="outline">{isInternalTeamRecord(client) ? "Internal" : client.status}</Badge>
+                      <Badge variant="outline">
+                        {isPortalPersonRecord(client) ? "Portal Person" : isInternalTeamRecord(client) ? "Internal" : client.status}
+                      </Badge>
                     </div>
                   </div>
                 </CardHeader>
@@ -650,6 +679,12 @@ export default function ClientsPage() {
                     <div className="text-sm text-muted-foreground">
                       <strong className="text-foreground">Portal contact:</strong>{" "}
                       <span className="font-mono text-xs">{primaryEmail}</span>
+                    </div>
+                  ) : null}
+
+                  {client.assignedClientId ? (
+                    <div className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">Assigned under:</strong> {client.assignedClientId}
                     </div>
                   ) : null}
 

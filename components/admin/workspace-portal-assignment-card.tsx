@@ -21,6 +21,7 @@ type PortalRole = "owner" | "developer" | "collaborator" | "employee-of-client" 
 
 type PendingPortalSignup = {
   id: string
+  source?: "pending-client-signup" | "portal-user"
   email: string
   displayName: string
   companyName: string
@@ -29,6 +30,7 @@ type PendingPortalSignup = {
   organizationType: string
   notes: string
   serviceInterests: string[]
+  assignedClientIds?: string[]
 }
 
 type PortalMember = {
@@ -74,6 +76,10 @@ function candidateText(candidate: PendingPortalSignup): string {
 
 function candidateLabel(candidate: PendingPortalSignup): string {
   return candidate.email || candidate.displayName || candidate.companyName || candidate.id
+}
+
+function candidateSourceLabel(candidate: PendingPortalSignup): string {
+  return candidate.source === "portal-user" ? "Existing portal user" : "Pending signup"
 }
 
 function highlightMatch(value: string, query: string) {
@@ -170,7 +176,8 @@ export function WorkspacePortalAssignmentCard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pendingClientId: selectedSignup.id,
+          pendingClientId: selectedSignup.source === "portal-user" ? undefined : selectedSignup.id,
+          uid: selectedSignup.uid || (selectedSignup.source === "portal-user" ? selectedSignup.id : undefined),
           role,
           notes,
           repositoryChains: [DEFAULT_REPOSITORY_CHAIN],
@@ -204,7 +211,7 @@ export function WorkspacePortalAssignmentCard({
               Assign Portal Workspace
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Approve Google signups and bind them to this workspace without manually typing an email.
+              Approve new Google signups or add an existing portal user to this workspace.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -261,6 +268,10 @@ export function WorkspacePortalAssignmentCard({
                 <span className="text-sm font-medium">{highlightMatch(candidateLabel(candidate), query)}</span>
                 <span className="text-xs text-muted-foreground">
                   {highlightMatch(candidate.displayName || candidate.companyName || candidate.uid, query)}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {candidateSourceLabel(candidate)}
+                  {candidate.assignedClientIds?.length ? ` - already on ${candidate.assignedClientIds.length} workspace(s)` : ""}
                 </span>
                 {candidate.notes ? (
                   <span className="line-clamp-2 text-xs text-muted-foreground">

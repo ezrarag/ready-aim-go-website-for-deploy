@@ -168,6 +168,10 @@ type FirestoreClientDoc = {
   contactEmail?: unknown
   clientPortalEmail?: unknown
   portalAccessStatus?: unknown
+  adminApprovalPending?: unknown
+  assignedClientId?: unknown
+  assignedWorkspaceId?: unknown
+  portalSignup?: unknown
   status?: unknown
   lastActivity?: unknown
   updatedAt?: unknown
@@ -266,6 +270,8 @@ const asStripeStatus = (value: unknown): StripeStatus =>
 const asBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === "boolean" ? value : fallback
 
+const looksLikeEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
 const asPublicProfile = (value: unknown): ClientPublicProfile | undefined =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as ClientPublicProfile)
@@ -315,6 +321,18 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
   })
   const parsedPulseReport = pulseReportSchema.safeParse(doc.pulseReport)
   const parsedRoleSuggestionSnapshot = clientRoleSuggestionSnapshotSchema.safeParse(doc.roleSuggestionSnapshot)
+  const portalAccessStatus = asString(doc.portalAccessStatus) || undefined
+  const adminApprovalPending = asBoolean(doc.adminApprovalPending, false)
+  const assignedClientId = asString(doc.assignedClientId) || undefined
+  const assignedWorkspaceId = asString(doc.assignedWorkspaceId) || undefined
+  const hasPortalSignup = Boolean(doc.portalSignup && typeof doc.portalSignup === "object" && !Array.isArray(doc.portalSignup))
+  const isPortalPersonRecord =
+    hasPortalSignup ||
+    adminApprovalPending ||
+    portalAccessStatus === "pending_manual_provision" ||
+    portalAccessStatus === "assigned" ||
+    Boolean(assignedClientId) ||
+    looksLikeEmail(normalizedId)
 
   return {
     id: normalizedId,
@@ -323,7 +341,11 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     brands: asStringArray(doc.brands),
     contactEmail: asString(doc.contactEmail) || undefined,
     clientPortalEmail: asString(doc.clientPortalEmail) || undefined,
-    portalAccessStatus: asString(doc.portalAccessStatus) || undefined,
+    portalAccessStatus,
+    adminApprovalPending,
+    assignedClientId,
+    assignedWorkspaceId,
+    isPortalPersonRecord,
     status: asClientStatus(doc.status),
     lastActivity: asString(doc.lastActivity, "Recently updated"),
     updatedAt: asString(doc.updatedAt) || undefined,

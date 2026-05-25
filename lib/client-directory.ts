@@ -24,6 +24,10 @@ export interface ClientDirectoryEntry {
   contactEmail?: string
   clientPortalEmail?: string
   portalAccessStatus?: string
+  adminApprovalPending?: boolean
+  assignedClientId?: string
+  assignedWorkspaceId?: string
+  isPortalPersonRecord?: boolean
   status: ClientStatus
   lastActivity: string
   updatedAt?: string
