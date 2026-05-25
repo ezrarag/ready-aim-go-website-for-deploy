@@ -18,6 +18,7 @@ import { ClientClaimRequestsPanel } from "@/components/admin/client-claim-reques
 
 type ClientRecord = {
   id: string
+  recordType?: string
   name?: string
   status?: string
   updatedAt?: unknown
@@ -159,8 +160,12 @@ export default function DashboardPage() {
   }, [])
 
   const openTasks = state.tasks.filter((task) => !["done", "declined"].includes(task.status ?? "")).length
-  const activeProjects = state.projects.filter((project) => project.status !== "archived").length
-  const projectClientIds = new Set(state.projects.map((project) => project.clientId || project.id).filter(Boolean))
+  const relationshipClientIds = new Set(state.clients.map((client) => client.id).filter(Boolean))
+  const relationshipProjects = state.projects.filter(
+    (project) => project.status !== "archived" && Boolean(project.clientId) && relationshipClientIds.has(project.clientId!)
+  )
+  const activeProjects = relationshipProjects.length
+  const projectClientIds = new Set(relationshipProjects.map((project) => project.clientId).filter(Boolean))
   const portalWarnings = state.clients.filter((client) => !projectClientIds.has(client.id)).length
   const recentClients = useMemo(
     () =>
@@ -197,15 +202,15 @@ export default function DashboardPage() {
 
         <div className="grid gap-4 md:grid-cols-4">
           <AdminMetricTile
-            label="Clients"
+            label="Relationships"
             value={loading ? "..." : state.clients.length}
-            hint="Records in clients"
+            hint="Business records only"
             trailing={<Users className="h-5 w-5 text-muted-foreground" />}
           />
           <AdminMetricTile
             label="Projects"
             value={loading ? "..." : activeProjects}
-            hint="Shared projects collection"
+            hint="Linked to relationships"
             trailing={<FolderOpen className="h-5 w-5 text-muted-foreground" />}
           />
           <AdminMetricTile

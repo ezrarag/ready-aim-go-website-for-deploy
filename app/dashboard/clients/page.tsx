@@ -27,6 +27,7 @@ import {
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset } from "@/components/admin/admin-panel"
 import { ClientSectionNav } from "@/components/admin/client-section-nav"
+import { WorkspacePortalAssignmentCard } from "@/components/admin/workspace-portal-assignment-card"
 import type { ClientDirectoryEntry, ClientStatus, DeployStatus, StripeStatus } from "@/lib/client-directory"
 import { clientHasWebsiteSignal } from "@/lib/admin-operations"
 import {
@@ -89,6 +90,7 @@ function looksLikeEmail(value: string | undefined): boolean {
 
 function isPortalPersonRecord(client: Client): boolean {
   return Boolean(
+    client.recordType === "portal_person" ||
     client.isPortalPersonRecord ||
     client.adminApprovalPending ||
     client.assignedClientId ||
@@ -97,6 +99,12 @@ function isPortalPersonRecord(client: Client): boolean {
     looksLikeEmail(client.id) ||
     looksLikeEmail(client.storyId)
   )
+}
+
+function isRelationshipRecord(client: Client): boolean {
+  if (client.recordType === "relationship") return true
+  if (client.recordType === "portal_person" || client.recordType === "legacy") return false
+  return !isInternalTeamRecord(client) && !isPortalPersonRecord(client)
 }
 
 function getActivityTimestamp(client: Client): number {
@@ -160,6 +168,7 @@ export default function ClientsPage() {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editSaveState, setEditSaveState] = useState<EditSaveState>("idle")
   const [generatingPulse, setGeneratingPulse] = useState(false)
+  const [storyVideoUploading, setStoryVideoUploading] = useState(false)
   const editAutosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editLastSavedSignatureRef = useRef("")
   const editLastErrorSignatureRef = useRef("")
@@ -200,7 +209,7 @@ export default function ClientsPage() {
     let filtered = [...clients]
 
     if (rosterView === "relationships") {
-      filtered = filtered.filter((client) => !isInternalTeamRecord(client) && !isPortalPersonRecord(client))
+      filtered = filtered.filter((client) => !isInternalTeamRecord(client) && isRelationshipRecord(client))
     }
 
     if (rosterView === "people") {
@@ -250,7 +259,7 @@ export default function ClientsPage() {
     const name = addForm.name.trim()
     const storyId = addForm.storyId.trim()
     const storyVideoUrl = addForm.storyVideoUrl.trim()
-    if (!name || !storyId || !storyVideoUrl) return
+    if (!name || !storyId) return
 
     setAddSubmitting(true)
     try {
@@ -259,6 +268,7 @@ export default function ClientsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
+          recordType: "relationship",
           storyId,
           storyVideoUrl,
           githubRepo: addForm.githubRepo.trim() || undefined,
@@ -277,6 +287,32 @@ export default function ClientsPage() {
       alert(error instanceof Error ? error.message : "Failed to create client")
     } finally {
       setAddSubmitting(false)
+    }
+  }
+
+  const handleStoryVideoUpload = async (file: File | null) => {
+    if (!editingClient || !file) return
+    setStoryVideoUploading(true)
+    try {
+      const formData = new FormData()
+      formData.set("file", file)
+      const response = await fetch(`/api/clients/${encodeURIComponent(editingClient.id)}/story-video`, {
+        method: "POST",
+        body: formData,
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload?.success || typeof payload.url !== "string") {
+        throw new Error(payload?.error || "Failed to upload story video")
+      }
+      setEditForm((prev) => ({ ...prev, storyVideoUrl: payload.url }))
+      setClients((prev) =>
+        prev.map((client) => (client.id === editingClient.id ? { ...client, storyVideoUrl: payload.url } : client))
+      )
+      setEditingClient((prev) => (prev ? { ...prev, storyVideoUrl: payload.url } : prev))
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to upload story video")
+    } finally {
+      setStoryVideoUploading(false)
     }
   }
 
@@ -445,7 +481,7 @@ export default function ClientsPage() {
     }
   }
 
-  const relationshipClients = clients.filter((client) => !isInternalTeamRecord(client) && !isPortalPersonRecord(client))
+  const relationshipClients = clients.filter((client) => !isInternalTeamRecord(client) && isRelationshipRecord(client))
   const portalPersonRecords = clients.filter((client) => isPortalPersonRecord(client))
   const internalTeamRecords = clients.filter((client) => isInternalTeamRecord(client))
   const activeClients = relationshipClients.filter((client) => client.status === "active").length
@@ -516,7 +552,7 @@ export default function ClientsPage() {
             </Button>
             <Button onClick={() => setAddClientOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Add Client
+              Create Relationship
             </Button>
           </div>
         </div>
@@ -765,7 +801,7 @@ export default function ClientsPage() {
       <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Client</DialogTitle>
+            <DialogTitle>Create Relationship</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -774,7 +810,7 @@ export default function ClientsPage() {
                 id="add-name"
                 value={addForm.name}
                 onChange={(event) => setAddForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Client name"
+                placeholder="Relationship name"
               />
             </div>
             <div>
@@ -788,7 +824,7 @@ export default function ClientsPage() {
               <p className="mt-1 text-xs text-muted-foreground">Used in roster and story routes.</p>
             </div>
             <div>
-              <Label htmlFor="add-storyVideoUrl">Story Video URL *</Label>
+              <Label htmlFor="add-storyVideoUrl">Story Video URL</Label>
               <Input
                 id="add-storyVideoUrl"
                 type="url"
@@ -828,7 +864,7 @@ export default function ClientsPage() {
             </Button>
             <Button
               onClick={handleAddClient}
-              disabled={!addForm.name.trim() || !addForm.storyId.trim() || !addForm.storyVideoUrl.trim() || addSubmitting}
+              disabled={!addForm.name.trim() || !addForm.storyId.trim() || addSubmitting}
             >
               {addSubmitting ? "Creating…" : "Create"}
             </Button>
@@ -839,7 +875,7 @@ export default function ClientsPage() {
       <Dialog open={editClientOpen} onOpenChange={(open) => void handleEditDialogOpenChange(open)}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
+            <DialogTitle>Edit Relationship</DialogTitle>
             <DialogDescription>
               Keep relationship fields visible first. Technical links live in Assets & Infra.
             </DialogDescription>
@@ -857,7 +893,7 @@ export default function ClientsPage() {
                   id="edit-name"
                   value={editForm.name}
                   onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
-                  placeholder="Client name"
+                  placeholder="Relationship name"
                 />
               </div>
               <div>
@@ -901,6 +937,14 @@ export default function ClientsPage() {
                 </Select>
               </div>
             </div>
+
+            {editingClient && isRelationshipRecord(editingClient) ? (
+              <WorkspacePortalAssignmentCard
+                clientId={editingClient.id}
+                clientName={editForm.name || editingClient.name}
+                onAssigned={fetchClientsData}
+              />
+            ) : null}
 
             <details className="rounded-lg border border-border bg-muted/20 p-4">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-foreground">
@@ -1078,7 +1122,7 @@ export default function ClientsPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-storyVideoUrl">Story Video URL *</Label>
+              <Label htmlFor="edit-storyVideoUrl">Story Video URL</Label>
               <Input
                 id="edit-storyVideoUrl"
                 type="url"
@@ -1086,6 +1130,26 @@ export default function ClientsPage() {
                 onChange={(event) => setEditForm({ ...editForm, storyVideoUrl: event.target.value })}
                 placeholder="https://..."
               />
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="edit-storyVideoFile">Upload Story Video</Label>
+                <Input
+                  id="edit-storyVideoFile"
+                  type="file"
+                  accept="video/*"
+                  disabled={storyVideoUploading || !editingClient}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    void handleStoryVideoUpload(file)
+                    event.currentTarget.value = ""
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Pasted URLs still work. Uploads save to Firebase Storage and fill this URL automatically.
+                </p>
+                {storyVideoUploading ? (
+                  <p className="text-xs text-muted-foreground">Uploading story video…</p>
+                ) : null}
+              </div>
             </div>
 
             <div className="space-y-1">

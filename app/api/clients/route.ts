@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
     const storyVideoUrl = typeof body.storyVideoUrl === "string" ? body.storyVideoUrl.trim() : ""
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
 
-    if (!name || !storyId || !storyVideoUrl) {
+    if (!name || !storyId) {
       return NextResponse.json(
-        { success: false, error: "name, storyId, and storyVideoUrl are required" },
+        { success: false, error: "name and storyId are required" },
         { status: 400 }
       )
     }
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
     // 1. Create the client document in the clients collection
     const id = await createClientDocument({
       name,
+      recordType: "relationship",
       storyId,
       storyVideoUrl,
       githubRepo: typeof body.githubRepo === "string" ? body.githubRepo.trim() : undefined,
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
     // 2. Auto-provision portal access if email was provided
     let portalProvisioned = false
     let portalResult = null
+    let defaultDeveloperProvisioned = false
 
     if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       try {
@@ -103,16 +105,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    try {
+      await provisionClientPortalAccess({
+        clientId: id,
+        clientName: name,
+        email: "ezra@readyaimgo.biz",
+        clientSlug: storyId,
+        role: "developer",
+        addedBy: "auto-default-developer",
+      })
+      defaultDeveloperProvisioned = true
+    } catch (developerError) {
+      console.error("[clients POST] Default developer assignment failed:", developerError)
+    }
+
     return NextResponse.json({
       success: true,
       id,
       portalProvisioned,
       portalResult,
+      defaultDeveloperProvisioned,
       message: portalProvisioned
-        ? `Client created and portal access granted to ${email}`
+        ? `Relationship created and portal access granted to ${email}`
         : email
-          ? `Client created — portal provisioning failed, use the Invite to Portal button on the client detail page`
-          : `Client created — add email later to grant portal access`,
+          ? `Relationship created — portal provisioning failed, use the Invite to Portal button on the relationship detail page`
+          : `Relationship created — add portal people later to grant access`,
     })
   } catch (error) {
     return NextResponse.json(

@@ -4,6 +4,35 @@ import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isPortalPersonRecord(record: Record<string, unknown>): boolean {
+  const id = readString(record.id)
+  const storyId = readString(record.storyId)
+  const portalAccessStatus = readString(record.portalAccessStatus)
+  return Boolean(
+    record.recordType === "portal_person" ||
+    record.adminApprovalPending === true ||
+    readString(record.assignedClientId) ||
+    portalAccessStatus === "pending_manual_provision" ||
+    portalAccessStatus === "assigned" ||
+    looksLikeEmail(id) ||
+    looksLikeEmail(storyId)
+  )
+}
+
+function isRelationshipRecord(record: Record<string, unknown>): boolean {
+  if (record.recordType === "relationship") return true
+  if (record.recordType === "portal_person" || record.recordType === "legacy") return false
+  return !isPortalPersonRecord(record)
+}
+
 // GET /api/admin/clients — list all client documents
 export async function GET(request: NextRequest) {
   if (!isInternalReadAuthorized(request)) {
@@ -16,13 +45,15 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
+    const includePeople = searchParams.get("includePeople") === "true"
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200)
 
     let query: FirebaseFirestore.Query = db.collection("clients")
     if (status) query = query.where("status", "==", status)
     const snap = await query.limit(limit).get()
 
-    const data = snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
+    const records = snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
+    const data = includePeople ? records : records.filter(isRelationshipRecord)
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error("GET /api/admin/clients:", err)
@@ -50,7 +81,12 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    const payload = { ...body, name, createdAt: now, updatedAt: now }
+    const requestedRecordType = body.recordType
+    const recordType =
+      requestedRecordType === "portal_person" || requestedRecordType === "legacy"
+        ? requestedRecordType
+        : "relationship"
+    const payload = { ...body, recordType, name, createdAt: now, updatedAt: now }
     const ref = await db.collection("clients").add(payload)
 
     await writeAuditLog({

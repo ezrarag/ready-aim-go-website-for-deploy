@@ -111,7 +111,7 @@ export async function provisionClientPortalAccess(
 
   const email = input.email.trim().toLowerCase()
   const clientName = input.clientName.trim()
-  const clientId = input.clientId.trim().toLowerCase()
+  const clientId = input.clientId.trim()
   const clientSlug = generateSlug(input.clientSlug?.trim() || clientName)
   const allowlistDocId = emailToDocId(email)
   const now = new Date().toISOString()

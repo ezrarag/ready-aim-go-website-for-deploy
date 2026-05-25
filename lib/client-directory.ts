@@ -5,6 +5,7 @@ import type { ClientPublicProfile } from "./types/client-public-profile"
 export type ClientStatus = "active" | "inactive" | "onboarding"
 export type DeployStatus = "live" | "building" | "error"
 export type StripeStatus = "connected" | "pending" | "error"
+export type ClientRecordType = "relationship" | "portal_person" | "legacy"
 
 export type ModuleKey = "web" | "app" | "rd" | "housing" | "transportation" | "insurance"
 
@@ -17,6 +18,7 @@ export interface ClientModule {
 
 export interface ClientDirectoryEntry {
   id: string
+  recordType: ClientRecordType
   workspaceId?: string
   storyId: string
   name: string

@@ -256,6 +256,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       transaction.set(
         targetRef,
         {
+          recordType: "relationship",
           workspaceId,
           githubRepo: primaryRepo,
           githubRepos: FieldValue.arrayUnion(...repositoryChains),
@@ -271,6 +272,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         transaction.set(
           pendingRef,
           {
+            recordType: "portal_person",
             adminApprovalPending: false,
             portalAccessStatus: "assigned",
             assignedClientId: clientId,
@@ -286,6 +288,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         transaction.set(
           db.collection("clients").doc(candidate.email),
           {
+            recordType: "portal_person",
             portalAccessStatus: "assigned",
             assignedClientId: clientId,
             assignedWorkspaceId: workspaceId,

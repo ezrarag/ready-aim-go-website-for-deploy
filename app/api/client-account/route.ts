@@ -128,6 +128,7 @@ async function createClientSignupRecord(input: {
   const ref = input.db.collection("clients").doc()
 
   await ref.set({
+    recordType: "portal_person",
     storyId,
     name: input.companyName,
     brands: [],

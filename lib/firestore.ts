@@ -3,6 +3,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { getAuth as getAdminAuth, type Auth as AdminAuth } from 'firebase-admin/auth'
 import type {
   ClientDirectoryEntry,
+  ClientRecordType,
   ClientStatus,
   DeployStatus,
   StripeStatus,
@@ -162,6 +163,8 @@ export interface Contribution {
 }
 
 type FirestoreClientDoc = {
+  recordType?: unknown
+  workspaceId?: unknown
   storyId?: unknown
   name?: unknown
   brands?: unknown
@@ -267,6 +270,11 @@ const asDeployStatus = (value: unknown): DeployStatus =>
 const asStripeStatus = (value: unknown): StripeStatus =>
   value === "connected" || value === "pending" || value === "error" ? value : "pending"
 
+const asClientRecordType = (value: unknown, isPortalPersonRecord: boolean): ClientRecordType => {
+  if (value === "relationship" || value === "portal_person" || value === "legacy") return value
+  return isPortalPersonRecord ? "portal_person" : "relationship"
+}
+
 const asBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === "boolean" ? value : fallback
 
@@ -336,6 +344,8 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
 
   return {
     id: normalizedId,
+    recordType: asClientRecordType(doc.recordType, isPortalPersonRecord),
+    workspaceId: asString(doc.workspaceId) || undefined,
     storyId: asString(doc.storyId, normalizedId),
     name: asString(doc.name, normalizedId.toUpperCase()),
     brands: asStringArray(doc.brands),
@@ -626,6 +636,8 @@ export async function createClientDocument(
   const normalizedPulseReport = data.pulseReport ? pulseReportSchema.safeParse(data.pulseReport) : null
 
   await ref.set({
+    recordType: data.recordType ?? "relationship",
+    workspaceId: data.workspaceId ?? null,
     storyId: data.storyId,
     name: data.name,
     brands: data.brands ?? [],
