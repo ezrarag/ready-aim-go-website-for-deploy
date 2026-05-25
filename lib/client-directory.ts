@@ -21,6 +21,9 @@ export interface ClientDirectoryEntry {
   storyId: string
   name: string
   brands: string[]
+  contactEmail?: string
+  clientPortalEmail?: string
+  portalAccessStatus?: string
   status: ClientStatus
   lastActivity: string
   updatedAt?: string

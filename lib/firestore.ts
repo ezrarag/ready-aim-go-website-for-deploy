@@ -165,6 +165,9 @@ type FirestoreClientDoc = {
   storyId?: unknown
   name?: unknown
   brands?: unknown
+  contactEmail?: unknown
+  clientPortalEmail?: unknown
+  portalAccessStatus?: unknown
   status?: unknown
   lastActivity?: unknown
   updatedAt?: unknown
@@ -318,6 +321,9 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     storyId: asString(doc.storyId, normalizedId),
     name: asString(doc.name, normalizedId.toUpperCase()),
     brands: asStringArray(doc.brands),
+    contactEmail: asString(doc.contactEmail) || undefined,
+    clientPortalEmail: asString(doc.clientPortalEmail) || undefined,
+    portalAccessStatus: asString(doc.portalAccessStatus) || undefined,
     status: asClientStatus(doc.status),
     lastActivity: asString(doc.lastActivity, "Recently updated"),
     updatedAt: asString(doc.updatedAt) || undefined,

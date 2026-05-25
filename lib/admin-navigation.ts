@@ -8,12 +8,11 @@ export type AdminNavItem = {
 // ── Sub-arrays (exported for consumers such as ClientSectionNav) ──────────────
 
 export const CLIENT_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "clients-all",        label: "All Clients",   href: "/dashboard/clients" },
-  { id: "clients-onboarding", label: "Onboarding",    href: "/dashboard/clients/onboarding" },
-  { id: "clients-contracts",  label: "Contracts",     href: "/dashboard/clients/contracts" },
-  { id: "clients-team",       label: "Portal Requests", href: "/dashboard/clients/access" },
-  { id: "clients-assets",     label: "Assets",        href: "/dashboard/clients/assets" },
-  { id: "clients-activity",   label: "Activity",      href: "/dashboard/clients/activity" },
+  { id: "clients-all",        label: "Relationships",   href: "/dashboard/clients" },
+  { id: "clients-team",       label: "Portal Access",   href: "/dashboard/clients/access" },
+  { id: "clients-contracts",  label: "Contracts",       href: "/dashboard/clients/contracts" },
+  { id: "clients-assets",     label: "Assets & Infra",  href: "/dashboard/clients/assets" },
+  { id: "clients-activity",   label: "Activity",        href: "/dashboard/clients/activity" },
 ]
 
 export const PROJECTS_SECTION_ITEMS: AdminNavItem[] = [

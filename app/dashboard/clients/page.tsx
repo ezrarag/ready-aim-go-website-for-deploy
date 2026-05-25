@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { Edit, ExternalLink, FileText, PlusCircle, Search, Sparkles } from "lucide-react"
+import { Box, Building2, Edit, ExternalLink, FileText, PlusCircle, Search, Sparkles, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +43,7 @@ import { getClientPreferredProductionUrl } from "@/lib/vercel"
 
 type Client = ClientDirectoryEntry
 type EditSaveState = "idle" | "saving" | "saved" | "error"
+type RosterView = "relationships" | "internal" | "all"
 
 async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
   const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
@@ -64,11 +65,77 @@ function formatClientActivity(value: unknown) {
   return "Recently updated"
 }
 
+function getClientEmails(client: Client): string[] {
+  return [client.contactEmail, client.clientPortalEmail]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim().toLowerCase())
+}
+
+function isInternalTeamRecord(client: Client): boolean {
+  const emails = getClientEmails(client)
+  if (emails.some((email) => email.endsWith("@readyaimgo.biz"))) return true
+
+  const identityText = [client.name, client.storyId, ...(client.brands ?? [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+
+  return identityText.includes("readyaimgo") || identityText.includes("ready aim go")
+}
+
+function getActivityTimestamp(client: Client): number {
+  const candidates = [client.lastActivity, client.updatedAt]
+  for (const value of candidates) {
+    const serialized = serializeFirestoreValue(value)
+    if (!serialized) continue
+    if (serialized instanceof Date) {
+      const timestamp = serialized.getTime()
+      if (!Number.isNaN(timestamp)) return timestamp
+    }
+    if (typeof serialized === "string" || typeof serialized === "number") {
+      const timestamp = new Date(serialized).getTime()
+      if (!Number.isNaN(timestamp)) return timestamp
+    }
+  }
+  return 0
+}
+
+function formatLastInteraction(client: Client): string {
+  const timestamp = getActivityTimestamp(client)
+  if (!timestamp) return formatClientActivity(client.lastActivity)
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(timestamp))
+}
+
+function getDaysSinceInteraction(client: Client): number | null {
+  const timestamp = getActivityTimestamp(client)
+  if (!timestamp) return null
+  return Math.floor((Date.now() - timestamp) / 86_400_000)
+}
+
+function getRelationshipHealth(client: Client): { label: string; tone: "good" | "watch" | "setup" } {
+  if (client.status === "onboarding") return { label: "Setup", tone: "setup" }
+  if (!client.storyVideoUrl || !clientHasWebsiteSignal(client)) return { label: "Needs Proof", tone: "watch" }
+  const daysSinceInteraction = getDaysSinceInteraction(client)
+  if (daysSinceInteraction === null || daysSinceInteraction > 21) return { label: "Follow Up", tone: "watch" }
+  return { label: "Healthy", tone: "good" }
+}
+
+function getRelationshipHealthClass(tone: "good" | "watch" | "setup") {
+  if (tone === "good") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+  if (tone === "setup") return "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+  return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [filteredClients, setFilteredClients] = useState<Client[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [missingFieldFilter, setMissingFieldFilter] = useState<"all" | "storyVideo" | "websiteUrl">("all")
+  const [rosterView, setRosterView] = useState<RosterView>("relationships")
   const [loading, setLoading] = useState(true)
   const [addClientOpen, setAddClientOpen] = useState(false)
   const [addSubmitting, setAddSubmitting] = useState(false)
@@ -95,7 +162,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     filterClients()
-  }, [clients, searchTerm, missingFieldFilter])
+  }, [clients, searchTerm, missingFieldFilter, rosterView])
 
   const fetchClientsData = async () => {
     try {
@@ -116,11 +183,19 @@ export default function ClientsPage() {
   const filterClients = () => {
     let filtered = [...clients]
 
+    if (rosterView === "relationships") {
+      filtered = filtered.filter((client) => !isInternalTeamRecord(client))
+    }
+
+    if (rosterView === "internal") {
+      filtered = filtered.filter((client) => isInternalTeamRecord(client))
+    }
+
     if (searchTerm) {
       const normalizedSearch = searchTerm.toLowerCase()
       filtered = filtered.filter((client) =>
-        [client.name, client.storyId, ...(client.brands ?? [])]
-          .filter(Boolean)
+        [client.name, client.storyId, client.contactEmail, client.clientPortalEmail, client.workspaceId, ...(client.brands ?? [])]
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
           .some((value) => value.toLowerCase().includes(normalizedSearch))
       )
     }
@@ -350,10 +425,13 @@ export default function ClientsPage() {
     }
   }
 
-  const activeClients = clients.filter((client) => client.status === "active").length
-  const onboardingClients = clients.filter((client) => client.status === "onboarding").length
-  const storyCoverage = clients.filter((client) => Boolean(client.storyVideoUrl?.trim())).length
-  const websiteCoverage = clients.filter((client) => clientHasWebsiteSignal(client)).length
+  const relationshipClients = clients.filter((client) => !isInternalTeamRecord(client))
+  const internalTeamRecords = clients.filter((client) => isInternalTeamRecord(client))
+  const activeClients = relationshipClients.filter((client) => client.status === "active").length
+  const onboardingClients = relationshipClients.filter((client) => client.status === "onboarding").length
+  const storyCoverage = relationshipClients.filter((client) => Boolean(client.storyVideoUrl?.trim())).length
+  const websiteCoverage = relationshipClients.filter((client) => clientHasWebsiteSignal(client)).length
+  const followUpClients = relationshipClients.filter((client) => getRelationshipHealth(client).label === "Follow Up").length
   const editCanSave = canSaveClientEditForm(editForm)
   const editHasUnsavedChanges =
     Boolean(editingClient) &&
@@ -404,9 +482,9 @@ export default function ClientsPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Clients</h1>
+            <h1 className="text-2xl font-bold text-foreground">Client Relationships</h1>
             <p className="text-muted-foreground">
-              Client records, onboarding readiness, website coverage, and story/activity context.
+              Relationship health, portal access context, public proof, and follow-up signals.
             </p>
           </div>
           <div className="flex gap-2">
@@ -427,8 +505,8 @@ export default function ClientsPage() {
 
         <div className="grid gap-4 md:grid-cols-4">
           <AdminMetricTile
-            label="Total Clients"
-            value={clients.length}
+            label="Relationships"
+            value={relationshipClients.length}
             hint={`${activeClients} active`}
           />
           <AdminMetricTile
@@ -437,18 +515,31 @@ export default function ClientsPage() {
             hint="Still moving into delivery"
           />
           <AdminMetricTile
+            label="Follow-Up"
+            value={followUpClients}
+            hint="No recent touch in 21+ days"
+          />
+          <AdminMetricTile
+            label="Internal Hidden"
+            value={internalTeamRecords.length}
+            hint="@readyaimgo / team-like records"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <AdminMetricTile
             className={`cursor-pointer transition-shadow ${missingFieldFilter === "storyVideo" ? "ring-2 ring-orange-500" : ""}`}
             onClick={() => setMissingFieldFilter((prev) => (prev === "storyVideo" ? "all" : "storyVideo"))}
             label="Story / Activity Coverage"
             value={storyCoverage}
-            hint={`Missing: ${clients.length - storyCoverage}`}
+            hint={`Missing: ${relationshipClients.length - storyCoverage}`}
           />
           <AdminMetricTile
             className={`cursor-pointer transition-shadow ${missingFieldFilter === "websiteUrl" ? "ring-2 ring-orange-500" : ""}`}
             onClick={() => setMissingFieldFilter((prev) => (prev === "websiteUrl" ? "all" : "websiteUrl"))}
             label="Website Coverage"
             value={websiteCoverage}
-            hint={`Missing: ${clients.length - websiteCoverage}`}
+            hint={`Missing: ${relationshipClients.length - websiteCoverage}`}
           />
         </div>
 
@@ -458,13 +549,35 @@ export default function ClientsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search clients, brands, or story IDs..."
+                  placeholder="Search clients, brands, emails, or story IDs..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={rosterView === "relationships" ? "default" : "outline"}
+                  onClick={() => setRosterView("relationships")}
+                >
+                  <Building2 className="mr-2 h-4 w-4" />
+                  Relationships
+                </Button>
+                <Button
+                  variant={rosterView === "internal" ? "default" : "outline"}
+                  onClick={() => setRosterView("internal")}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Internal
+                </Button>
+                <Button
+                  variant={rosterView === "all" ? "default" : "outline"}
+                  onClick={() => setRosterView("all")}
+                >
+                  All Records
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <Button variant={missingFieldFilter === "all" ? "default" : "outline"} onClick={() => setMissingFieldFilter("all")}>
                   All
                 </Button>
@@ -483,7 +596,7 @@ export default function ClientsPage() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Infrastructure discovery has been moved out of this page. Use <Link href="/dashboard/clients/vercel-sync" className="text-orange-600 underline-offset-4 hover:underline dark:text-orange-400">Vercel Sync</Link> for matching, linking, and deployment sync operations.
+              Internal ReadyAimGo records are hidden from the relationship view by default. Technical discovery stays in <Link href="/dashboard/clients/vercel-sync" className="text-orange-600 underline-offset-4 hover:underline dark:text-orange-400">Vercel Sync</Link> and card-level Assets & Infra drawers.
             </p>
           </CardContent>
         </AdminPanel>
@@ -491,6 +604,9 @@ export default function ClientsPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredClients.map((client) => {
             const preferredProductionUrl = getClientPreferredProductionUrl(client)
+            const relationshipHealth = getRelationshipHealth(client)
+            const daysSinceInteraction = getDaysSinceInteraction(client)
+            const primaryEmail = client.clientPortalEmail || client.contactEmail
 
             return (
               <AdminPanel key={client.id} className="transition-shadow hover:shadow-lg">
@@ -507,23 +623,35 @@ export default function ClientsPage() {
                         ))}
                       </div>
                     </div>
-                    <Badge variant="outline">
-                      {client.status}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge className={getRelationshipHealthClass(relationshipHealth.tone)}>
+                        {relationshipHealth.label}
+                      </Badge>
+                      <Badge variant="outline">{isInternalTeamRecord(client) ? "Internal" : client.status}</Badge>
+                    </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <AdminPanelInset className="p-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Website</p>
-                      <p className="mt-2 text-foreground">{preferredProductionUrl || "Missing"}</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Public Proof</p>
+                      <p className="mt-2 text-foreground">{client.storyVideoUrl && preferredProductionUrl ? "Ready" : "Needs work"}</p>
                     </AdminPanelInset>
                     <AdminPanelInset className="p-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Story</p>
-                      <p className="mt-2 text-foreground">{client.storyVideoUrl ? "Ready" : "Missing"}</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Last Touch</p>
+                      <p className="mt-2 text-foreground">
+                        {daysSinceInteraction === null ? "Unknown" : `${daysSinceInteraction}d ago`}
+                      </p>
                     </AdminPanelInset>
                   </div>
+
+                  {primaryEmail ? (
+                    <div className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">Portal contact:</strong>{" "}
+                      <span className="font-mono text-xs">{primaryEmail}</span>
+                    </div>
+                  ) : null}
 
                   {client.pulseSummary ? (
                     <AdminPanelInset className="p-3">
@@ -536,8 +664,29 @@ export default function ClientsPage() {
                   ) : null}
 
                   <div className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Last activity:</strong> {formatClientActivity(client.lastActivity)}
+                    <strong className="text-foreground">Last interaction:</strong> {formatLastInteraction(client)}
                   </div>
+
+                  <details className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-foreground">
+                      <Box className="h-4 w-4 text-muted-foreground" />
+                      Assets & Infra
+                    </summary>
+                    <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                      <div>
+                        <strong className="text-foreground">Production:</strong> {preferredProductionUrl || "Missing"}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Workspace:</strong> {client.workspaceId || client.id}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Repo:</strong> {client.githubRepo || client.githubRepos?.[0] || "Not linked"}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Deploy:</strong> {client.deployStatus}
+                      </div>
+                    </div>
+                  </details>
 
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1" asChild>
@@ -572,7 +721,7 @@ export default function ClientsPage() {
         {filteredClients.length === 0 ? (
           <AdminPanel>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              No client records match the current filters.
+              No records match this view and filter combination.
             </CardContent>
           </AdminPanel>
         ) : null}
@@ -613,15 +762,18 @@ export default function ClientsPage() {
                 placeholder="https://..."
               />
             </div>
-            <div>
-              <Label htmlFor="add-githubRepo">GitHub Repo (optional)</Label>
-              <Input
-                id="add-githubRepo"
-                value={addForm.githubRepo}
-                onChange={(event) => setAddForm((prev) => ({ ...prev, githubRepo: event.target.value }))}
-                placeholder="owner/repo"
-              />
-            </div>
+            <details className="rounded-lg border border-border bg-muted/20 p-3">
+              <summary className="cursor-pointer text-sm font-medium text-foreground">Optional Assets & Infra</summary>
+              <div className="mt-3">
+                <Label htmlFor="add-githubRepo">GitHub Repo</Label>
+                <Input
+                  id="add-githubRepo"
+                  value={addForm.githubRepo}
+                  onChange={(event) => setAddForm((prev) => ({ ...prev, githubRepo: event.target.value }))}
+                  placeholder="owner/repo"
+                />
+              </div>
+            </details>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -653,9 +805,16 @@ export default function ClientsPage() {
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
-            <DialogDescription>Update client information in Firebase.</DialogDescription>
+            <DialogDescription>
+              Keep relationship fields visible first. Technical links live in Assets & Infra.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-foreground">Relationship Identity</h3>
+              <p className="text-xs text-muted-foreground">Name, story routing, business labels, and account status.</p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-name">Name *</Label>
@@ -692,7 +851,7 @@ export default function ClientsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="max-w-xs">
               <div>
                 <Label>Status</Label>
                 <Select value={editForm.status} onValueChange={(value: ClientStatus) => setEditForm({ ...editForm, status: value })}>
@@ -706,39 +865,51 @@ export default function ClientsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Deploy Status</Label>
-                <Select
-                  value={editForm.deployStatus}
-                  onValueChange={(value: DeployStatus) => setEditForm({ ...editForm, deployStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="live">Live</SelectItem>
-                    <SelectItem value="building">Building</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Stripe Status</Label>
-                <Select
-                  value={editForm.stripeStatus}
-                  onValueChange={(value: StripeStatus) => setEditForm({ ...editForm, stripeStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="connected">Connected</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
+
+            <details className="rounded-lg border border-border bg-muted/20 p-4">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-foreground">
+                <Box className="h-4 w-4 text-muted-foreground" />
+                Assets & Infra
+              </summary>
+              <p className="mt-2 text-xs text-muted-foreground">
+                GitHub, Vercel, App Store, and vertical asset URLs are tucked away so daily relationship edits stay focused.
+              </p>
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Deploy Status</Label>
+                    <Select
+                      value={editForm.deployStatus}
+                      onValueChange={(value: DeployStatus) => setEditForm({ ...editForm, deployStatus: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="live">Live</SelectItem>
+                        <SelectItem value="building">Building</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Stripe Status</Label>
+                    <Select
+                      value={editForm.stripeStatus}
+                      onValueChange={(value: StripeStatus) => setEditForm({ ...editForm, stripeStatus: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="connected">Connected</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -863,6 +1034,14 @@ export default function ClientsPage() {
               </div>
             </div>
 
+              </div>
+            </details>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-foreground">Public Proof</h3>
+              <p className="text-xs text-muted-foreground">Story visibility and public-facing proof signals.</p>
+            </div>
+
             <div>
               <Label htmlFor="edit-storyVideoUrl">Story Video URL *</Label>
               <Input
@@ -872,6 +1051,13 @@ export default function ClientsPage() {
                 onChange={(event) => setEditForm({ ...editForm, storyVideoUrl: event.target.value })}
                 placeholder="https://..."
               />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-foreground">Activity & Relationship Pulse</h3>
+              <p className="text-xs text-muted-foreground">
+                These fields support the roster health badges and follow-up prioritization.
+              </p>
             </div>
 
             <div className="grid grid-cols-4 gap-4">
