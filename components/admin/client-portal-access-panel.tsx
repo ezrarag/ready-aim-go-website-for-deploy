@@ -15,23 +15,11 @@
  */
 
 import { useEffect, useState } from "react"
-import {
-  CheckCircle,
-  ExternalLink,
-  Loader2,
-  Mail,
-  ShieldCheck,
-  ShieldOff,
-  UserPlus,
-  Users,
-} from "lucide-react"
+import { ExternalLink, Loader2, Mail, ShieldCheck, ShieldOff, UserPlus, Users } from "lucide-react"
 import { AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 
 type AccessStatus = {
@@ -58,15 +46,11 @@ type Props = {
   clientName: string
 }
 
-export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
+export function ClientPortalAccessPanel({ clientId }: Props) {
   const { toast } = useToast()
   const [status, setStatus] = useState<AccessStatus | null>(null)
   const [loading, setLoading] = useState(true)
-  const [email, setEmail] = useState("")
-  const [notes, setNotes] = useState("")
-  const [submitting, setSubmitting] = useState(false)
   const [revoking, setRevoking] = useState(false)
-  const [showForm, setShowForm] = useState(false)
   const [members, setMembers] = useState<PortalMember[]>([])
   const [membersLoading, setMembersLoading] = useState(true)
 
@@ -84,7 +68,6 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
           active: data.active,
           provisionedAt: data.provisionedAt,
         })
-        if (data.email) setEmail(data.email)
       }
     } catch (e) {
       console.error(e)
@@ -113,37 +96,6 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
   useEffect(() => {
     void Promise.all([fetchStatus(), fetchMembers()])
   }, [clientId])
-
-  const handleProvision = async () => {
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast({ title: "Valid email required", variant: "destructive" })
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/portal-access`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), notes }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || "Failed to provision")
-
-      toast({ title: "Portal access granted", description: data.message })
-      setShowForm(false)
-      setNotes("")
-      await Promise.all([fetchStatus(), fetchMembers()])
-    } catch (e) {
-      toast({
-        title: "Failed to grant access",
-        description: e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive",
-      })
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   const handleRevoke = async () => {
     if (!status?.email) return
@@ -252,9 +204,9 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
                   variant="ghost"
                   size="sm"
                   className="h-8 text-xs text-muted-foreground"
-                  onClick={() => setShowForm(true)}
+                  asChild
                 >
-                  Update email
+                  <a href="#assign-portal-workspace">Manage workspace people</a>
                 </Button>
                 <Button
                   variant="ghost"
@@ -324,81 +276,22 @@ export function ClientPortalAccessPanel({ clientId, clientName }: Props) {
                         ) : null}
                         <div className="mt-1 text-xs text-muted-foreground">Source: {member.source}</div>
                       </div>
-                      {member.email ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => {
-                            setEmail(member.email ?? "")
-                            setShowForm(true)
-                          }}
-                        >
-                          Use email
-                        </Button>
-                      ) : null}
                     </div>
                   ))}
                 </div>
               )}
             </AdminPanelInset>
 
-            {/* Grant / re-grant button */}
-            {(!status.hasAccess || !status.active || showForm) && (
-              <div className="space-y-3 rounded-xl border border-border/60 bg-card/60 p-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    {status.hasAccess ? "Update client email" : "Client email address"}
-                  </Label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="maia@hroshi.com"
-                    className="h-8 text-sm"
-                    onKeyDown={(e) => { if (e.key === "Enter") void handleProvision() }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This email will be used to log into clients.readyaimgo.biz and must match what they sign in with.
-                  </p>
+            {(!status.hasAccess || !status.active) && (
+              <AdminPanelInset className="space-y-2 border-amber-500/30 bg-amber-500/10">
+                <div className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                  Workspace assignment is handled from the Workspace tab.
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Notes (optional)</Label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any context about this access grant..."
-                    className="text-sm min-h-[60px]"
-                    rows={2}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-500"
-                    onClick={handleProvision}
-                    disabled={submitting || !email.trim()}
-                  >
-                    {submitting ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Provisioning...</>
-                    ) : (
-                      <><CheckCircle className="h-3.5 w-3.5 mr-1" />
-                        {status.hasAccess ? "Update access" : `Grant portal access to ${clientName}`}
-                      </>
-                    )}
-                  </Button>
-                  {showForm && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => setShowForm(false)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              </div>
+                <p className="text-xs text-muted-foreground">
+                  Use the Assign Portal Workspace typeahead to approve pending portal registrations and bind them to
+                  this client without manually typing an email address.
+                </p>
+              </AdminPanelInset>
             )}
           </>
         ) : (

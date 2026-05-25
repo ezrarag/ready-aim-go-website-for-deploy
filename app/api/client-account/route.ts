@@ -113,6 +113,7 @@ async function createClientSignupRecord(input: {
         contactPhone: input.phone,
         organizationType: input.organizationType || null,
         portalAccessStatus: "pending_manual_provision",
+        adminApprovalPending: true,
         status: "onboarding",
         lastActivity: "Client signed up; portal access pending",
         updatedAt: now,
@@ -161,6 +162,7 @@ async function createClientSignupRecord(input: {
     contactPhone: input.phone,
     organizationType: input.organizationType || null,
     portalAccessStatus: "pending_manual_provision",
+    adminApprovalPending: true,
     portalSignup: {
       ...portalSignup,
       createdAt: now,

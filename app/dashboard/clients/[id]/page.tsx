@@ -298,6 +298,7 @@ export default function ClientDetailPage() {
   const [workspaceSaving, setWorkspaceSaving] = useState(false)
   const [workspaceDirty, setWorkspaceDirty] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+  const [pendingPortalSignupCount, setPendingPortalSignupCount] = useState(0)
 
   const fetchClient = () => {
     if (!clientId) return
@@ -358,6 +359,20 @@ export default function ClientDetailPage() {
       .finally(() => setWorkspaceLoading(false))
   }
 
+  const fetchPendingPortalSignupCount = () => {
+    if (!clientId) return
+    fetch(`/api/clients/${encodeURIComponent(clientId)}/pending-portal-signups?limit=100`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && Array.isArray(data.candidates)) {
+          setPendingPortalSignupCount(data.candidates.length)
+        }
+      })
+      .catch(() => {
+        setPendingPortalSignupCount(0)
+      })
+  }
+
   useEffect(() => {
     if (!clientId) return
     fetchUpdates()
@@ -366,6 +381,11 @@ export default function ClientDetailPage() {
   useEffect(() => {
     if (!clientId) return
     fetchWorkspace()
+  }, [clientId])
+
+  useEffect(() => {
+    if (!clientId) return
+    fetchPendingPortalSignupCount()
   }, [clientId])
 
   useEffect(() => {
@@ -895,7 +915,14 @@ export default function ClientDetailPage() {
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="workspace">Workspace</TabsTrigger>
+            <TabsTrigger value="workspace" className="gap-2">
+              Workspace
+              {pendingPortalSignupCount > 0 ? (
+                <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+                  Action Needed - Unassigned Portal Registrations Active
+                </Badge>
+              ) : null}
+            </TabsTrigger>
             <TabsTrigger value="roles">Role Suggestions</TabsTrigger>
             <TabsTrigger value="updates">Updates</TabsTrigger>
           </TabsList>
@@ -1109,7 +1136,15 @@ export default function ClientDetailPage() {
               </Card>
             ) : null}
 
-            <WorkspacePortalAssignmentCard clientId={clientId} clientName={client.name} />
+            <WorkspacePortalAssignmentCard
+              clientId={clientId}
+              clientName={client.name}
+              onPendingCountChange={setPendingPortalSignupCount}
+              onAssigned={() => {
+                fetchClient()
+                fetchPendingPortalSignupCount()
+              }}
+            />
             <WorkspaceProjectControlCenter clientId={clientId} workspaceId={client.workspaceId} />
 
             {workspaceLoading && !workspace ? (
