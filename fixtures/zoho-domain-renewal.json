@@ -1,0 +1,11 @@
+{
+  "event": "mail.received",
+  "provider": "Zoho Mail",
+  "messageId": "mock-zoho-domain-renewal-001",
+  "threadId": "mock-thread-domain-renewal-001",
+  "from": "billing@zoho.com",
+  "to": ["operations@readyaimgo.biz"],
+  "subject": "Zoho Mail renewal notice for example-client.com",
+  "date": "2026-05-26T14:00:00.000Z",
+  "body": "Your Zoho Mail Business Email subscription for example-client.com renews on 2026-06-15. The base renewal cost is USD 72.00. Please ensure billing details are current."
+}

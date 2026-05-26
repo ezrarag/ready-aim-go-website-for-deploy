@@ -11,6 +11,7 @@
     "lint": "next lint",
     "ra:admin-cleanup": "node scripts/ra-command.mjs admin-cleanup",
     "ra:audit-identity": "node scripts/ra-command.mjs audit-identity",
+    "ra:ingest-zoho-email": "node scripts/ra-command.mjs ingest-zoho-email",
     "start": "next start"
   },
   "dependencies": {

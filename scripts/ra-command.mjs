@@ -3,14 +3,17 @@
 import fs from "node:fs"
 import path from "node:path"
 import process from "node:process"
+import { createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
-import { GoogleGenAI } from "@google/genai"
+import { cert, getApps, initializeApp } from "firebase-admin/app"
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore"
+import { GoogleGenAI, Type } from "@google/genai"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const DEFAULT_ADMIN_ROOT = path.resolve(__dirname, "..")
 const DEFAULT_CLIENTS_ROOT = path.resolve(DEFAULT_ADMIN_ROOT, "..", "clients.readyaimgo.biz")
-const DEFAULT_MODEL = "models/gemini-1.5-flash";
+const DEFAULT_MODEL = "models/gemini-2.5-flash";
 const DEFAULT_MAX_FILE_CHARS = 24_000
 const SKIP_DIRS = new Set([".git", ".next", "node_modules", ".claude"])
 
@@ -64,6 +67,10 @@ function parseArgs(argv) {
     model: DEFAULT_MODEL,
     maxFileChars: DEFAULT_MAX_FILE_CHARS,
     output: "",
+    file: "",
+    rawText: "",
+    stdin: false,
+    write: false,
     dryRun: false,
     help: false,
   }
@@ -77,6 +84,22 @@ function parseArgs(argv) {
     }
     if (arg === "--dry-run") {
       args.dryRun = true
+      continue
+    }
+    if (arg === "--write") {
+      args.write = true
+      continue
+    }
+    if (arg === "--stdin") {
+      args.stdin = true
+      continue
+    }
+    if (arg === "--file") {
+      args.file = path.resolve(argv[++i] || "")
+      continue
+    }
+    if (arg === "--raw-text") {
+      args.rawText = argv[++i] || ""
       continue
     }
     if (arg === "--admin-root") {
@@ -117,6 +140,7 @@ function parseArgs(argv) {
   if (args.command === "audit_identity") args.command = "audit-identity"
   if (args.command === "admin_cleanup") args.command = "admin-cleanup"
   if (args.command === "list_models") args.command = "list-models"
+  if (args.command === "ingest_zoho_email") args.command = "ingest-zoho-email"
   return args
 }
 
@@ -126,12 +150,17 @@ function printHelp() {
   npm run ra:admin-cleanup
   node scripts/ra-command.mjs list-models
   node scripts/ra-command.mjs audit-identity --dry-run
-  node scripts/ra-command.mjs admin-cleanup --model gemini-1.5-flash
+  node scripts/ra-command.mjs admin-cleanup --model gemini-2.5-flash
   node scripts/ra-command.mjs audit-identity --output ./identity-audit.md
+  node scripts/ra-command.mjs ingest-zoho-email --file ./fixtures/zoho-domain-renewal.json --dry-run
+  node scripts/ra-command.mjs ingest-zoho-email --stdin --write
 
 Commands:
   audit-identity  Audit cross-repo identity sync between readyaimgo.biz and clients.readyaimgo.biz.
   admin-cleanup   Find portal-only logic living in the Admin repo and ask Gemini for a safe refactor plan.
+  ingest-zoho-email
+                  Parse a local/mock Zoho Mail webhook payload, match it to a workspace domain,
+                  and optionally write client-visible infrastructure activity to Firestore.
   list-models     List all Gemini models available to your API key.
 
 Options:
@@ -140,12 +169,20 @@ Options:
   --model <model>           Gemini model. Defaults to ${DEFAULT_MODEL}.
   --max-file-chars <n>      Per-file character cap. Defaults to ${DEFAULT_MAX_FILE_CHARS}.
   --output <path>           Write the generated report to a file.
-  --dry-run                 Print the Gemini prompt without calling the API.
+  --file <path>             Read a mock Zoho webhook JSON payload from a file.
+  --stdin                   Read a mock Zoho webhook JSON payload from stdin.
+  --raw-text <text>         Analyze raw email text directly.
+  --write                   Commit Firestore writes. Without this, ingest-zoho-email is dry-run only.
+  --dry-run                 For report commands, print the Gemini prompt. For ingestion, analyze and match without writing.
   --help, -h                Show this help.
 
 Gemini API key:
   Put GEMINI_API_KEY=... or GOOGLE_API_KEY=... in the Admin repo's local .env file.
-  NEXT_PUBLIC_* keys are intentionally ignored.`)
+  NEXT_PUBLIC_* keys are intentionally ignored.
+
+Firebase Admin credentials for ingest-zoho-email:
+  Put FIREBASE_SERVICE_ACCOUNT_KEY=... in .env.local/.env, or provide project/client/private key envs.
+  Set AGENCY_MONITORING_MARGIN_PERCENT for billing payloads.`)
 }
 
 function ensureDirectory(root, label) {
@@ -417,6 +454,528 @@ async function listModels(adminRoot) {
   }
 }
 
+function loadRuntimeEnv(adminRoot) {
+  loadDotEnv(path.join(adminRoot, ".env.local"))
+  loadDotEnv(path.join(adminRoot, ".env"))
+}
+
+function readFirebaseCredential() {
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim()
+  if (serviceAccountKey?.startsWith("{")) {
+    const parsed = JSON.parse(serviceAccountKey)
+    if (typeof parsed.private_key === "string" && typeof parsed.client_email === "string") {
+      return cert(parsed)
+    }
+  }
+
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ||
+    process.env.GOOGLE_CLOUD_PROJECT?.trim()
+  const clientEmail =
+    process.env.FIREBASE_CLIENT_EMAIL?.trim() ||
+    process.env.FIREBASE_ADMIN_CLIENT_EMAIL?.trim() ||
+    process.env.FIREBASE_AMIN_CLIENT_EMAIL?.trim()
+  const privateKey = (
+    process.env.FIREBASE_PRIVATE_KEY ||
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
+    ""
+  )
+    .trim()
+    .replace(/\\n/g, "\n")
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      "Missing Firebase Admin credentials. Set FIREBASE_SERVICE_ACCOUNT_KEY, or set FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY."
+    )
+  }
+
+  return cert({ projectId, clientEmail, privateKey })
+}
+
+function getAdminFirestore(adminRoot) {
+  loadRuntimeEnv(adminRoot)
+  if (getApps().length === 0) {
+    initializeApp({ credential: readFirebaseCredential() })
+  }
+  return getFirestore()
+}
+
+function readStdin() {
+  return new Promise((resolve, reject) => {
+    let data = ""
+    process.stdin.setEncoding("utf8")
+    process.stdin.on("data", (chunk) => {
+      data += chunk
+    })
+    process.stdin.on("end", () => resolve(data))
+    process.stdin.on("error", reject)
+  })
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+function compactWhitespace(value, maxLength = 6_000) {
+  return typeof value === "string"
+    ? value.replace(/\s+/g, " ").trim().slice(0, maxLength)
+    : ""
+}
+
+function collectStringValues(value, results = []) {
+  if (typeof value === "string") {
+    results.push(value)
+    return results
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStringValues(item, results)
+    return results
+  }
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) collectStringValues(nested, results)
+  }
+  return results
+}
+
+function extractRawEmailText(input) {
+  const parsed = safeJsonParse(input)
+  if (!parsed || typeof parsed !== "object") {
+    return compactWhitespace(input, 20_000)
+  }
+
+  const candidateKeys = [
+    "subject",
+    "from",
+    "sender",
+    "to",
+    "recipient",
+    "date",
+    "body",
+    "text",
+    "plainText",
+    "html",
+    "content",
+    "snippet",
+    "summary",
+    "message",
+  ]
+  const blocks = []
+  for (const key of candidateKeys) {
+    if (key in parsed) {
+      const value = parsed[key]
+      if (Array.isArray(value)) {
+        blocks.push(`${key}: ${value.filter((item) => typeof item === "string").join(", ")}`)
+      } else if (typeof value === "string") {
+        blocks.push(`${key}: ${value}`)
+      }
+    }
+  }
+
+  if (blocks.length === 0) {
+    blocks.push(...collectStringValues(parsed).slice(0, 30))
+  }
+
+  return compactWhitespace(blocks.join("\n"), 20_000)
+}
+
+async function loadZohoPayloadInput(args) {
+  const inputSources = [Boolean(args.file), Boolean(args.stdin), Boolean(args.rawText)]
+    .filter(Boolean)
+    .length
+  if (inputSources !== 1) {
+    throw new Error("Pass exactly one of --file, --stdin, or --raw-text.")
+  }
+
+  if (args.file) {
+    if (!fs.existsSync(args.file)) throw new Error(`Input file not found: ${args.file}`)
+    return fs.readFileSync(args.file, "utf8")
+  }
+
+  if (args.stdin) {
+    const input = await readStdin()
+    if (!input.trim()) throw new Error("No stdin payload was provided.")
+    return input
+  }
+
+  return args.rawText
+}
+
+function normalizeDomain(value) {
+  if (typeof value !== "string") return ""
+  let domain = value.trim().toLowerCase()
+  if (!domain) return ""
+
+  domain = domain.replace(/^mailto:/, "")
+  domain = domain.replace(/^[^@\s]+@/, "")
+  domain = domain.replace(/^https?:\/\//, "")
+  domain = domain.replace(/^www\./, "")
+  domain = domain.split(/[/?#:\s]/)[0] || ""
+  domain = domain.replace(/^\.+|\.+$/g, "")
+
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? domain : ""
+}
+
+function addDomainCandidate(candidates, value, source) {
+  const domain = normalizeDomain(value)
+  if (domain) candidates.set(domain, source)
+}
+
+function collectWorkspaceDomainCandidates(workspace) {
+  const candidates = new Map()
+  addDomainCandidate(candidates, workspace.primaryDomain, "primaryDomain")
+  addDomainCandidate(candidates, workspace.targetDomain, "targetDomain")
+
+  for (const domain of Array.isArray(workspace.domains) ? workspace.domains : []) {
+    addDomainCandidate(candidates, domain, "domains[]")
+  }
+
+  const hosting =
+    workspace.hosting && typeof workspace.hosting === "object" ? workspace.hosting : {}
+  for (const registrar of Array.isArray(hosting.domainRegistrars) ? hosting.domainRegistrars : []) {
+    if (registrar && typeof registrar === "object") {
+      addDomainCandidate(candidates, registrar.domain, "hosting.domainRegistrars[].domain")
+    }
+  }
+
+  for (const project of Array.isArray(workspace.vercelProjects) ? workspace.vercelProjects : []) {
+    if (!project || typeof project !== "object") continue
+    for (const domain of Array.isArray(project.domains) ? project.domains : []) {
+      addDomainCandidate(candidates, domain, "vercelProjects[].domains[]")
+    }
+  }
+
+  return candidates
+}
+
+function stableHash(input) {
+  return createHash("sha256").update(input).digest("hex").slice(0, 32)
+}
+
+function readNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[$,]/g, ""))
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function getMarginPercent() {
+  const raw = process.env.AGENCY_MONITORING_MARGIN_PERCENT?.trim()
+  if (!raw) {
+    throw new Error("AGENCY_MONITORING_MARGIN_PERCENT is required when billing data is present.")
+  }
+  const parsed = Number(raw.replace(/%$/, ""))
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("AGENCY_MONITORING_MARGIN_PERCENT must be a non-negative number.")
+  }
+  return parsed
+}
+
+function calculateInvoiceLineItem(extraction) {
+  const baseCost = readNumber(extraction.baseCost)
+  if (!extraction.billingDataPresent || !baseCost || baseCost <= 0) return null
+
+  const marginPercent = getMarginPercent()
+  const marginAmount = Number((baseCost * (marginPercent / 100)).toFixed(2))
+  const totalCost = Number((baseCost + marginAmount).toFixed(2))
+  const currency = typeof extraction.currency === "string" && extraction.currency.trim()
+    ? extraction.currency.trim().toUpperCase()
+    : "USD"
+
+  return {
+    description: `${extraction.billingProvider || "Infrastructure"} monitoring premium for ${extraction.domainName}`,
+    baseCost,
+    marginPercent,
+    marginAmount,
+    totalCost,
+    currency,
+  }
+}
+
+function normalizeGeminiExtraction(value) {
+  const domainName = normalizeDomain(value?.domainName)
+  const confidence = Math.max(0, Math.min(1, readNumber(value?.confidence) ?? 0))
+  return {
+    domainName,
+    renewalDate: typeof value?.renewalDate === "string" && value.renewalDate.trim()
+      ? value.renewalDate.trim()
+      : null,
+    billingProvider:
+      typeof value?.billingProvider === "string" && value.billingProvider.trim()
+        ? value.billingProvider.trim()
+        : null,
+    baseCost: readNumber(value?.baseCost),
+    currency: typeof value?.currency === "string" && value.currency.trim()
+      ? value.currency.trim().toUpperCase()
+      : "USD",
+    billingDataPresent: Boolean(value?.billingDataPresent),
+    evidenceSnippet:
+      typeof value?.evidenceSnippet === "string" && value.evidenceSnippet.trim()
+        ? value.evidenceSnippet.trim().slice(0, 500)
+        : null,
+    confidence,
+  }
+}
+
+function toFirestoreTimestamp(value) {
+  if (typeof value !== "string" || !value.trim()) return null
+  const date = new Date(value.trim())
+  return Number.isNaN(date.getTime()) ? null : Timestamp.fromDate(date)
+}
+
+async function analyzeIncomingEmail(rawEmailText, { adminRoot, model }) {
+  const apiKey = getGeminiApiKey(adminRoot)
+  const ai = new GoogleGenAI({ apiKey })
+  const response = await ai.models.generateContent({
+    model,
+    contents: `Extract domain renewal and billing metadata from this Zoho Mail webhook/email text.
+
+Return only source-backed facts. Use null for absent values. Do not infer a customer/workspace.
+
+Email text:
+${rawEmailText}`,
+    config: {
+      temperature: 0,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          domainName: { type: Type.STRING },
+          renewalDate: { type: Type.STRING, nullable: true },
+          billingProvider: { type: Type.STRING, nullable: true },
+          baseCost: { type: Type.NUMBER, nullable: true },
+          currency: { type: Type.STRING, nullable: true },
+          billingDataPresent: { type: Type.BOOLEAN },
+          evidenceSnippet: { type: Type.STRING, nullable: true },
+          confidence: { type: Type.NUMBER },
+        },
+        required: ["domainName", "billingDataPresent", "confidence"],
+      },
+    },
+  })
+
+  const text = response.text || ""
+  const parsed = safeJsonParse(text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, ""))
+  if (!parsed) {
+    throw new Error("Gemini did not return valid JSON for incoming email analysis.")
+  }
+  return normalizeGeminiExtraction(parsed)
+}
+
+async function findWorkspaceByDomain(db, domainName) {
+  const normalizedDomain = normalizeDomain(domainName)
+  if (!normalizedDomain) throw new Error("Gemini did not extract a valid domainName.")
+
+  const snap = await db.collection("workspaces").limit(1_000).get()
+  const matches = []
+  for (const doc of snap.docs) {
+    const workspace = doc.data()
+    const candidates = collectWorkspaceDomainCandidates(workspace)
+    if (candidates.has(normalizedDomain)) {
+      matches.push({
+        workspaceId: doc.id,
+        workspace,
+        matchedField: candidates.get(normalizedDomain),
+      })
+    }
+  }
+
+  if (matches.length > 1) {
+    throw new Error(
+      `Domain ${normalizedDomain} matched multiple workspaces: ${matches.map((match) => match.workspaceId).join(", ")}. Refusing to write.`
+    )
+  }
+
+  return matches[0] || null
+}
+
+function buildZohoFirestorePayloads({ extraction, match, rawEmailText, payloadHash }) {
+  const clientId = typeof match.workspace.clientId === "string" && match.workspace.clientId.trim()
+    ? match.workspace.clientId.trim()
+    : ""
+  if (!clientId) {
+    throw new Error(`Matched workspace ${match.workspaceId} has no clientId; cannot write clientActivity.`)
+  }
+
+  const invoiceLineItem = calculateInvoiceLineItem(extraction)
+  const renewalTimestamp = toFirestoreTimestamp(extraction.renewalDate)
+  const sourceRef = `zoho_${payloadHash}`
+  const activityId = sourceRef
+  const text = [
+    `Zoho infrastructure email matched ${extraction.domainName}.`,
+    extraction.billingProvider ? `Provider: ${extraction.billingProvider}.` : "",
+    extraction.renewalDate ? `Renewal date: ${extraction.renewalDate}.` : "",
+    invoiceLineItem ? `Billing total with monitoring premium: ${invoiceLineItem.currency} ${invoiceLineItem.totalCost}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+
+  const activityItem = {
+    category: "infrastructure",
+    visibility: "client",
+    sourceSystem: "zoho-mail-webhook",
+    sourceRef,
+    workspaceId: match.workspaceId,
+    clientId,
+    domainName: extraction.domainName,
+    billingProvider: extraction.billingProvider,
+    renewalDate: renewalTimestamp,
+    billingDataPresent: extraction.billingDataPresent,
+    invoiceLineItem,
+    text,
+    summary: text,
+    description: extraction.evidenceSnippet,
+    evidenceSnippet: extraction.evidenceSnippet,
+    confidence: extraction.confidence,
+    rawEmailText: rawEmailText.slice(0, 4_000),
+  }
+
+  const infrastructureLink = {
+    provider: extraction.billingProvider?.toLowerCase().includes("zoho") ? "Zoho" : "Other",
+    type: invoiceLineItem ? "invoice" : "mail",
+    domain: extraction.domainName,
+    status: invoiceLineItem ? "unpaid" : "unknown",
+    amount: invoiceLineItem?.totalCost ?? null,
+    dueDate: renewalTimestamp,
+    sourceSystem: "zoho-mail-webhook",
+    sourceRef,
+    evidenceSnippet: extraction.evidenceSnippet,
+    confidence: extraction.confidence,
+    clientVisible: true,
+    verified: null,
+    registrar: extraction.billingProvider,
+    expirationSource: extraction.renewalDate ? "zoho-mail-webhook" : null,
+    vercelProjectId: null,
+    vercelProjectName: null,
+    invoiceLineItem,
+  }
+
+  const expense = invoiceLineItem
+    ? {
+        source: "Zoho Mail System",
+        description: invoiceLineItem.description,
+        amount: invoiceLineItem.totalCost,
+        baseCost: invoiceLineItem.baseCost,
+        marginPercent: invoiceLineItem.marginPercent,
+        marginAmount: invoiceLineItem.marginAmount,
+        currency: invoiceLineItem.currency,
+        status: "unpaid",
+        serviceProvider: "Zoho",
+        billingCycleType: "Business Email Tier",
+        dueDate: renewalTimestamp,
+        vendor: extraction.billingProvider || "Zoho",
+        category: "business-email",
+        domain: extraction.domainName,
+        sourceEmailId: sourceRef,
+        sourceThreadId: null,
+        evidenceSnippet: extraction.evidenceSnippet,
+        confidence: extraction.confidence,
+        contractAppendageReady: true,
+      }
+    : null
+
+  return {
+    clientId,
+    activityId,
+    linkId: sourceRef,
+    expenseId: sourceRef,
+    activityItem,
+    infrastructureLink,
+    expense,
+  }
+}
+
+async function writeZohoIngestion(db, payloads, workspaceId) {
+  const batch = db.batch()
+  const now = FieldValue.serverTimestamp()
+  const workspaceRef = db.collection("workspaces").doc(workspaceId)
+  const activityRef = db
+    .collection("clientActivity")
+    .doc(payloads.clientId)
+    .collection("items")
+    .doc(payloads.activityId)
+  const linkRef = workspaceRef.collection("infrastructureLinks").doc(payloads.linkId)
+
+  batch.set(activityRef, { ...payloads.activityItem, createdAt: now, updatedAt: now }, { merge: true })
+  batch.set(linkRef, { ...payloads.infrastructureLink, createdAt: now, updatedAt: now }, { merge: true })
+
+  if (payloads.expense) {
+    const expenseRef = workspaceRef.collection("expenses").doc(payloads.expenseId)
+    batch.set(expenseRef, { ...payloads.expense, createdAt: now, updatedAt: now }, { merge: true })
+  }
+
+  batch.set(workspaceRef, { updatedAt: now }, { merge: true })
+  await batch.commit()
+}
+
+async function ingestZohoEmail(args) {
+  if (args.dryRun && args.write) {
+    throw new Error("Pass either --dry-run or --write, not both.")
+  }
+  const shouldWrite = args.write && !args.dryRun
+  const input = await loadZohoPayloadInput(args)
+  const rawEmailText = extractRawEmailText(input)
+  if (!rawEmailText) throw new Error("No analyzable email text was found in the payload.")
+
+  const extraction = await analyzeIncomingEmail(rawEmailText, {
+    adminRoot: args.adminRoot,
+    model: args.model,
+  })
+  if (extraction.confidence < 0.45) {
+    throw new Error(`Gemini extraction confidence ${extraction.confidence} is below the 0.45 write threshold.`)
+  }
+
+  const db = getAdminFirestore(args.adminRoot)
+  const match = await findWorkspaceByDomain(db, extraction.domainName)
+  if (!match) {
+    console.log(JSON.stringify({ success: true, matched: false, extraction }, null, 2))
+    return
+  }
+
+  const payloadHash = stableHash([match.workspaceId, extraction.domainName, rawEmailText].join("|"))
+  const payloads = buildZohoFirestorePayloads({
+    extraction,
+    match,
+    rawEmailText,
+    payloadHash,
+  })
+
+  const result = {
+    success: true,
+    dryRun: !shouldWrite,
+    matched: true,
+    workspacePath: `workspaces/${match.workspaceId}`,
+    clientActivityPath: `clientActivity/${payloads.clientId}/items/${payloads.activityId}`,
+    infrastructureLinkPath: `workspaces/${match.workspaceId}/infrastructureLinks/${payloads.linkId}`,
+    expensePath: payloads.expense
+      ? `workspaces/${match.workspaceId}/expenses/${payloads.expenseId}`
+      : null,
+    matchedField: match.matchedField,
+    extraction,
+    proposedWrites: {
+      activityItem: payloads.activityItem,
+      infrastructureLink: payloads.infrastructureLink,
+      expense: payloads.expense,
+    },
+  }
+
+  if (shouldWrite) {
+    await writeZohoIngestion(db, payloads, match.workspaceId)
+    result.dryRun = false
+    result.written = true
+  } else {
+    result.written = false
+  }
+
+  console.log(JSON.stringify(result, null, 2))
+}
+
 async function emitReport(args, prompt) {
   const report = args.dryRun
     ? `# ra-command dry run\n\nThe Gemini API was not called.\n\n## Prompt\n\n${prompt}`
@@ -560,6 +1119,11 @@ async function main() {
 
   if (args.command === "admin-cleanup") {
     await adminCleanup(args)
+    return
+  }
+
+  if (args.command === "ingest-zoho-email") {
+    await ingestZohoEmail(args)
     return
   }
 
