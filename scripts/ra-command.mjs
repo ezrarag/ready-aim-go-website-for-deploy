@@ -725,7 +725,25 @@ function normalizeGeminiExtraction(value) {
 
 function toFirestoreTimestamp(value) {
   if (typeof value !== "string" || !value.trim()) return null
-  const date = new Date(value.trim())
+  const trimmed = value.trim()
+  const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  let date
+  if (dateOnlyMatch) {
+    const year = Number(dateOnlyMatch[1])
+    const month = Number(dateOnlyMatch[2])
+    const day = Number(dateOnlyMatch[3])
+    date = new Date(year, month - 1, day)
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return null
+    }
+  } else {
+    date = new Date(trimmed)
+  }
+
   return Number.isNaN(date.getTime()) ? null : Timestamp.fromDate(date)
 }
 
