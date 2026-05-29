@@ -48,16 +48,21 @@ export async function ensureCanonicalWorkspace({
   preferredWorkspaceId,
   projectId,
 }: EnsureWorkspaceInput): Promise<string> {
-  const normalizedClientId = clientId.trim().toLowerCase()
-  const normalizedProjectId = projectId?.trim() || normalizedClientId
+  const canonicalClientId = clientId.trim()
+  const legacyLowerClientId = canonicalClientId.toLowerCase()
+  const normalizedProjectId = projectId?.trim() || canonicalClientId
   const now = FieldValue.serverTimestamp()
 
-  const [clientSnap, projectSnap] = await Promise.all([
-    db.collection("clients").doc(normalizedClientId).get(),
+  const [canonicalClientSnap, legacyClientSnap, projectSnap] = await Promise.all([
+    db.collection("clients").doc(canonicalClientId).get(),
+    canonicalClientId === legacyLowerClientId
+      ? Promise.resolve(null)
+      : db.collection("clients").doc(legacyLowerClientId).get(),
     db.collection("projects").doc(normalizedProjectId).get(),
   ])
 
-  const clientData = clientSnap.exists ? (clientSnap.data() as Record<string, unknown>) : undefined
+  const clientSnap = canonicalClientSnap.exists ? canonicalClientSnap : legacyClientSnap
+  const clientData = clientSnap?.exists ? (clientSnap.data() as Record<string, unknown>) : undefined
   const projectData = projectSnap.exists ? (projectSnap.data() as Record<string, unknown>) : undefined
 
   let workspaceId =
@@ -66,22 +71,25 @@ export async function ensureCanonicalWorkspace({
     readString(projectData, "workspaceId")
 
   if (!workspaceId) {
-    const workspaceByClient = await db
-      .collection("workspaces")
-      .where("clientId", "==", normalizedClientId)
-      .limit(1)
-      .get()
-    workspaceId = workspaceByClient.docs[0]?.id || buildWorkspaceId(normalizedClientId, clientName)
+    const workspaceByClient = await db.collection("workspaces").where("clientId", "==", canonicalClientId).limit(1).get()
+    const legacyWorkspaceByClient =
+      workspaceByClient.empty && canonicalClientId !== legacyLowerClientId
+        ? await db.collection("workspaces").where("clientId", "==", legacyLowerClientId).limit(1).get()
+        : null
+    workspaceId =
+      workspaceByClient.docs[0]?.id ||
+      legacyWorkspaceByClient?.docs[0]?.id ||
+      buildWorkspaceId(canonicalClientId, clientName)
   }
 
   const workspaceRef = db.collection("workspaces").doc(workspaceId)
   const workspaceSnap = await workspaceRef.get()
   const existing = workspaceSnap.exists ? (workspaceSnap.data() as Record<string, unknown>) : undefined
-  const name = clientName.trim() || readString(clientData, "name") || readString(clientData, "companyName") || normalizedClientId
+  const name = clientName.trim() || readString(clientData, "name") || readString(clientData, "companyName") || canonicalClientId
 
   const workspacePayload: Record<string, unknown> = {
     name,
-    clientId: normalizedClientId,
+    clientId: canonicalClientId,
     clientEmail: clientEmail?.trim().toLowerCase() || readString(clientData, "email") || null,
     projectIds: FieldValue.arrayUnion(normalizedProjectId),
     updatedAt: now,
@@ -122,7 +130,7 @@ export async function ensureCanonicalWorkspace({
 
   await Promise.all([
     workspaceRef.set(workspacePayload, { merge: true }),
-    db.collection("clients").doc(normalizedClientId).set(
+    db.collection("clients").doc(canonicalClientId).set(
       {
         workspaceId,
         updatedAt: now,
@@ -132,7 +140,7 @@ export async function ensureCanonicalWorkspace({
     db.collection("projects").doc(normalizedProjectId).set(
       {
         workspaceId,
-        clientId: normalizedClientId,
+        clientId: canonicalClientId,
         updatedAt: new Date().toISOString(),
       },
       { merge: true }
