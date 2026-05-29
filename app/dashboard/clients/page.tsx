@@ -46,6 +46,48 @@ type Client = ClientDirectoryEntry
 type EditSaveState = "idle" | "saving" | "saved" | "error"
 type RosterView = "relationships" | "people" | "internal" | "all"
 
+function normalizeClientRecord(record: Partial<ClientDirectoryEntry> & { id?: string }): Client {
+  const id = typeof record.id === "string" && record.id.trim() ? record.id : "unknown"
+  const storyId = typeof record.storyId === "string" && record.storyId.trim() ? record.storyId : id
+  const name = typeof record.name === "string" && record.name.trim() ? record.name : storyId
+
+  return {
+    ...record,
+    id,
+    recordType:
+      record.recordType === "portal_person" || record.recordType === "legacy"
+        ? record.recordType
+        : "relationship",
+    storyId,
+    name,
+    brands: Array.isArray(record.brands) ? record.brands : [],
+    status:
+      record.status === "active" || record.status === "inactive" || record.status === "onboarding"
+        ? record.status
+        : "onboarding",
+    lastActivity:
+      typeof record.lastActivity === "string" && record.lastActivity.trim()
+        ? record.lastActivity
+        : "Recently updated",
+    deployStatus:
+      record.deployStatus === "live" || record.deployStatus === "error" || record.deployStatus === "building"
+        ? record.deployStatus
+        : "building",
+    githubRepos: Array.isArray(record.githubRepos) ? record.githubRepos : [],
+    deployHosts: Array.isArray(record.deployHosts) ? record.deployHosts : [],
+    stripeStatus:
+      record.stripeStatus === "connected" || record.stripeStatus === "error" || record.stripeStatus === "pending"
+        ? record.stripeStatus
+        : "pending",
+    revenue: typeof record.revenue === "number" ? record.revenue : 0,
+    meetings: typeof record.meetings === "number" ? record.meetings : 0,
+    emails: typeof record.emails === "number" ? record.emails : 0,
+    commits: typeof record.commits === "number" ? record.commits : 0,
+    modules: record.modules,
+    publicProfile: record.publicProfile,
+  }
+}
+
 async function saveClientEdit(clientId: string, payload: ClientEditPayload) {
   const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
     method: "PATCH",
@@ -195,13 +237,13 @@ export default function ClientsPage() {
       const clientsResponse = await fetch("/api/admin/clients?includePeople=true&limit=200", { cache: "no-store" })
       if (!clientsResponse.ok) return
       const payload = await clientsResponse.json()
-      const clientRecords = Array.isArray(payload.data)
+      const clientRecords: unknown[] = Array.isArray(payload.data)
         ? payload.data
         : Array.isArray(payload.clients)
           ? payload.clients
           : []
       if (payload?.success && clientRecords.length > 0) {
-        setClients(clientRecords as Client[])
+        setClients(clientRecords.map((record) => normalizeClientRecord(record as Partial<Client> & { id?: string })))
       }
     } catch (error) {
       console.error("Error fetching clients data:", error)
@@ -684,7 +726,7 @@ export default function ClientsPage() {
                       <CardTitle className="text-lg text-foreground">{client.name}</CardTitle>
                       <p className="mt-1 text-sm text-muted-foreground">{client.storyId}</p>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {client.brands.map((brand) => (
+                        {(client.brands ?? []).map((brand) => (
                           <Badge key={brand} variant="outline" className="text-xs">
                             {brand}
                           </Badge>
