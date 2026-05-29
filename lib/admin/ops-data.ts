@@ -3,6 +3,7 @@ export type AdminClientStatus = "active" | "inactive" | "onboarding"
 export type AdminDeployStatus = "live" | "building" | "error"
 export type AdminStripeStatus = "connected" | "pending" | "error"
 export type AdminTaskStatus = "proposed" | "accepted" | "in_progress" | "blocked" | "done" | "declined"
+export type AdminProjectLinkState = "linked" | "unlinked" | "email-client-id" | "missing-client"
 
 export type AdminClientRecord = {
   id: string
@@ -92,6 +93,12 @@ export type AdminOpsMetrics = {
   systemWarnings: number
 }
 
+export type AdminProjectRelationshipMeta = {
+  linkedClient: AdminClientRecord | null
+  linkState: AdminProjectLinkState
+  suggestedEmail: string | null
+}
+
 export function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
@@ -169,6 +176,10 @@ export function formatAdminDateTime(value: unknown): string {
 
 function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+export function isEmailLike(value: string | null | undefined): boolean {
+  return Boolean(value && looksLikeEmail(value))
 }
 
 function normalizeClientStatus(value: unknown): AdminClientStatus {
@@ -323,6 +334,22 @@ export function getRelationshipHealth(client: AdminClientRecord, projects: Admin
   const lastTouch = getClientActivityMillis(client)
   if (!lastTouch || Date.now() - lastTouch > 21 * 86_400_000) return { label: "Follow Up", tone: "warning" }
   return { label: "Healthy", tone: "good" }
+}
+
+export function getProjectRelationshipMeta(
+  project: AdminProjectRecord,
+  clientById: Map<string, AdminClientRecord>
+): AdminProjectRelationshipMeta {
+  const linkedClient = project.clientId ? clientById.get(project.clientId) ?? null : null
+  const suggestedEmail =
+    project.clientPortalEmail ||
+    project.clientPortalEmails.find(isEmailLike) ||
+    (isEmailLike(project.clientId) ? project.clientId : null)
+
+  if (linkedClient) return { linkedClient, linkState: "linked", suggestedEmail }
+  if (isEmailLike(project.clientId)) return { linkedClient: null, linkState: "email-client-id", suggestedEmail }
+  if (project.clientId) return { linkedClient: null, linkState: "missing-client", suggestedEmail }
+  return { linkedClient: null, linkState: "unlinked", suggestedEmail }
 }
 
 export function isTaskOpen(task: AdminTaskRecord): boolean {

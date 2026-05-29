@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     const storyId = readString(body.storyId)
     const portalUid = readString(body.portalUid)
     const portalPersonId = readString(body.portalPersonId)
+    const sourceProjectId = readString(body.sourceProjectId)
     const notes = readString(body.notes)
 
     if (!isEmail(email)) {
@@ -62,11 +63,19 @@ export async function POST(request: NextRequest) {
     if (!name || !storyId) {
       return NextResponse.json({ success: false, error: "name and storyId are required" }, { status: 400 })
     }
-    if (!portalUid && !portalPersonId) {
+    if (!portalUid && !portalPersonId && !sourceProjectId) {
       return NextResponse.json(
-        { success: false, error: "portalUid or portalPersonId is required" },
+        { success: false, error: "portalUid, portalPersonId, or sourceProjectId is required" },
         { status: 400 }
       )
+    }
+
+    let sourceProjectSnapshot: FirebaseFirestore.DocumentSnapshot | null = null
+    if (sourceProjectId) {
+      sourceProjectSnapshot = await db.collection("projects").doc(sourceProjectId).get()
+      if (!sourceProjectSnapshot.exists) {
+        return NextResponse.json({ success: false, error: "Source project not found" }, { status: 404 })
+      }
     }
 
     const portalPersonSnapshots = new Map<string, FirebaseFirestore.DocumentSnapshot>()
@@ -164,6 +173,21 @@ export async function POST(request: NextRequest) {
       { merge: true }
     )
 
+    if (sourceProjectSnapshot?.exists) {
+      batch.set(
+        sourceProjectSnapshot.ref,
+        {
+          clientId,
+          clientName: name,
+          clientPortalEmail: email,
+          clientPortalEmails: FieldValue.arrayUnion(email),
+          workspaceId: portalResult.workspaceId,
+          updatedAt: now,
+        },
+        { merge: true }
+      )
+    }
+
     for (const snapshot of assignablePortalDocs) {
       if (snapshot.id !== clientId) {
         batch.set(snapshot.ref, portalPersonPatch, { merge: true })
@@ -199,6 +223,7 @@ export async function POST(request: NextRequest) {
         email,
         portalUid: portalUid || null,
         portalPersonId: portalPersonId || null,
+        sourceProjectId: sourceProjectId || null,
         assignedWorkspaceId: portalResult.workspaceId,
         role: "owner",
       },
