@@ -192,11 +192,16 @@ export default function ClientsPage() {
   const fetchClientsData = async () => {
     try {
       setLoading(true)
-      const clientsResponse = await fetch("/api/clients", { cache: "no-store" })
+      const clientsResponse = await fetch("/api/admin/clients?includePeople=true&limit=200", { cache: "no-store" })
       if (!clientsResponse.ok) return
       const payload = await clientsResponse.json()
-      if (payload?.success && Array.isArray(payload.clients)) {
-        setClients(payload.clients as Client[])
+      const clientRecords = Array.isArray(payload.data)
+        ? payload.data
+        : Array.isArray(payload.clients)
+          ? payload.clients
+          : []
+      if (payload?.success && clientRecords.length > 0) {
+        setClients(clientRecords as Client[])
       }
     } catch (error) {
       console.error("Error fetching clients data:", error)

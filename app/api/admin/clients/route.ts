@@ -8,6 +8,10 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
+}
+
 function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
@@ -33,6 +37,86 @@ function isRelationshipRecord(record: Record<string, unknown>): boolean {
   return !isPortalPersonRecord(record)
 }
 
+function timestampToIso(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === "string") return value
+  if (typeof value === "number") return new Date(value).toISOString()
+  if (typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toISOString()
+  }
+  return null
+}
+
+function buildPortalPersonFromUser(uid: string, user: Record<string, unknown>) {
+  const email = readString(user.email).toLowerCase()
+  if (!email) return null
+
+  const clientIds = readStringArray(user.clientIds)
+  const assignedClientId = readString(user.client_id) || clientIds[0] || ""
+  const displayName =
+    readString(user.displayName) ||
+    readString(user.full_name) ||
+    readString(user.name) ||
+    email
+  const updatedAt =
+    timestampToIso(user.updatedAt) ||
+    timestampToIso(user.updated_at) ||
+    timestampToIso(user.createdAt) ||
+    timestampToIso(user.created_at) ||
+    new Date().toISOString()
+
+  return {
+    id: `portal_${uid}`,
+    recordType: "portal_person",
+    storyId: email,
+    name: displayName,
+    brands: [],
+    contactEmail: email,
+    clientPortalEmail: email,
+    portalUid: uid,
+    portalAccessStatus: assignedClientId ? "assigned" : "pending_manual_provision",
+    adminApprovalPending: !assignedClientId,
+    assignedClientId: assignedClientId || undefined,
+    status: assignedClientId ? "active" : "onboarding",
+    lastActivity: assignedClientId
+      ? `Portal user linked to ${assignedClientId}`
+      : "Portal user signed in; workspace assignment pending",
+    updatedAt,
+    pulseSummary: "",
+    deployStatus: "building",
+    deployUrl: "",
+    githubRepo: "",
+    githubRepos: [],
+    deployHosts: [],
+    stripeStatus: "pending",
+    revenue: 0,
+    meetings: 0,
+    emails: 0,
+    commits: 0,
+    lastDeploy: "",
+    storyVideoUrl: "",
+    showOnFrontend: false,
+    isNewStory: false,
+    websiteUrl: "",
+    appUrl: "",
+    appStoreUrl: "",
+    rdUrl: "",
+    housingUrl: "",
+    transportationUrl: "",
+    insuranceUrl: "",
+  }
+}
+
+function getPortalIdentityKeys(record: Record<string, unknown>) {
+  return [
+    readString(record.portalUid),
+    readString(record.clientPortalEmail).toLowerCase(),
+    readString(record.contactEmail).toLowerCase(),
+    looksLikeEmail(readString(record.id)) ? readString(record.id).toLowerCase() : "",
+    looksLikeEmail(readString(record.storyId)) ? readString(record.storyId).toLowerCase() : "",
+  ].filter(Boolean)
+}
+
 // GET /api/admin/clients — list all client documents
 export async function GET(request: NextRequest) {
   if (!isInternalReadAuthorized(request)) {
@@ -53,7 +137,26 @@ export async function GET(request: NextRequest) {
     const snap = await query.limit(limit).get()
 
     const records = snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
-    const data = includePeople ? records : records.filter(isRelationshipRecord)
+    let data = includePeople ? records : records.filter(isRelationshipRecord)
+
+    if (includePeople) {
+      const representedPortalPeople = new Set<string>()
+      for (const record of records) {
+        if (!isPortalPersonRecord(record)) continue
+        for (const key of getPortalIdentityKeys(record)) representedPortalPeople.add(key)
+      }
+
+      const usersSnap = await db.collection("users").limit(limit).get()
+      const syntheticPortalPeople = usersSnap.docs
+        .map((doc) => buildPortalPersonFromUser(doc.id, serializeFirestoreDocument(doc.id, doc.data())))
+        .filter((record): record is NonNullable<typeof record> => Boolean(record))
+        .filter((record) =>
+          getPortalIdentityKeys(record).every((key) => !representedPortalPeople.has(key))
+        )
+
+      data = [...data, ...syntheticPortalPeople]
+    }
+
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error("GET /api/admin/clients:", err)
