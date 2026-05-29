@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  Loader2,
   RefreshCw,
   Search,
   UserPlus,
@@ -17,10 +18,21 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
 import { ClientSectionNav } from "@/components/admin/client-section-nav"
+import { useToast } from "@/hooks/use-toast"
 import {
   buildAdminActivity,
   computeAdminOpsMetrics,
@@ -47,6 +59,20 @@ type ClientsState = {
   projects: AdminProjectRecord[]
   tasks: AdminTaskRecord[]
   errors: string[]
+}
+
+type CreateClientForm = {
+  email: string
+  name: string
+  storyId: string
+  notes: string
+}
+
+type CreateClientResult = {
+  clientId: string
+  workspaceId: string
+  email: string
+  message: string
 }
 
 const emptyState: ClientsState = {
@@ -106,6 +132,45 @@ function clientMatchesSearch(client: AdminClientRecord, search: string) {
   return text.includes(search.toLowerCase())
 }
 
+function getPortalPersonEmail(person: AdminClientRecord): string {
+  return person.clientPortalEmail || person.contactEmail || (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.storyId) ? person.storyId : "")
+}
+
+function humanizeEmailName(email: string): string {
+  const localPart = email.split("@")[0] || email
+  const words = localPart
+    .replace(/[._+-]+/g, " ")
+    .split(" ")
+    .map((word) => word.trim())
+    .filter(Boolean)
+  return words.length
+    ? words.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ")
+    : email
+}
+
+function slugifyClientName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function buildCreateClientForm(person: AdminClientRecord): CreateClientForm {
+  const email = getPortalPersonEmail(person)
+  const fallbackName = humanizeEmailName(email || person.name)
+  const name = person.name && person.name !== person.storyId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.name)
+    ? person.name
+    : fallbackName
+  return {
+    email,
+    name,
+    storyId: slugifyClientName(name) || slugifyClientName(fallbackName),
+    notes: "",
+  }
+}
+
 function RelationshipCard({ client, projects }: { client: AdminClientRecord; projects: AdminProjectRecord[] }) {
   const health = getRelationshipHealth(client, projects)
   const clientProjects = projects.filter((project) => project.clientId === client.id)
@@ -157,7 +222,13 @@ function RelationshipCard({ client, projects }: { client: AdminClientRecord; pro
   )
 }
 
-function PortalPersonCard({ person }: { person: AdminClientRecord }) {
+function PortalPersonCard({
+  person,
+  onCreateClient,
+}: {
+  person: AdminClientRecord
+  onCreateClient: (person: AdminClientRecord) => void
+}) {
   const assigned = Boolean(person.assignedClientId)
   return (
     <AdminPanel>
@@ -185,7 +256,13 @@ function PortalPersonCard({ person }: { person: AdminClientRecord }) {
         </div>
         <p className="text-sm text-muted-foreground">{person.lastActivity}</p>
         <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm">
+          {!assigned ? (
+            <Button size="sm" onClick={() => onCreateClient(person)} disabled={!getPortalPersonEmail(person)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create Client
+            </Button>
+          ) : null}
+          <Button asChild size="sm" variant={assigned ? "default" : "outline"}>
             <Link href="/dashboard/clients/access">
               Manage Access
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -203,12 +280,17 @@ function PortalPersonCard({ person }: { person: AdminClientRecord }) {
 }
 
 export default function ClientsPage() {
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const [state, setState] = useState<ClientsState>(emptyState)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [view, setView] = useState<RosterView>(() => resolveInitialView(searchParams.get("view")))
   const [search, setSearch] = useState("")
+  const [selectedPortalPerson, setSelectedPortalPerson] = useState<AdminClientRecord | null>(null)
+  const [createForm, setCreateForm] = useState<CreateClientForm>({ email: "", name: "", storyId: "", notes: "" })
+  const [creatingClient, setCreatingClient] = useState(false)
+  const [createResult, setCreateResult] = useState<CreateClientResult | null>(null)
 
   const loadClients = async () => {
     setLoading(true)
@@ -263,6 +345,60 @@ export default function ClientsPage() {
     () => needsAssignment.filter((client) => clientMatchesSearch(client, search)),
     [needsAssignment, search]
   )
+  const canCreateClient = Boolean(createForm.email && createForm.name.trim() && createForm.storyId.trim())
+
+  const openCreateDialog = (person: AdminClientRecord) => {
+    setSelectedPortalPerson(person)
+    setCreateForm(buildCreateClientForm(person))
+    setCreateResult(null)
+  }
+
+  const closeCreateDialog = (open: boolean) => {
+    if (open) return
+    setSelectedPortalPerson(null)
+    setCreateResult(null)
+    setCreatingClient(false)
+  }
+
+  const submitCreateClient = async () => {
+    if (!selectedPortalPerson || !canCreateClient) return
+    setCreatingClient(true)
+    try {
+      const response = await fetch("/api/admin/clients/from-portal-person", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: createForm.email,
+          name: createForm.name,
+          storyId: createForm.storyId,
+          notes: createForm.notes,
+          portalUid: selectedPortalPerson.portalUid,
+          portalPersonId: selectedPortalPerson.id,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.error || `Create failed with ${response.status}`)
+      }
+      const result = {
+        clientId: String(payload.clientId || ""),
+        workspaceId: String(payload.workspaceId || ""),
+        email: String(payload.email || createForm.email),
+        message: String(payload.message || "Client created."),
+      }
+      setCreateResult(result)
+      toast({ title: "Client created", description: result.message })
+      await loadClients()
+    } catch (error) {
+      toast({
+        title: "Unable to create client",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingClient(false)
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -362,7 +498,9 @@ export default function ClientsPage() {
                 </CardContent>
               </AdminPanel>
             ) : (
-              visiblePortalPeople.map((person) => <PortalPersonCard key={person.id} person={person} />)
+              visiblePortalPeople.map((person) => (
+                <PortalPersonCard key={person.id} person={person} onCreateClient={openCreateDialog} />
+              ))
             )}
           </section>
         ) : null}
@@ -377,7 +515,9 @@ export default function ClientsPage() {
                 </CardContent>
               </AdminPanel>
             ) : (
-              visibleNeedsAssignment.map((person) => <PortalPersonCard key={person.id} person={person} />)
+              visibleNeedsAssignment.map((person) => (
+                <PortalPersonCard key={person.id} person={person} onCreateClient={openCreateDialog} />
+              ))
             )}
           </section>
         ) : null}
@@ -414,6 +554,78 @@ export default function ClientsPage() {
           </AdminPanel>
         ) : null}
       </div>
+      <Dialog open={Boolean(selectedPortalPerson)} onOpenChange={closeCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Client From Portal Person</DialogTitle>
+            <DialogDescription>
+              Review the relationship defaults before creating the client and assigning this portal person as owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="portal-client-email">Email</Label>
+              <Input id="portal-client-email" value={createForm.email} readOnly className="font-mono text-xs" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="portal-client-name">Client name</Label>
+              <Input
+                id="portal-client-name"
+                value={createForm.name}
+                onChange={(event) => {
+                  const name = event.target.value
+                  setCreateForm((current) => ({
+                    ...current,
+                    name,
+                    storyId: current.storyId ? current.storyId : slugifyClientName(name),
+                  }))
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="portal-client-story-id">Story ID</Label>
+              <Input
+                id="portal-client-story-id"
+                value={createForm.storyId}
+                onChange={(event) => setCreateForm((current) => ({ ...current, storyId: slugifyClientName(event.target.value) }))}
+              />
+            </div>
+            <AdminPanelInset className="p-3 text-sm">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Portal role</p>
+              <p className="mt-2 font-medium text-foreground">Owner</p>
+            </AdminPanelInset>
+            <div className="grid gap-2">
+              <Label htmlFor="portal-client-notes">Notes</Label>
+              <Textarea
+                id="portal-client-notes"
+                value={createForm.notes}
+                onChange={(event) => setCreateForm((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="Optional internal context for this conversion."
+              />
+            </div>
+            {createResult ? (
+              <AdminPanelInset className="border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200">
+                {createResult.message}
+              </AdminPanelInset>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            {createResult ? (
+              <Button asChild>
+                <Link href={`/dashboard/clients/${encodeURIComponent(createResult.clientId)}`}>
+                  Open Client
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <Button onClick={() => void submitCreateClient()} disabled={!canCreateClient || creatingClient}>
+                {creatingClient ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                Create Client
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }
