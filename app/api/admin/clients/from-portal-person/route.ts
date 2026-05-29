@@ -39,6 +39,28 @@ function buildMembership() {
   }
 }
 
+async function collectEmailMatchedProjectSnapshots(
+  db: FirebaseFirestore.Firestore,
+  email: string,
+  sourceProjectSnapshot: FirebaseFirestore.DocumentSnapshot | null
+): Promise<FirebaseFirestore.DocumentSnapshot[]> {
+  const snapshots = new Map<string, FirebaseFirestore.DocumentSnapshot>()
+  const addSnapshot = (snapshot: FirebaseFirestore.DocumentSnapshot | null | undefined) => {
+    if (snapshot?.exists) snapshots.set(snapshot.id, snapshot)
+  }
+
+  addSnapshot(sourceProjectSnapshot)
+  addSnapshot(await db.collection("projects").doc(email).get())
+
+  const byClientId = await db.collection("projects").where("clientId", "==", email).limit(20).get()
+  byClientId.docs.forEach(addSnapshot)
+
+  const byPortalEmail = await db.collection("projects").where("clientPortalEmail", "==", email).limit(20).get()
+  byPortalEmail.docs.forEach(addSnapshot)
+
+  return Array.from(snapshots.values())
+}
+
 export async function POST(request: NextRequest) {
   if (!isInternalMutationAuthorized(request)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
@@ -159,6 +181,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     }
 
+    const emailMatchedProjects = await collectEmailMatchedProjectSnapshots(db, email, sourceProjectSnapshot)
     const batch = db.batch()
     batch.set(
       db.collection("clients").doc(clientId),
@@ -173,15 +196,15 @@ export async function POST(request: NextRequest) {
       { merge: true }
     )
 
-    if (sourceProjectSnapshot?.exists) {
+    for (const projectSnapshot of emailMatchedProjects) {
       batch.set(
-        sourceProjectSnapshot.ref,
+        projectSnapshot.ref,
         {
           clientId,
           clientName: name,
           clientPortalEmail: email,
           clientPortalEmails: FieldValue.arrayUnion(email),
-          workspaceId: portalResult.workspaceId,
+          workspaceId: readString(projectSnapshot.data()?.workspaceId) || portalResult.workspaceId,
           updatedAt: now,
         },
         { merge: true }
@@ -224,6 +247,7 @@ export async function POST(request: NextRequest) {
         portalUid: portalUid || null,
         portalPersonId: portalPersonId || null,
         sourceProjectId: sourceProjectId || null,
+        linkedProjectIds: emailMatchedProjects.map((project) => project.id),
         assignedWorkspaceId: portalResult.workspaceId,
         role: "owner",
       },
