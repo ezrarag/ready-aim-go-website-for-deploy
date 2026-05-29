@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { FieldValue } from "firebase-admin/firestore"
 
 import { normalizeClientServiceInterests } from "@/lib/client-onboarding"
 import { getFirebaseAdminAuth, getFirestoreDb } from "@/lib/firestore"
 import { buildOwnerMembership } from "@/lib/types/client-membership"
-import { generateSlug } from "@/lib/beam-access-shared"
+import { emailToDocId, generateSlug } from "@/lib/beam-access-shared"
 
 function readTrimmedString(value: unknown, maxLength = 280) {
   if (typeof value !== "string") {
@@ -72,6 +73,169 @@ async function findExistingSignupClientId(
     .get()
 
   return byEmail.empty ? null : byEmail.docs[0].id
+}
+
+async function findPortalPersonRef(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  email: string
+) {
+  const byPortalUid = await db
+    .collection("clients")
+    .where("portalUid", "==", uid)
+    .limit(1)
+    .get()
+
+  if (!byPortalUid.empty) return byPortalUid.docs[0].ref
+
+  const bySignupUid = await db
+    .collection("clients")
+    .where("portalSignup.uid", "==", uid)
+    .limit(1)
+    .get()
+
+  if (!bySignupUid.empty) return bySignupUid.docs[0].ref
+
+  const byEmail = await db
+    .collection("clients")
+    .where("clientPortalEmail", "==", email)
+    .limit(10)
+    .get()
+
+  const portalPersonDoc = byEmail.docs.find((doc) => {
+    const data = doc.data()
+    return (
+      data.recordType === "portal_person" ||
+      data.adminApprovalPending === true ||
+      typeof data.assignedClientId === "string" ||
+      data.portalAccessStatus === "pending_manual_provision" ||
+      data.portalAccessStatus === "assigned"
+    )
+  })
+
+  return portalPersonDoc?.ref ?? db.collection("clients").doc(`portal_${uid || emailToDocId(email)}`)
+}
+
+async function mirrorActivePortalPerson(input: {
+  db: FirebaseFirestore.Firestore
+  uid: string
+  email: string
+  fullName: string
+  phone: string | null
+  role: string
+  handoffId: string
+  mode: "claim" | "new"
+  companyName: string
+  organizationType: string
+  notes: string
+  serviceInterests: string[]
+  clientId: string
+}) {
+  const now = new Date().toISOString()
+  const clientRef = input.db.collection("clients").doc(input.clientId)
+  const clientSnapshot = await clientRef.get()
+  const clientData = clientSnapshot.data() ?? {}
+  const workspaceId =
+    readTrimmedString(clientData.workspaceId, 160) ||
+    input.clientId
+  const clientName =
+    readTrimmedString(clientData.name, 160) ||
+    input.companyName ||
+    input.clientId
+  const clientSlug =
+    readTrimmedString(clientData.storyId, 160) ||
+    generateSlug(clientName || input.clientId)
+  const portalPersonRef = await findPortalPersonRef(input.db, input.uid, input.email)
+
+  await Promise.all([
+    portalPersonRef.set(
+      {
+        recordType: "portal_person",
+        portalUid: input.uid,
+        storyId: input.email,
+        name: input.fullName || input.email,
+        brands: [],
+        status: "active",
+        lastActivity: `Client logged in and linked to ${clientName}`,
+        updatedAt: now,
+        pulseSummary: "Portal person record created automatically from client portal login.",
+        deployStatus: "building",
+        deployUrl: null,
+        githubRepo: null,
+        githubRepos: [],
+        deployHosts: [],
+        stripeStatus: "pending",
+        revenue: 0,
+        meetings: 0,
+        emails: 0,
+        commits: 0,
+        lastDeploy: null,
+        storyVideoUrl: null,
+        showOnFrontend: false,
+        isNewStory: false,
+        websiteUrl: null,
+        appUrl: null,
+        appStoreUrl: null,
+        rdUrl: null,
+        housingUrl: null,
+        transportationUrl: null,
+        insuranceUrl: null,
+        clientPortalEmail: input.email,
+        contactEmail: input.email,
+        contactName: input.fullName,
+        contactPhone: input.phone,
+        organizationType: input.organizationType || null,
+        portalAccessStatus: "assigned",
+        adminApprovalPending: false,
+        assignedClientId: input.clientId,
+        assignedWorkspaceId: workspaceId,
+        assignedRole: "owner",
+        assignedAt: now,
+        portalSignup: {
+          uid: input.uid,
+          email: input.email,
+          fullName: input.fullName,
+          role: input.role || null,
+          handoffId: input.handoffId || null,
+          mode: input.mode,
+          serviceInterests: input.serviceInterests,
+          notes: input.notes || null,
+          accessStatus: "assigned",
+          updatedAt: now,
+        },
+      },
+      { merge: true }
+    ),
+    clientRef.collection("members").doc(input.uid).set(
+      {
+        uid: input.uid,
+        email: input.email,
+        displayName: input.fullName,
+        workspaceId,
+        role: "owner",
+        status: "active",
+        source: "client-account-finalize",
+        approvedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    ),
+    input.db.collection("ragAllowlist").doc(emailToDocId(input.email)).set(
+      {
+        email: input.email,
+        clientId: input.clientId,
+        clientName,
+        clientSlug,
+        clientIds: FieldValue.arrayUnion(input.clientId),
+        workspaceIds: FieldValue.arrayUnion(workspaceId),
+        memberships: buildOwnerMembership(input.clientId),
+        active: true,
+        addedBy: "client-account-finalize",
+        updatedAt: now,
+      },
+      { merge: true }
+    ),
+  ])
 }
 
 async function createClientSignupRecord(input: {
@@ -335,10 +499,13 @@ export async function POST(request: NextRequest) {
             notes,
             serviceInterests,
           })
+    const activeClientId = claimedClientId || existingLinkedClientId || null
+    const activeMemberships = activeClientId ? buildOwnerMembership(activeClientId) : null
 
     await userRef.set(
       {
         role: "client",
+        displayName: fullName,
         full_name: fullName,
         email,
         phone,
@@ -361,10 +528,18 @@ export async function POST(request: NextRequest) {
         },
         pending_client_id: signupClientId,
         portal_access_status:
-          claimedClientId || existingLinkedClientId
+          activeClientId
             ? "active"
             : "pending_manual_provision",
+        ...(activeClientId
+          ? {
+              clientIds: FieldValue.arrayUnion(activeClientId),
+              userRole: "owner",
+              memberships: activeMemberships,
+            }
+          : {}),
         updated_at: now,
+        updatedAt: FieldValue.serverTimestamp(),
         created_at: createdAt,
       },
       { merge: true }
@@ -376,12 +551,30 @@ export async function POST(request: NextRequest) {
     if (claimedClientId) {
       await userRef.set(
         {
-          clientIds: [claimedClientId],
+          clientIds: FieldValue.arrayUnion(claimedClientId),
           userRole: "owner",
           memberships: buildOwnerMembership(claimedClientId),
         },
         { merge: true }
       )
+    }
+
+    if (activeClientId) {
+      await mirrorActivePortalPerson({
+        db,
+        uid: decodedToken.uid,
+        email,
+        fullName,
+        phone,
+        role,
+        handoffId,
+        mode,
+        companyName,
+        organizationType,
+        notes,
+        serviceInterests,
+        clientId: activeClientId,
+      })
     }
 
     if (handoffRef) {

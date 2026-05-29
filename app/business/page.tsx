@@ -69,7 +69,18 @@ export default function BusinessPage() {
   const businessOptions = [
     { id: "ABOUT", label: "ABOUT", href: "/about", note: "Company overview and staff" },
     { id: "PITCH", label: "PITCH DECK", href: "/pitch", note: "Open current presentation" },
-    { id: "MORE_SOON", label: "MORE SOON", disabled: true, note: "Additional entries will land here" },
+    {
+      id: "SERVICES",
+      label: "SERVICES",
+      href: "/services",
+      note: "Nexus, Motion, Space, and Cohort briefs",
+      subItems: [
+        { id: "NEXUS", label: "Nexus", href: "/services/nexus", note: "Web · App · Creative · Hardware" },
+        { id: "MOTION", label: "Motion", href: "/services/motion", note: "Rides · Delivery · Fleet" },
+        { id: "SPACE", label: "Space", href: "/services/space", note: "Meeting rooms · Pop-ups · Studio" },
+        { id: "COHORT", label: "Cohort", href: "/services/cohort", note: "Specialist teams · BEAM workforce" },
+      ],
+    },
   ]
 
   return (

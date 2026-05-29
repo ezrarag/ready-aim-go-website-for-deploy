@@ -10,6 +10,12 @@ type BusinessOption = {
   href?: string
   disabled?: boolean
   note?: string
+  subItems?: {
+    id: string
+    label: string
+    href: string
+    note?: string
+  }[]
 }
 
 type BusinessOptionsOverlayProps = {
@@ -90,6 +96,7 @@ export function BusinessOptionsOverlay({
                 <nav className="space-y-2">
                   {options.map((option) => {
                     const isActive = activeItem === option.id
+                    const hasSubItems = Boolean(option.subItems?.length)
                     const content = (
                       <div
                         className={`flex items-center justify-between border px-5 py-4 transition-all duration-150 ${
@@ -112,11 +119,86 @@ export function BusinessOptionsOverlay({
                         </div>
                         {!option.disabled ? (
                           <div className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-500">
-                            Open
+                            {hasSubItems ? "View" : "Open"}
                           </div>
                         ) : null}
                       </div>
                     )
+
+                    if (hasSubItems) {
+                      return (
+                        <motion.div
+                          key={option.id}
+                          layout
+                          onMouseEnter={() => setActiveItem(option.id)}
+                          onMouseLeave={() => setActiveItem(null)}
+                          className="border border-white/40 bg-white/45"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setActiveItem(isActive ? null : option.id)}
+                            onFocus={() => setActiveItem(option.id)}
+                            className="block w-full text-left"
+                          >
+                            {content}
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {isActive ? (
+                              <motion.div
+                                key="services-options"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.22, ease: "easeOut" }}
+                                className="overflow-hidden border-t border-white/45"
+                              >
+                                <div className="grid gap-2 p-3">
+                                  {option.href ? (
+                                    <Link
+                                      href={option.href}
+                                      onClick={onClose}
+                                      className="flex items-center justify-between bg-slate-950 px-4 py-3 text-white transition hover:bg-slate-800"
+                                    >
+                                      <span className="text-sm font-black uppercase tracking-[0.22em]">
+                                        View All Services
+                                      </span>
+                                      <span className="text-xs font-semibold uppercase tracking-[0.28em] text-orange-400">
+                                        Open
+                                      </span>
+                                    </Link>
+                                  ) : null}
+
+                                  {option.subItems?.map((subItem, index) => (
+                                    <motion.div
+                                      key={subItem.id}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: index * 0.035, duration: 0.18 }}
+                                    >
+                                      <Link
+                                        href={subItem.href}
+                                        onClick={onClose}
+                                        className="block border border-white/45 bg-white/65 px-4 py-3 text-slate-900 transition hover:border-white/90 hover:bg-white"
+                                      >
+                                        <div className="text-xl font-black uppercase tracking-[-0.04em]">
+                                          {subItem.label}
+                                        </div>
+                                        {subItem.note ? (
+                                          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                            {subItem.note}
+                                          </div>
+                                        ) : null}
+                                      </Link>
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            ) : null}
+                          </AnimatePresence>
+                        </motion.div>
+                      )
+                    }
 
                     if (option.disabled || !option.href) {
                       return (
