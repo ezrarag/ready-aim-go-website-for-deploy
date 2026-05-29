@@ -1,204 +1,73 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { StoryOverlay } from "./story-overlay"
-import { RosterOverlay } from "./roster-overlay"
-import { StoryAreaDetail } from "./story-area-detail"
-import type { Hero as RosterHero } from "./roster-overlay"
-import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
-import { isVisible } from "@/lib/types/client-public-profile"
+import { ArrowRight } from "lucide-react"
+import { ActSelectorOverlay } from "./act-selector-overlay"
+import { RoleSelectorOverlay } from "./role-selector-overlay"
+import { SceneVideoPlayer } from "./scene-video-player"
+import {
+  defaultLandingSceneId,
+  getLandingArea,
+  getLandingScene,
+  getScenesForArea,
+  landingAreas,
+  type LandingAreaId,
+} from "@/lib/landing-scenes"
 
 interface HeroProps {
   onWatchDemo?: () => void
   onViewProjects?: () => void
-  initialStory?: string
 }
 
-const CATEGORY_SLUG_MAP: Record<string, string> = { web: "website", app: "app", rd: "rd", housing: "housing", transportation: "transportation", insurance: "insurance" }
-
-export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
+export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   const router = useRouter()
-  // Initialize story from localStorage or prop, default to femileasing
-  const getInitialStory = () => {
-    if (initialStory) return initialStory
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lastViewedStory')
-      return saved || "femileasing"
-    }
-    return "femileasing"
+  const [activeSceneId, setActiveSceneId] = useState(defaultLandingSceneId)
+  const [showActOverlay, setShowActOverlay] = useState(false)
+  const [showRoleOverlay, setShowRoleOverlay] = useState(false)
+
+  const activeScene = getLandingScene(activeSceneId)
+  const activeArea = getLandingArea(activeScene.area)
+  const activeAreaScenes = useMemo(() => getScenesForArea(activeScene.area), [activeScene.area])
+  const menuOverlayOpen = showActOverlay || showRoleOverlay
+
+  const loadScene = (sceneId: string) => {
+    setActiveSceneId(getLandingScene(sceneId).id)
   }
 
-  const [currentStory, setCurrentStory] = useState(() => getInitialStory())
-  const [clients, setClients] = useState<ClientDirectoryEntry[]>([])
-  const [heroes, setHeroes] = useState<RosterHero[]>([])
-  const [showStoryOverlay, setShowStoryOverlay] = useState(false)
-  const [showRosterOverlay, setShowRosterOverlay] = useState(false)
-  const [showAreaDetail, setShowAreaDetail] = useState(false)
-  const [areaDetailPayload, setAreaDetailPayload] = useState<{ clientId: string; areaId: string; areaTitle: string } | null>(null)
-  /** Module keys to show (only those with key field set on client: websiteUrl, appUrl, rdUrl, etc.). */
-  const [storyModuleKeysWithData, setStoryModuleKeysWithData] = useState<ModuleKey[]>([])
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const isOverlayOpen = showStoryOverlay || showRosterOverlay || showAreaDetail
-
-  useEffect(() => {
-    const fetchRoster = async () => {
-      try {
-        const response = await fetch("/api/clients")
-        if (!response.ok) return
-        const payload = await response.json()
-        if (!payload?.success || !Array.isArray(payload.clients)) return
-
-        const list = payload.clients as ClientDirectoryEntry[]
-        setClients(list)
-
-        const mapped = list
-          .filter(
-            (client) =>
-              client.showOnFrontend !== false &&
-              Boolean(client.storyVideoUrl) &&
-              // Respect publicProfile.visibility.story — missing = visible
-              isVisible(client.publicProfile, "story")
-          )
-          .map((client) => ({
-            id: client.id,
-            name: client.name.toUpperCase(),
-            storyId: client.storyId,
-            videoUrl: client.storyVideoUrl!,
-            isNew: client.isNewStory,
-          }))
-
-        if (mapped.length > 0) {
-          setHeroes(mapped)
-        }
-      } catch (error) {
-        console.error("Failed to fetch roster from /api/clients:", error)
-      }
-    }
-
-    fetchRoster()
-  }, [])
-
-  // Sync with localStorage when story changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lastViewedStory', currentStory)
-    }
-  }, [currentStory])
-
-  // Update story if initialStory prop changes (e.g., from URL params)
-  useEffect(() => {
-    if (initialStory && initialStory !== currentStory) {
-      setCurrentStory(initialStory)
-    }
-  }, [initialStory, currentStory])
-
-  // Get video URL based on current story
-  const getVideoUrl = (story: string) => {
-    const selected = heroes.find((hero) => hero.storyId === story)
-    return selected?.videoUrl ?? heroes[0]?.videoUrl ?? ""
-  }
-
-  // Handle hero selection from roster
-  const handleHeroSelect = (storyId: string) => {
-    setCurrentStory(storyId)
+  const selectArea = (areaId: LandingAreaId) => {
+    const area = getLandingArea(areaId)
+    setActiveSceneId(area.defaultSceneId)
   }
 
   useEffect(() => {
-    if (heroes.length === 0) return
-    const hasCurrentStory = heroes.some((hero) => hero.storyId === currentStory)
-    if (!hasCurrentStory) {
-      setCurrentStory(heroes[0].storyId)
-    }
-  }, [heroes, currentStory])
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (showActOverlay || showRoleOverlay) return
 
-  // Only show story cards when the client has the key field set for that category (edit client URLs)
-  useEffect(() => {
-    if (!showStoryOverlay) {
-      setStoryModuleKeysWithData([])
-      return
-    }
-    const client = clients.find((c) => c.storyId === currentStory)
-    if (!client) {
-      setStoryModuleKeysWithData([])
-      return
-    }
-    const keys: ModuleKey[] = []
-    if (client.websiteUrl?.trim()) keys.push("web")
-    if (client.appUrl?.trim() || client.appStoreUrl?.trim()) keys.push("app")
-    if (client.rdUrl?.trim()) keys.push("rd")
-    if (client.housingUrl?.trim()) keys.push("housing")
-    if (client.transportationUrl?.trim()) keys.push("transportation")
-    if (client.insuranceUrl?.trim()) keys.push("insurance")
-    setStoryModuleKeysWithData(keys)
-  }, [showStoryOverlay, currentStory, clients])
-
-  const videoUrl = getVideoUrl(currentStory)
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !videoUrl) return
-
-    if (isOverlayOpen) {
-      video.pause()
-      return
-    }
-
-    video.play().catch((error) => {
-      console.error('Error auto-playing video:', error)
-    })
-  }, [isOverlayOpen, videoUrl])
-
-  const handleVideoCanPlay = () => {
-    if (!isOverlayOpen) {
-      videoRef.current?.play().catch(() => {})
-    }
-  }
-
-  // Handle F4 key to exit
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F4') {
-        e.preventDefault()
-        window.location.href = '/business'
+      if (event.key === "F4") {
+        event.preventDefault()
+        router.push("/business")
         return
       }
 
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        router.push('/business')
+      if (event.key === "Escape") {
+        event.preventDefault()
+        router.push("/business")
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [router])
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [router, showActOverlay, showRoleOverlay])
 
   return (
-    <section className="fixed inset-0 h-screen w-screen flex items-center justify-center overflow-hidden z-0">
-      {/* Background Video */}
-      <div className="absolute inset-0 z-0">
-        {videoUrl ? (
-          <video
-            key={currentStory}
-            ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
-            loop
-            muted
-            playsInline
-            autoPlay
-            onCanPlay={handleVideoCanPlay}
-          >
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-        ) : null}
-        {/* Subtle overlay for text readability */}
-        <div className="absolute inset-0 bg-black/30" />
-      </div>
+    <section className="fixed inset-0 z-0 flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+      <SceneVideoPlayer scene={activeScene} onLoadScene={loadScene} pause={menuOverlayOpen} />
 
-      {/* Left Side - Story and Roster Text (Vertically Centered) */}
-      <div className="absolute left-8 md:left-16 top-1/2 -translate-y-1/2 z-20">
+      <div className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.34)_36%,rgba(0,0,0,0.08)_70%)]" />
+
+      <div className="absolute left-5 top-1/2 z-20 -translate-y-1/2 sm:left-8 md:left-16">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -206,109 +75,122 @@ export function Hero({ onWatchDemo, onViewProjects, initialStory }: HeroProps) {
           className="flex flex-col gap-2"
         >
           <button
-            onClick={() => setShowStoryOverlay(true)}
-            className="text-white hover:text-white/80 transition-colors text-left"
+            type="button"
+            onClick={() => {
+              onWatchDemo?.()
+              setShowActOverlay(true)
+            }}
+            className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
           >
-            <h2 className="text-7xl md:text-9xl font-bold uppercase tracking-tight leading-none" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              STORY{(() => {
-                const currentClient = clients.find((c) => c.storyId === currentStory)
-                return currentClient?.name ? `: ${currentClient.name.toUpperCase()}` : ""
-              })()}
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.34em] text-orange-400">
+              {activeScene.roleLabel} · {activeScene.actLabel}
+            </span>
+            <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
+              Story
             </h2>
           </button>
+
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowRosterOverlay(true)}
-              className="text-white hover:text-white/80 transition-colors text-left"
+              type="button"
+              onClick={() => setShowRoleOverlay(true)}
+              className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
             >
-              <h2 className="text-7xl md:text-9xl font-bold uppercase tracking-tight leading-none" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                ROSTER
+              <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
+                Roster
               </h2>
             </button>
-            <span className="bg-orange-500 text-white text-xs md:text-sm font-semibold px-2 py-1 rounded uppercase">
-              NEW!
+            <span className="bg-orange-500 px-2 py-1 text-xs font-black uppercase text-white md:text-sm">
+              New
             </span>
           </div>
         </motion.div>
       </div>
 
-      {/* Footer - Exit and Options Buttons - Matches Screenshot */}
-      <div className="absolute bottom-8 right-8 md:bottom-12 md:right-16 z-20 flex items-center gap-4">
-        {/* EXIT GAME Button Group */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.2 }}
+        className="absolute bottom-6 left-5 z-20 hidden max-w-sm border border-white/15 bg-black/55 p-4 text-white backdrop-blur-sm sm:block md:left-16"
+      >
+        <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+          Selected role
+        </p>
+        <h3 className="mt-2 text-2xl font-black uppercase leading-none">{activeArea.label}</h3>
+        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/48">
+          {activeArea.subtitle}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={activeArea.serviceHref}
+            className="inline-flex items-center gap-2 border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"
+          >
+            Service brief
+            <ArrowRight className="h-3.5 w-3.5" />
+          </a>
+          <button
+            type="button"
+            onClick={onViewProjects}
+            className="inline-flex items-center border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"
+          >
+            Projects
+          </button>
+        </div>
+      </motion.div>
+
+      <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-8 sm:right-8 sm:flex-row md:bottom-12 md:right-16 md:gap-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.4 }}
           className="flex items-center overflow-hidden"
         >
-          {/* F4 Keybind Button - Grey background wrapping white text */}
-          <div className="bg-gray-600 border-r border-white/30 text-white px-3 py-2 text-xs font-bold uppercase flex items-center justify-center min-w-[38px]">
+          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 text-xs font-black uppercase text-white">
             F4
           </div>
-          {/* EXIT GAME Button - No background, just text */}
           <button
-            onClick={() => window.location.href = '/business'}
-            className="bg-transparent text-white px-4 py-2 text-sm font-semibold uppercase hover:text-white/80 transition-colors"
+            type="button"
+            onClick={() => router.push("/business")}
+            className="bg-transparent px-4 py-2 text-sm font-black uppercase text-white transition hover:text-white/80"
           >
-            EXIT GAME
+            Business
           </button>
         </motion.div>
 
-        {/* OPTIONS Button Group */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.5 }}
           className="flex items-center overflow-hidden"
         >
-          {/* ESC Keybind Button - Grey background wrapping white text */}
-          <div className="bg-gray-600 border-r border-white/30 text-white px-3 py-2 text-xs font-bold uppercase flex items-center justify-center min-w-[38px]">
+          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 text-xs font-black uppercase text-white">
             ESC
           </div>
-          {/* OPTIONS Button - No background, just text */}
           <button
-            onClick={() => router.push('/business')}
-            className="bg-transparent text-white px-4 py-2 text-sm font-semibold uppercase hover:text-white/80 transition-colors"
+            type="button"
+            onClick={() => router.push("/business")}
+            className="bg-transparent px-4 py-2 text-sm font-black uppercase text-white transition hover:text-white/80"
           >
-            OPTIONS
+            Options
           </button>
         </motion.div>
       </div>
 
-      {/* Story Overlay */}
-      <StoryOverlay
-        isOpen={showStoryOverlay}
-        onClose={() => setShowStoryOverlay(false)}
-        currentStory={currentStory}
-        client={clients.find((c) => c.storyId === currentStory) ?? null}
-        moduleKeysWithData={storyModuleKeysWithData}
-        onOpenModule={(clientId, moduleId, _areaTitle) => {
-          const categorySlug = CATEGORY_SLUG_MAP[moduleId] ?? moduleId
-          setShowStoryOverlay(false)
-          router.push(`/story/${clientId}/${categorySlug}`)
-        }}
+      <ActSelectorOverlay
+        isOpen={showActOverlay}
+        onClose={() => setShowActOverlay(false)}
+        scenes={activeAreaScenes}
+        activeSceneId={activeScene.id}
+        areaLabel={activeArea.label}
+        onSelectScene={loadScene}
       />
 
-      {/* Module detail (Latest updates) */}
-      <StoryAreaDetail
-        isOpen={showAreaDetail}
-        onClose={() => {
-          setShowAreaDetail(false)
-          setAreaDetailPayload(null)
-        }}
-        areaId={areaDetailPayload?.areaId ?? "web"}
-        areaTitle={areaDetailPayload?.areaTitle ?? "Website"}
-        currentStory={currentStory}
-        clientId={areaDetailPayload?.clientId ?? ""}
-      />
-
-      {/* Roster Overlay */}
-      <RosterOverlay
-        isOpen={showRosterOverlay}
-        onClose={() => setShowRosterOverlay(false)}
-        currentStory={currentStory}
-        onHeroSelect={handleHeroSelect}
-        heroes={heroes}
+      <RoleSelectorOverlay
+        isOpen={showRoleOverlay}
+        onClose={() => setShowRoleOverlay(false)}
+        areas={landingAreas}
+        activeAreaId={activeScene.area}
+        onSelectArea={selectArea}
       />
     </section>
   )

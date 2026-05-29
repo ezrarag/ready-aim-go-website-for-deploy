@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { ArrowRight, ChevronLeft, Globe, Briefcase } from "lucide-react"
 import StickyFloatingHeader from "@/components/ui/sticky-floating-header"
 import { Hero } from "@/components/landing/hero"
@@ -22,22 +21,6 @@ export default function HomePage() {
   const [showProjectsModal, setShowProjectsModal] = useState(false)
   const [currentProjectIndex, setCurrentProjectIndex] = useState(0)
   const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  // Get story from URL params or localStorage
-  const getStoryFromUrl = () => {
-    const storyParam = searchParams?.get('story')
-    if (storyParam) {
-      // Save to localStorage when coming from URL
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('lastViewedStory', storyParam)
-      }
-      return storyParam
-    }
-    return undefined
-  }
-  
-  const initialStory = getStoryFromUrl()
 
   const handleLogin = useCallback(async () => {
     router.push('/login')
@@ -141,7 +124,6 @@ export default function HomePage() {
       <Hero 
         onWatchDemo={() => {}} 
         onViewProjects={handleViewProjects}
-        initialStory={initialStory}
       />
       
       <div className="relative z-40">
