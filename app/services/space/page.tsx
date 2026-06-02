@@ -1,13 +1,13 @@
 import type { Metadata } from "next"
-import { SpaceBrief } from "@/components/services/SpaceBrief"
+import { ServiceSlugPage } from "../[slug]/page"
 
 export const metadata: Metadata = {
-  title: "Space Network - Fractional Workspace Subscription | ReadyAimGo",
+  title: "Space Network | ReadyAimGo",
   description:
-    "For $100/month, the readyaimgo Space Network provides 12 Space Credits - redeemable as 2-hour blocks of meeting rooms, storefronts, studios, or desk space.",
+    "ReadyAimGo Space Network provides fractional workspace credits for rooms, storefronts, studios, and desks.",
   robots: { index: true, follow: true },
 }
 
 export default function SpacePage() {
-  return <SpaceBrief />
+  return <ServiceSlugPage slug="space" />
 }

@@ -1,13 +1,13 @@
 import type { Metadata } from "next"
-import { MotionBrief } from "@/components/services/MotionBrief"
+import { ServiceSlugPage } from "../[slug]/page"
 
 export const metadata: Metadata = {
-  title: "Motion Network - Fleet Logistics Subscription | ReadyAimGo",
+  title: "Motion Network | ReadyAimGo",
   description:
-    "For $100/month, the readyaimgo Motion Network provides fractional fleet logistics - rides, delivery, and scheduling - powered by BEAM drivers.",
+    "ReadyAimGo Motion Network provides fractional fleet logistics, rides, delivery, and route coordination.",
   robots: { index: true, follow: true },
 }
 
 export default function MotionPage() {
-  return <MotionBrief />
+  return <ServiceSlugPage slug="motion" />
 }
