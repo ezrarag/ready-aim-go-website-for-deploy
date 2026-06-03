@@ -27,6 +27,56 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ── aiThreads ─────────────────────────────────────────────────────────────
+    //
+    // The unified AI Thread Registry (raCommand-side AIThreadRecord).
+    //
+    // Service writes (Admin SDK via /api/ai-threads/*) bypass these rules
+    // entirely — the route handlers enforce the X-Intelligence-Secret check.
+    // These rules govern ANY client-SDK reads.
+    //
+    //   - Operators (isAdmin) may read & write everything.
+    //   - Portal users may read a thread only when its `visibility != 'internal'`
+    //     and `clientId` matches their portalUsers record. Internal Claude
+    //     Code transcripts never leak to portal sessions.
+    //   - All writes from client SDK are blocked. Producers must POST through
+    //     /api/ai-threads/* with the service secret.
+    //
+    match /aiThreads/{threadId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+
+      // Portal access — gated by visibility AND a matching portalUsers record.
+      // The portalUsers collection lookup is the same pattern used by
+      // ragIntelligence in the broader rules set; if portalUsers/{uid} does
+      // not exist this expression short-circuits to false.
+      allow get: if
+        signedIn()
+        && resource.data.visibility != 'internal'
+        && exists(/databases/$(database)/documents/portalUsers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/portalUsers/$(request.auth.uid)).data.clientId == resource.data.clientId
+        && get(/databases/$(database)/documents/portalUsers/$(request.auth.uid)).data.disabled != true;
+
+      // Sub-collection: messages. Admin SDK writes only.
+      match /messages/{messageId} {
+        allow read: if isAdmin();
+        allow write: if false;  // Admin SDK only
+      }
+
+      // Sub-collection: artifacts. Admin SDK writes only.
+      match /artifacts/{artifactId} {
+        allow read: if isAdmin();
+        allow write: if false;  // Admin SDK only
+      }
+    }
+
+    // ── auditLog (already used by /api/intelligence/sync; declared here so
+    //    /api/ai-threads/import/* writes don't fall through to deny-all) ──
+    match /auditLog/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;  // Admin SDK only
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
