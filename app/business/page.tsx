@@ -67,6 +67,9 @@ export default function BusinessPage() {
   ]
 
   const businessOptions = [
+    { id: "CLIENTS", label: "CLIENTS", href: "/clients", note: "Client directory and claim flow" },
+    { id: "PARTNERS", label: "PARTNERS", href: "/partner", note: "Space, referral, and BEAM partnerships" },
+    { id: "ADMIN", label: "ADMIN", href: "/dashboard", note: "ReadyAimGo ops console" },
     { id: "ABOUT", label: "ABOUT", href: "/about", note: "Company overview and staff" },
     { id: "PITCH", label: "PITCH DECK", href: "/pitch", note: "Open current presentation" },
     {
@@ -179,10 +182,13 @@ export default function BusinessPage() {
                 setActiveMenuItem("OPTIONS")
                 setIsOptionsOpen(true)
               }}
-              className="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white transition-colors"
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-white/25 bg-black/35 px-3 text-white/85 backdrop-blur-sm transition-colors hover:border-white/45 hover:bg-black/50 hover:text-white"
               aria-label="Open options"
             >
               <Menu className="w-6 h-6" />
+              <span className="hidden text-xs font-bold uppercase tracking-[0.18em] sm:inline">
+                Menu
+              </span>
             </button>
           </div>
         </div>
