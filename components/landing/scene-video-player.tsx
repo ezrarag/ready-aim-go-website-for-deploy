@@ -16,11 +16,17 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
   const [isOverlayRevealed, setIsOverlayRevealed] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [videoFailed, setVideoFailed] = useState(false)
+  const [remainingSeconds, setRemainingSeconds] = useState(scene.autoAdvanceSeconds ?? 0)
+  const [isAutoAdvancePaused, setIsAutoAdvancePaused] = useState(false)
+  const autoAdvanceSeconds = scene.autoAdvanceSeconds ?? 0
+  const hasAutoAdvance = autoAdvanceSeconds > 0 && Boolean(scene.nextSceneId)
 
   useEffect(() => {
     const video = videoRef.current
     setIsOverlayRevealed(false)
     setVideoFailed(false)
+    setRemainingSeconds(autoAdvanceSeconds)
+    setIsAutoAdvancePaused(false)
 
     if (!video) return
 
@@ -29,7 +35,7 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
     if (!pause) {
       video.play().catch(() => {})
     }
-  }, [scene.id, pause])
+  }, [scene.id, autoAdvanceSeconds])
 
   useEffect(() => {
     const video = videoRef.current
@@ -78,9 +84,29 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
   }
 
   const handlePrimaryClick = () => {
+    setIsAutoAdvancePaused(true)
     const nextSceneId = scene.primaryButton.nextSceneId ?? scene.nextSceneId
     if (nextSceneId) onLoadScene(nextSceneId)
   }
+
+  useEffect(() => {
+    if (!hasAutoAdvance || pause || isAutoAdvancePaused) return
+
+    const intervalId = window.setInterval(() => {
+      setRemainingSeconds((current) => {
+        if (current <= 1) {
+          window.clearInterval(intervalId)
+          const nextSceneId = scene.nextSceneId
+          if (nextSceneId) onLoadScene(nextSceneId)
+          return 0
+        }
+
+        return current - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [hasAutoAdvance, isAutoAdvancePaused, onLoadScene, pause, scene.id, scene.nextSceneId])
 
   const toggleSound = () => {
     const shouldMute = !isMuted
@@ -95,6 +121,15 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
     }
   }
 
+  const cancelAutoAdvance = () => {
+    setIsAutoAdvancePaused(true)
+  }
+
+  const progressPercent =
+    hasAutoAdvance && autoAdvanceSeconds > 0
+      ? Math.max(0, Math.min(100, (remainingSeconds / autoAdvanceSeconds) * 100))
+      : 0
+
   return (
     <div className="absolute inset-0 overflow-hidden bg-black">
       {!videoFailed ? (
@@ -102,6 +137,7 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
           key={scene.id}
           ref={videoRef}
           className="absolute inset-0 h-full w-full object-cover"
+          loop
           muted={isMuted}
           playsInline
           autoPlay
@@ -176,11 +212,33 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
             {scene.secondaryButton.href ? (
               <a
                 href={scene.secondaryButton.href}
+                onClick={cancelAutoAdvance}
                 className="inline-flex min-h-14 items-center justify-center gap-2 bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-white transition hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-white"
               >
                 {scene.secondaryButton.label}
                 <ExternalLink className="h-4 w-4" />
               </a>
+            ) : null}
+
+            {hasAutoAdvance ? (
+              <button
+                type="button"
+                onClick={cancelAutoAdvance}
+                className="col-span-full flex flex-col gap-2 text-left focus:outline-none focus:ring-2 focus:ring-orange-400"
+                aria-label="Pause automatic scene advance"
+              >
+                <div className="h-1.5 w-full overflow-hidden bg-white/15">
+                  <div
+                    className="h-full bg-[#f97316] transition-[width] duration-1000 ease-linear"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-[0.22em] text-white/60">
+                  {isAutoAdvancePaused
+                    ? "Paused — click → to continue"
+                    : `Next in ${Math.max(0, Math.ceil(remainingSeconds))}s`}
+                </span>
+              </button>
             ) : null}
           </div>
         </div>

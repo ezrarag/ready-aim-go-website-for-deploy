@@ -1,6 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore"
 
-import { getFirestoreDb } from "@/lib/firestore"
+import { getFirestoreDb, getStorageBucket } from "@/lib/firestore"
 
 export function getAdminDb(): Firestore {
   const db = getFirestoreDb()
@@ -10,4 +10,14 @@ export function getAdminDb(): Firestore {
   }
 
   return db
+}
+
+export function getAdminStorage() {
+  const bucket = getStorageBucket()
+
+  if (!bucket) {
+    throw new Error("Firebase Admin Storage is not configured.")
+  }
+
+  return bucket
 }
