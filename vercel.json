@@ -1,0 +1,29 @@
+{
+  "crons": [
+    {
+      "path": "/api/videos/scan-drive",
+      "schedule": "*/15 * * * *",
+      "comment": "Scan Google Drive for new Meet recordings — auto-processes, generates AI summary, sends client SMS"
+    },
+    {
+      "path": "/api/videos/scan",
+      "schedule": "*/15 * * * *",
+      "comment": "Scan Firebase Storage raw-client-updates/ for manually uploaded videos"
+    },
+    {
+      "path": "/api/comms/sync",
+      "schedule": "0 * * * *",
+      "comment": "Sync Gmail threads to clientMessages collection every hour"
+    },
+    {
+      "path": "/api/comms/outlook/sync",
+      "schedule": "0 * * * *",
+      "comment": "Sync Outlook emails to clientMessages collection every hour"
+    },
+    {
+      "path": "/api/comms/calendar-sync",
+      "schedule": "0 */6 * * *",
+      "comment": "Sync all calendars to calendarEvents every 6 hours"
+    }
+  ]
+}

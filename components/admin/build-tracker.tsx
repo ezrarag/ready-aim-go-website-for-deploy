@@ -96,6 +96,15 @@ const CATEGORY_CONFIG: Record<TaskCategory, { label: string; color: string }> = 
   planning: { label: "Planning", color: "text-slate-400" },
 }
 
+const CATEGORY_TIME_MINUTES: Record<TaskCategory, number> = {
+  env: 5,
+  setup: 15,
+  feature: 60,
+  ops: 20,
+  qa: 30,
+  planning: 45,
+}
+
 const PROJECT_COLORS: Record<string, string> = {
   orange: "border-orange-500/30 bg-orange-500/10 text-orange-400",
   blue: "border-blue-500/30 bg-blue-500/10 text-blue-400",
@@ -298,6 +307,7 @@ export function BuildTracker() {
   const [projects, setProjects] = useState<BuildProject[]>([])
   const [loading, setLoading] = useState(true)
   const [seeded, setSeeded] = useState(false)
+  const [dailyView, setDailyView] = useState(false)
 
   // Add task dialog
   const [addTaskOpen, setAddTaskOpen] = useState(false)
@@ -400,6 +410,19 @@ export function BuildTracker() {
   const doneTasks = projects.reduce((sum, p) => sum + p.tasks.filter((t) => t.status === "done").length, 0)
   const blockedTasks = projects.reduce((sum, p) => sum + p.tasks.filter((t) => t.status === "blocked").length, 0)
   const envTasks = projects.reduce((sum, p) => sum + p.tasks.filter((t) => t.category === "env" && t.status === "pending").length, 0)
+  const dailyTasks = projects.flatMap((project) => {
+    const priority: TaskStatus[] = ["blocked", "in-progress", "pending"]
+
+    for (const status of priority) {
+      const task = project.tasks.find((candidate) => candidate.status === status)
+      if (task) {
+        return [{ project, task }]
+      }
+    }
+
+    return []
+  })
+  const dailyMinutes = dailyTasks.reduce((sum, item) => sum + CATEGORY_TIME_MINUTES[item.task.category], 0)
 
   return (
     <div className="relative space-y-6">
@@ -418,15 +441,24 @@ export function BuildTracker() {
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="border-border/70 bg-card/80"
-          onClick={fetchProjects}
-          disabled={loading}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={dailyView ? "default" : "outline"}
+            className={dailyView ? "" : "border-border/70 bg-card/80"}
+            onClick={() => setDailyView((current) => !current)}
+          >
+            Daily View
+          </Button>
+          <Button
+            variant="outline"
+            className="border-border/70 bg-card/80"
+            onClick={fetchProjects}
+            disabled={loading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {seeded && (
@@ -469,12 +501,58 @@ export function BuildTracker() {
         </CardContent>
       </AdminPanel>
 
-      {/* Project cards */}
+      {/* Project cards / daily operator view */}
       {loading ? (
         <AdminPanel>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-purple-400" />
             Loading build tracker from Firestore...
+          </CardContent>
+        </AdminPanel>
+      ) : dailyView ? (
+        <AdminPanel>
+          <CardHeader className="pb-3">
+            <AdminPanelTitle>Daily Operator View</AdminPanelTitle>
+            <p className="text-sm text-muted-foreground">
+              Today&apos;s minimum {"\u2014"} {dailyTasks.length} projects {"\u00b7"} ~{dailyMinutes} minutes
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {dailyTasks.map(({ project, task }) => {
+              const projectColor = PROJECT_COLORS[project.color] ?? PROJECT_COLORS.slate
+              const category = CATEGORY_CONFIG[task.category]
+              const status = STATUS_CONFIG[task.status]
+              const estimate = CATEGORY_TIME_MINUTES[task.category]
+
+              return (
+                <div
+                  key={`${project.id}:${task.id}`}
+                  className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 lg:flex-row lg:items-center"
+                >
+                  <Badge className={`border w-fit ${projectColor}`}>{project.name}</Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{task.title}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className={`border text-xs ${category.color}`}>
+                      {category.label}
+                    </Badge>
+                    <Badge className={`border text-xs ${status.color}`}>
+                      {status.label}
+                    </Badge>
+                    <Badge variant="outline" className="border-border/70 bg-background/70 text-xs text-muted-foreground">
+                      ~{estimate} min
+                    </Badge>
+                  </div>
+                </div>
+              )
+            })}
+
+            {dailyTasks.length === 0 && (
+              <AdminPanelInset>
+                <p className="text-sm text-muted-foreground text-center">All projects are done. Nothing in today&apos;s minimum.</p>
+              </AdminPanelInset>
+            )}
           </CardContent>
         </AdminPanel>
       ) : (
