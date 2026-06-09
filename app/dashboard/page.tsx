@@ -13,6 +13,7 @@ import {
   ListTodo,
   RefreshCw,
   Search,
+  Trash2,
   UserRound,
   Users,
 } from "lucide-react"
@@ -46,6 +47,7 @@ import type {
   WorkspaceDuplicateCluster,
   WorkspaceDuplicateMergePlan,
 } from "@/lib/admin/workspace-duplicates"
+import type { WorkspacePurgePlan } from "@/lib/admin/workspace-purge"
 
 type AdminHubState = AdminHubPayload["data"] & {
   error: string | null
@@ -218,11 +220,15 @@ export default function DashboardPage() {
   const [duplicateAuditError, setDuplicateAuditError] = useState<string | null>(null)
   const [mergePreview, setMergePreview] = useState<WorkspaceDuplicateMergePlan | null>(null)
   const [mergePreviewLoading, setMergePreviewLoading] = useState<string | null>(null)
+  const [purgePreview, setPurgePreview] = useState<WorkspacePurgePlan | null>(null)
+  const [purgingWorkspaceId, setPurgingWorkspaceId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [taskStatus, setTaskStatus] = useState("open")
   const [videoDiagnostics, setVideoDiagnostics] = useState<VideoDiagnosticsPayload | null>(null)
   const [videoDiagnosticsLoading, setVideoDiagnosticsLoading] = useState(false)
   const [videoDiagnosticsError, setVideoDiagnosticsError] = useState<string | null>(null)
+  const [videoLiveScanRunning, setVideoLiveScanRunning] = useState(false)
+  const [videoLiveScanResult, setVideoLiveScanResult] = useState<{ processed: number; skipped: number; error?: string } | null>(null)
 
   const loadOps = async () => {
     setRefreshing(true)
@@ -388,6 +394,25 @@ export default function DashboardPage() {
     }
   }
 
+  const runLiveVideoScan = async () => {
+    if (!window.confirm("This will download and process matching Drive recordings now. Continue?")) return
+    setVideoLiveScanRunning(true)
+    setVideoLiveScanResult(null)
+    try {
+      const response = await fetch("/api/videos/scan-drive?sinceHours=72", { cache: "no-store" })
+      const payload = await response.json().catch(() => ({}))
+      setVideoLiveScanResult({
+        processed: payload.processed ?? 0,
+        skipped: payload.skipped ?? 0,
+        error: payload.ok === false ? (payload.error ?? "Scan failed") : undefined,
+      })
+    } catch (error) {
+      setVideoLiveScanResult({ processed: 0, skipped: 0, error: error instanceof Error ? error.message : "Scan failed" })
+    } finally {
+      setVideoLiveScanRunning(false)
+    }
+  }
+
   const runVideoDiagnostics = async () => {
     setVideoDiagnosticsLoading(true)
     setVideoDiagnosticsError(null)
@@ -407,6 +432,57 @@ export default function DashboardPage() {
       )
     } finally {
       setVideoDiagnosticsLoading(false)
+    }
+  }
+
+  const purgeWorkspace = async (workspace: AdminHubWorkspace) => {
+    setPurgingWorkspaceId(workspace.id)
+    setPurgePreview(null)
+    try {
+      const previewResponse = await fetch(`/api/admin/workspaces/${encodeURIComponent(workspace.id)}/purge`, {
+        cache: "no-store",
+      })
+      const previewPayload = await previewResponse.json().catch(() => ({}))
+      if (!previewResponse.ok || previewPayload?.success !== true) {
+        throw new Error(previewPayload?.error || `Purge preview returned ${previewResponse.status}`)
+      }
+      const preview = previewPayload.data as WorkspacePurgePlan
+      setPurgePreview(preview)
+      const subcollectionDocCount = preview.subcollectionDeletes.reduce((sum, item) => sum + item.docIds.length, 0)
+      const confirmed = window.confirm(
+        [
+          `Purge workspace "${workspace.id}"?`,
+          "",
+          `Users updated: ${preview.userUpdates.length}`,
+          `Clients updated: ${preview.clientUpdates.length}`,
+          `Allowlist records updated: ${preview.allowlistUpdates.length}`,
+          `Projects deleted: ${preview.projectDeletes.length}`,
+          `Tasks deleted: ${preview.taskDeletes.length}`,
+          `Workspace subcollection docs deleted: ${subcollectionDocCount}`,
+          "",
+          "This deletes the workspace record and cannot be undone from the UI.",
+        ].join("\n")
+      )
+      if (!confirmed) return
+
+      const response = await fetch(`/api/admin/workspaces/${encodeURIComponent(workspace.id)}/purge`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmWorkspaceId: workspace.id }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Purge returned ${response.status}`)
+      }
+      setPurgePreview(payload.data as WorkspacePurgePlan)
+      await Promise.all([loadOps(), loadDuplicateAudit()])
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to purge workspace.",
+      }))
+    } finally {
+      setPurgingWorkspaceId(null)
     }
   }
 
@@ -747,6 +823,17 @@ export default function DashboardPage() {
                     </div>
                   </AdminPanelInset>
                 ) : null}
+
+                {purgePreview ? (
+                  <AdminPanelInset className="p-3">
+                    <p className="text-sm font-medium text-foreground">
+                      Purge {purgePreview.dryRun ? "preview" : "result"} for {purgePreview.workspaceId}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {purgePreview.userUpdates.length} user update{purgePreview.userUpdates.length === 1 ? "" : "s"}, {purgePreview.clientUpdates.length} client update{purgePreview.clientUpdates.length === 1 ? "" : "s"}, {purgePreview.projectDeletes.length} project delete{purgePreview.projectDeletes.length === 1 ? "" : "s"}, {purgePreview.taskDeletes.length} task delete{purgePreview.taskDeletes.length === 1 ? "" : "s"}.
+                    </p>
+                  </AdminPanelInset>
+                ) : null}
               </CardContent>
             </AdminPanel>
 
@@ -758,23 +845,44 @@ export default function DashboardPage() {
                     Dry-run Google Drive discovery against clients, linked workspaces, existing update videos, and SMS readiness.
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => void runVideoDiagnostics()}
-                  disabled={videoDiagnosticsLoading}
-                >
-                  {videoDiagnosticsLoading ? (
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Film className="mr-2 h-4 w-4" />
-                  )}
-                  Dry-run Scan
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void runVideoDiagnostics()}
+                    disabled={videoDiagnosticsLoading || videoLiveScanRunning}
+                  >
+                    {videoDiagnosticsLoading ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Film className="mr-2 h-4 w-4" />
+                    )}
+                    Dry-run Scan
+                  </Button>
+                  <Button
+                    onClick={() => void runLiveVideoScan()}
+                    disabled={videoLiveScanRunning || videoDiagnosticsLoading}
+                  >
+                    {videoLiveScanRunning ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Film className="mr-2 h-4 w-4" />
+                    )}
+                    Trigger Live Scan
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {videoDiagnosticsError ? (
                   <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
                     {videoDiagnosticsError}
+                  </div>
+                ) : null}
+
+                {videoLiveScanResult ? (
+                  <div className={`rounded-lg border p-3 text-sm ${videoLiveScanResult.error ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>
+                    {videoLiveScanResult.error
+                      ? `Live scan error: ${videoLiveScanResult.error}`
+                      : `Live scan complete — ${videoLiveScanResult.processed} processed, ${videoLiveScanResult.skipped} skipped. Reload the client portal Updates tab to see new videos.`}
                   </div>
                 ) : null}
 
@@ -899,11 +1007,12 @@ export default function DashboardPage() {
                         <th className="px-4 py-3 font-medium">Client</th>
                         <th className="px-4 py-3 font-medium">Repos</th>
                         <th className="px-4 py-3 font-medium">Members</th>
+                        <th className="px-4 py-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleWorkspaces.length === 0 ? (
-                        <EmptyRow colSpan={4} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
+                        <EmptyRow colSpan={5} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
                       ) : (
                         visibleWorkspaces.map((workspace) => (
                           <tr key={workspace.id} className="border-b border-border transition hover:bg-muted/30">
@@ -923,6 +1032,18 @@ export default function DashboardPage() {
                             <td className="px-4 py-3">{workspace.clientId ? clientById.get(workspace.clientId)?.name || workspace.clientId : "Unlinked"}</td>
                             <td className="px-4 py-3 text-muted-foreground">{workspace.repoCount} repos / {workspace.vercelCount} deploys</td>
                             <td className="px-4 py-3 text-muted-foreground">{workspace.memberCount}</td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void purgeWorkspace(workspace)}
+                                disabled={purgingWorkspaceId === workspace.id}
+                                className="border-red-500/30 text-red-700 hover:bg-red-500/10 dark:text-red-300"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {purgingWorkspaceId === workspace.id ? "Purging..." : "Purge"}
+                              </Button>
+                            </td>
                           </tr>
                         ))
                       )}
