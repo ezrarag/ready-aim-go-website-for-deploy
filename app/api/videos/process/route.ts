@@ -91,6 +91,13 @@ function deriveCategory(value: string) {
   return "general"
 }
 
+function parseAiSummaryBullets(text: string): string[] {
+  return text
+    .split(/\n/)
+    .map((line) => line.trim().replace(/^[•\-\*]\s*/, ""))
+    .filter(Boolean)
+}
+
 function readPhone(...records: Array<Record<string, unknown>>) {
   const fields = ["phone", "contactPhone", "mobilePhone", "smsPhone"]
   for (const record of records) {
@@ -175,7 +182,8 @@ export async function POST(request: NextRequest) {
       "Review the screen recording at the URL above and return the full plain text transcript only.",
     ].join("\n")
 
-    const aiSummary = await callClaude(SUMMARY_SYSTEM_PROMPT, summaryPrompt, 500)
+    const aiSummaryRaw = await callClaude(SUMMARY_SYSTEM_PROMPT, summaryPrompt, 500)
+    const aiSummary = parseAiSummaryBullets(aiSummaryRaw)
     let rawTranscript = ""
 
     try {

@@ -9,7 +9,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getAdminDb, getAdminStorage } from "@/lib/firebase/admin"
-import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 
 type ClientRegistryEntry = {
   id: string
@@ -282,8 +282,11 @@ export async function GET(req: NextRequest) {
     if (!isInternalReadAuthorized(req)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
     }
-  } else if (cronSecret && req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
+  } else {
+    const hasCronSecret = Boolean(cronSecret) && req.headers.get("authorization") === `Bearer ${cronSecret}`
+    if (!hasCronSecret && !isInternalMutationAuthorized(req)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
+    }
   }
 
   const missingConfig = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"].filter(
