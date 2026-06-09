@@ -3,6 +3,7 @@ import { getFirestoreDb } from "@/lib/firestore"
 import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
+import { normalizePhoneToE164 } from "@/lib/telnyx"
 
 type Params = { params: Promise<{ clientId: string }> }
 
@@ -46,6 +47,9 @@ export async function PATCH(request: NextRequest, context: Params) {
 
     const body = (await request.json()) as Record<string, unknown>
     const patch = { ...body, updatedAt: new Date().toISOString() }
+    if (typeof patch.phone === "string") {
+      patch.phone = normalizePhoneToE164(patch.phone) || ""
+    }
     // Strip protected fields from caller payload
     delete patch.id
     delete patch.createdAt
@@ -57,6 +61,17 @@ export async function PATCH(request: NextRequest, context: Params) {
     }
 
     await ref.update(patch)
+
+    if (typeof patch.phone === "string") {
+      await db.collection("clientComms").doc(clientId).set(
+        {
+          clientId,
+          phone: patch.phone,
+          updatedAt: patch.updatedAt,
+        },
+        { merge: true }
+      )
+    }
 
     await writeAuditLog({
       collection: "clients",

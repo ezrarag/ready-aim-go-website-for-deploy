@@ -24,6 +24,7 @@ export interface ClientDirectoryEntry {
   name: string
   brands: string[]
   contactEmail?: string
+  phone?: string
   clientPortalEmail?: string
   portalAccessStatus?: string
   adminApprovalPending?: boolean

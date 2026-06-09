@@ -1887,7 +1887,7 @@ export default function ClientDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <Label htmlFor="edit-name">Name *</Label>
                 <Input
@@ -1904,6 +1904,16 @@ export default function ClientDetailPage() {
                   value={editForm.storyId}
                   onChange={(e) => setEditForm({ ...editForm, storyId: e.target.value })}
                   placeholder="e.g. femileasing"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-phone">SMS Phone</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="+1 312 555 0199"
                 />
               </div>
             </div>

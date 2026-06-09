@@ -9,6 +9,7 @@ import { collectClientDeployHosts, collectClientGithubRepos } from "./pulse-sele
 export interface ClientEditForm {
   name: string
   storyId: string
+  phone: string
   brands: string[]
   status: ClientStatus
   deployStatus: DeployStatus
@@ -38,6 +39,7 @@ export interface ClientEditForm {
 export interface ClientEditPayload {
   name: string
   storyId: string
+  phone: string
   brands: string[]
   status: ClientStatus
   deployStatus: DeployStatus
@@ -67,6 +69,7 @@ export interface ClientEditPayload {
 export const EMPTY_CLIENT_EDIT_FORM: ClientEditForm = {
   name: "",
   storyId: "",
+  phone: "",
   brands: [],
   status: "onboarding",
   deployStatus: "building",
@@ -104,6 +107,7 @@ export function createClientEditForm(client?: Partial<ClientDirectoryEntry> | nu
   return {
     name: client?.name ?? "",
     storyId: client?.storyId ?? "",
+    phone: client?.phone ?? "",
     brands: client?.brands ?? [],
     status: client?.status ?? "onboarding",
     deployStatus: client?.deployStatus ?? "building",
@@ -141,6 +145,7 @@ export function buildClientEditPayload(form: ClientEditForm): ClientEditPayload 
   return {
     name: form.name.trim(),
     storyId: form.storyId.trim(),
+    phone: form.phone.trim(),
     brands: form.brands,
     status: form.status,
     deployStatus: form.deployStatus,
@@ -186,6 +191,7 @@ export function applyClientEditPayload(
   return {
     ...client,
     ...payload,
+    phone: payload.phone || undefined,
     githubRepo: payload.githubRepo || undefined,
     pulseSummary: payload.pulseSummary || undefined,
     deployUrl: payload.deployUrl || undefined,
