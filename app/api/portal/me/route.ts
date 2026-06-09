@@ -23,7 +23,19 @@ export async function GET(request: NextRequest) {
     const data = doc.data() as Record<string, unknown>
     const { portalUid: _p, ...safeData } = data
 
-    return NextResponse.json({ success: true, data: serializeFirestoreDocument(doc.id, safeData) })
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...serializeFirestoreDocument(doc.id, safeData),
+        portalIdentity: {
+          uid: identity.uid,
+          activeClientId: identity.activeClientId,
+          clientIds: identity.clientIds,
+          userRole: identity.userRole,
+          memberships: identity.memberships,
+        },
+      },
+    })
   } catch (err) {
     console.error("GET /api/portal/me:", err)
     return NextResponse.json(

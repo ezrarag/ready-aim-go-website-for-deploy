@@ -1,65 +1,65 @@
+export type AdminHubView = "overview" | "clients" | "people" | "workspaces" | "tasks" | "billing"
+
 export type AdminNavItem = {
-  id: string
+  id: AdminHubView
   label: string
   href: string
-  children?: AdminNavItem[]
 }
 
-// ── Sub-arrays (exported for consumers such as ClientSectionNav) ──────────────
+export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
+  { id: "overview", label: "Overview", href: "/dashboard" },
+  { id: "clients", label: "Clients", href: "/dashboard?view=clients" },
+  { id: "people", label: "People", href: "/dashboard?view=people" },
+  { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
+  { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
+  { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
+]
 
+export const ADMIN_NAV_ITEMS = ADMIN_HUB_VIEWS
+
+/** @deprecated The admin dashboard now uses ADMIN_HUB_VIEWS. */
 export const CLIENT_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "clients-all",        label: "Relationships",   href: "/dashboard/clients" },
-  { id: "clients-team",       label: "Portal Access",   href: "/dashboard/clients/access" },
-  { id: "clients-contracts",  label: "Contracts",       href: "/dashboard/clients/contracts" },
-  { id: "clients-assets",     label: "Assets & Infra",  href: "/dashboard/clients/assets" },
-  { id: "clients-activity",   label: "Activity",        href: "/dashboard/clients/activity" },
+  { id: "clients", label: "Clients", href: "/dashboard?view=clients" },
+  { id: "people", label: "People", href: "/dashboard?view=people" },
+  { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
+  { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
+  { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
 ]
 
-export const PROJECTS_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "projects-overview",  label: "Overview",       href: "/dashboard/web-development" },
-  { id: "projects-vercel",    label: "Vercel Sync",    href: "/dashboard/clients/vercel-sync" },
-  { id: "projects-appstore",  label: "App Store Sync", href: "/dashboard/web-development/app-store-sync" },
-]
+/** @deprecated The admin dashboard now uses ADMIN_HUB_VIEWS. */
+export const ADVANCED_ADMIN_TOOLS: AdminNavItem[] = ADMIN_HUB_VIEWS
 
-export const BILLING_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "billing-finance",   label: "Finance",        href: "/dashboard/finance" },
-  { id: "billing-services",  label: "Infra Services", href: "/dashboard/admin/services" },
-]
+export const ADMIN_ROUTE_REDIRECTS: Record<string, string> = {
+  "/dashboard/clients": "/dashboard?view=clients",
+  "/dashboard/clients/access": "/dashboard?view=people",
+  "/dashboard/clients/activity": "/dashboard",
+  "/dashboard/clients/assets": "/dashboard?view=workspaces",
+  "/dashboard/clients/contracts": "/dashboard?view=billing",
+  "/dashboard/clients/onboarding": "/dashboard?view=people",
+  "/dashboard/clients/vercel-sync": "/dashboard?view=workspaces",
+  "/dashboard/command": "/dashboard?view=tasks",
+  "/dashboard/web-development": "/dashboard?view=workspaces",
+  "/dashboard/web-development/app-store-sync": "/dashboard?view=workspaces",
+  "/dashboard/finance": "/dashboard?view=billing",
+  "/dashboard/admin/services": "/dashboard?view=billing",
+}
 
-export const SYSTEM_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "system-admin",       label: "Admin Overview",    href: "/dashboard/admin" },
-  { id: "system-builds",      label: "Build Tracker",     href: "/dashboard/admin/build-tracker" },
-  { id: "system-comms",       label: "Communications",    href: "/dashboard/comms" },
-  { id: "system-calendar",    label: "Calendar",          href: "/dashboard/calendar" },
-  { id: "system-directory",   label: "Website Directory", href: "/dashboard/admin/website-directory" },
-  { id: "system-staff",       label: "Staff",             href: "/dashboard/staff" },
-  { id: "system-beam",        label: "BEAM Participants", href: "/dashboard/beam-participants" },
-  { id: "system-transport",   label: "Transportation",    href: "/dashboard/transportation" },
-  { id: "system-realestate",  label: "Real Estate",       href: "/dashboard/real-estate" },
-]
+export function normalizeAdminHubView(value: string | null | undefined): AdminHubView {
+  return value === "clients" ||
+    value === "people" ||
+    value === "workspaces" ||
+    value === "tasks" ||
+    value === "billing"
+    ? value
+    : "overview"
+}
 
-// ── Deprecated aliases — preserved for backward compatibility ─────────────────
-
-/** @deprecated Use PROJECTS_SECTION_ITEMS */
-export const WEB_DEVELOPMENT_SECTION_ITEMS: AdminNavItem[] = PROJECTS_SECTION_ITEMS
-
-/** @deprecated Use SYSTEM_SECTION_ITEMS */
-export const OPERATIONS_SYSTEM_ITEMS: AdminNavItem[] = SYSTEM_SECTION_ITEMS
-
-// ── Primary navigation tree ───────────────────────────────────────────────────
-
-export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "clients", label: "Clients", href: "/dashboard/clients" },
-  { id: "projects", label: "Projects", href: "/dashboard/web-development" },
-  { id: "files", label: "Files", href: "/dashboard/clients/assets" },
-  { id: "tasks", label: "Tasks", href: "/dashboard/command" },
-  { id: "settings", label: "Settings", href: "/dashboard/settings" },
-]
-
-export const ADVANCED_ADMIN_TOOLS: AdminNavItem[] = [
-  ...CLIENT_SECTION_ITEMS.filter((item) => item.href !== "/dashboard/clients/assets"),
-  ...PROJECTS_SECTION_ITEMS.filter((item) => item.href !== "/dashboard/web-development"),
-  ...BILLING_SECTION_ITEMS,
-  ...SYSTEM_SECTION_ITEMS,
-]
+export function getAdminHubHref(view: AdminHubView, params?: Record<string, string | null | undefined>) {
+  const search = new URLSearchParams()
+  if (view !== "overview") search.set("view", view)
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value) search.set(key, value)
+  }
+  const query = search.toString()
+  return query ? `/dashboard?${query}` : "/dashboard"
+}

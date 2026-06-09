@@ -1,16 +1,5 @@
-import DashboardLayout from "@/components/dashboard-layout"
-import { ClientSectionNav } from "@/components/admin/client-section-nav"
-import { BeamPortalAccessPanel } from "@/components/admin/beam-portal-access-panel"
-import { ClientClaimRequestsPanel } from "@/components/admin/client-claim-requests-panel"
+import { redirect } from "next/navigation"
 
-export default function ClientAccessPage() {
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <ClientSectionNav />
-        <ClientClaimRequestsPanel />
-        <BeamPortalAccessPanel />
-      </div>
-    </DashboardLayout>
-  )
+export default function ClientAccessRedirectPage() {
+  redirect("/dashboard?view=people")
 }

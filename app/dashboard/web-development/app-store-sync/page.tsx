@@ -1,10 +1,5 @@
-import DashboardLayout from "@/components/dashboard-layout"
-import { AppStoreSyncPanel } from "@/components/admin/app-store-sync-panel"
+import { redirect } from "next/navigation"
 
-export default function AppStoreSyncPage() {
-  return (
-    <DashboardLayout>
-      <AppStoreSyncPanel />
-    </DashboardLayout>
-  )
+export default function AppStoreSyncRedirectPage() {
+  redirect("/dashboard?view=workspaces")
 }

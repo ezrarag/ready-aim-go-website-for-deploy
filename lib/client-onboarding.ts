@@ -2,44 +2,24 @@ import type { ClientDirectoryEntry } from "@/lib/client-directory"
 
 export const CLIENT_SERVICE_OPTIONS = [
   {
-    id: "web",
-    label: "Web presence",
-    description: "Website updates, story publishing, and public presence management.",
+    id: "nexus",
+    label: "Nexus",
+    description: "Web, app, R&D, creative support, and client operating infrastructure.",
   },
   {
-    id: "app",
-    label: "Apps and portals",
-    description: "Client apps, internal portals, and product feature delivery.",
+    id: "space",
+    label: "Space",
+    description: "Workspace, rooms, pop-ups, studios, property ops, and facilities support.",
   },
   {
-    id: "rd",
-    label: "Research and development",
-    description: "R&D support, experiments, and innovation planning.",
+    id: "motion",
+    label: "Motion",
+    description: "Transportation, fleet, rides, delivery, and logistics coordination.",
   },
   {
-    id: "housing",
-    label: "Housing support",
-    description: "Housing wallet, lodging, and team accommodations.",
-  },
-  {
-    id: "transportation",
-    label: "Transportation",
-    description: "Fleet operations, logistics, and transportation coordination.",
-  },
-  {
-    id: "insurance",
-    label: "Insurance",
-    description: "Coverage planning and insurance support.",
-  },
-  {
-    id: "property-ops",
-    label: "Property ops",
-    description: "Property operations, facilities oversight, and site coordination.",
-  },
-  {
-    id: "beam-participants",
-    label: "BEAM participants",
-    description: "Participant operations, coaching, and cohort support.",
+    id: "cohort",
+    label: "Cohort",
+    description: "BEAM participants, specialist teams, training, and cohort delivery capacity.",
   },
 ] as const
 
@@ -79,28 +59,24 @@ export function deriveClientInterestDefaults(
 ): ClientServiceInterestKey[] {
   const defaults: ClientServiceInterestKey[] = []
 
-  if (client.websiteUrl || client.deployUrl || client.modules?.web?.enabled) {
-    defaults.push("web")
-  }
-
-  if (client.appUrl || client.modules?.app?.enabled) {
-    defaults.push("app")
-  }
-
-  if (client.rdUrl || client.modules?.rd?.enabled) {
-    defaults.push("rd")
+  if (
+    client.websiteUrl ||
+    client.deployUrl ||
+    client.appUrl ||
+    client.rdUrl ||
+    client.modules?.web?.enabled ||
+    client.modules?.app?.enabled ||
+    client.modules?.rd?.enabled
+  ) {
+    defaults.push("nexus")
   }
 
   if (client.housingUrl || client.modules?.housing?.enabled) {
-    defaults.push("housing")
+    defaults.push("space")
   }
 
   if (client.transportationUrl || client.modules?.transportation?.enabled) {
-    defaults.push("transportation")
-  }
-
-  if (client.insuranceUrl || client.modules?.insurance?.enabled) {
-    defaults.push("insurance")
+    defaults.push("motion")
   }
 
   return Array.from(new Set(defaults))

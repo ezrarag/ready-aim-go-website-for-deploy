@@ -1,10 +1,5 @@
-import DashboardLayout from "@/components/dashboard-layout"
-import { ServicesCostTracker } from "@/components/admin/services-cost-tracker"
+import { redirect } from "next/navigation"
 
-export default function AdminServicesPage() {
-  return (
-    <DashboardLayout>
-      <ServicesCostTracker />
-    </DashboardLayout>
-  )
+export default function AdminServicesRedirectPage() {
+  redirect("/dashboard?view=billing")
 }

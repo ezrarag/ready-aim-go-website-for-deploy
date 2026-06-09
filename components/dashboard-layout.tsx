@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { signOut } from "firebase/auth"
 import { useTheme } from "next-themes"
 import {
@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ADMIN_NAV_ITEMS, type AdminNavItem } from "@/lib/admin-navigation"
+import { ADMIN_NAV_ITEMS, normalizeAdminHubView, type AdminHubView, type AdminNavItem } from "@/lib/admin-navigation"
 import { isAdminRoute } from "@/lib/auth-routes"
 import { ensureAuthPersistence } from "@/lib/firebase-client"
 import { useUserWithRole } from "@/hooks/use-user-with-role"
@@ -26,28 +26,21 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-function isItemActive(pathname: string, href: string): boolean {
-  if (href === "/dashboard") {
-    return pathname === href
-  }
-  return pathname === href || pathname.startsWith(`${href}/`)
-}
-
-function getActiveNavItem(pathname: string) {
-  return ADMIN_NAV_ITEMS.find((item) => isItemActive(pathname, item.href)) ?? ADMIN_NAV_ITEMS[0]
+function getActiveNavItem(view: AdminHubView) {
+  return ADMIN_NAV_ITEMS.find((item) => item.id === view) ?? ADMIN_NAV_ITEMS[0]
 }
 
 function NavLinks({
-  pathname,
+  activeView,
   onNavigate,
 }: {
-  pathname: string
+  activeView: AdminHubView
   onNavigate?: () => void
 }) {
   return (
     <nav aria-label="Dashboard navigation" className="flex flex-wrap items-center gap-2">
       {ADMIN_NAV_ITEMS.map((item: AdminNavItem) => {
-        const active = isItemActive(pathname, item.href)
+        const active = item.id === activeView
 
         return (
           <Link
@@ -112,11 +105,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
   const { session, loading: authLoading, error: authError } = useUserWithRole()
   const requiresAdmin = isAdminRoute(pathname)
-  const activeNavItem = getActiveNavItem(pathname)
+  const activeView = normalizeAdminHubView(searchParams.get("view"))
+  const activeNavItem = getActiveNavItem(activeView)
   const isDark = mounted && resolvedTheme === "dark"
 
   useEffect(() => {
@@ -228,12 +223,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <div className="hidden lg:block">
-            <NavLinks pathname={pathname} />
+            <NavLinks activeView={activeView} />
           </div>
 
           {mobileNavOpen ? (
             <div className="space-y-4 rounded-xl border border-border bg-card p-3 lg:hidden">
-              <NavLinks pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
+              <NavLinks activeView={activeView} onNavigate={() => setMobileNavOpen(false)} />
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
                 <Button
                   variant="outline"

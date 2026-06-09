@@ -13,6 +13,7 @@ type ProcessVideoBody = {
   storagePath?: string
   clientSlug?: string
   title?: string
+  sendSms?: boolean
 }
 
 function getClaudeText(data: any): string {
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
     const clientCommsData = clientCommsDoc.data() ?? {}
     const phone = readPhone(clientCommsData, clientData)
 
-    if (phone) {
+    if (body.sendSms !== false && phone) {
       const smsResult = await sendSMS({
         to: phone,
         text: `ReadyAimGo: Your ${title} is ready. Watch it here: ${downloadUrl}`,

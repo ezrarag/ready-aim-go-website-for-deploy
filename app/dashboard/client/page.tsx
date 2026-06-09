@@ -184,7 +184,7 @@ function ClientDashboardContent() {
   const [businessAssets, setBusinessAssets] = useState([
     {
       id: 1,
-      name: "ezrahaugabrooks.com", // Will be updated dynamically
+      name: "Nexus", // Will be updated dynamically
       type: "website",
       status: "live",
       revenue: 2500,
@@ -195,7 +195,7 @@ function ClientDashboardContent() {
     },
     {
       id: 2,
-      name: "Portfolio App",
+      name: "Nexus App",
       type: "app",
       status: "inactive",
       revenue: 0,
@@ -206,7 +206,7 @@ function ClientDashboardContent() {
     },
     {
       id: 3,
-      name: "Business Plan",
+      name: "Cohort Plan",
       type: "business_plan", // Changed from communications
       status: "inactive",
       revenue: 0,
@@ -217,7 +217,7 @@ function ClientDashboardContent() {
     },
     {
       id: 4,
-      name: "Real Estate Portal",
+      name: "Space",
       type: "real_estate",
       status: "inactive",
       revenue: 0,
@@ -228,7 +228,7 @@ function ClientDashboardContent() {
     },
     {
       id: 5,
-      name: "Transportation Network",
+      name: "Motion",
       type: "transportation",
       status: "inactive",
       revenue: 0,
@@ -239,7 +239,7 @@ function ClientDashboardContent() {
     },
     {
       id: 6,
-      name: "Legal Filing System",
+      name: "Nexus Compliance",
       type: "filing_system",
       status: "inactive",
       revenue: 0,
@@ -301,7 +301,7 @@ function ClientDashboardContent() {
           const initialBusinessAssets = [
             {
               type: 'business_plan',
-              name: 'Business Plan',
+              name: 'Cohort Plan',
               value: '',
               status: 'not_started' as const,
               description: 'Upload your business plan document for AI analysis',
@@ -310,7 +310,7 @@ function ClientDashboardContent() {
             },
             {
               type: 'website',
-              name: 'Business Website',
+              name: 'Nexus',
               value: clientData?.website_url || '',
               status: clientData?.website_url ? 'completed' as const : 'not_started' as const,
               description: 'Enter your business website URL',
@@ -328,7 +328,7 @@ function ClientDashboardContent() {
             },
             {
               type: 'real_estate',
-              name: 'Real Estate Portal',
+              name: 'Space',
               value: '',
               status: 'not_started' as const,
               description: 'Connect your real estate listings or portal',
@@ -337,7 +337,7 @@ function ClientDashboardContent() {
             },
             {
               type: 'transportation',
-              name: 'Transportation Network',
+              name: 'Motion',
               value: '',
               status: 'not_started' as const,
               description: 'Link your transportation or logistics network',
@@ -346,7 +346,7 @@ function ClientDashboardContent() {
             },
             {
               type: 'legal_filing',
-              name: 'Legal Filing System',
+              name: 'Nexus Compliance',
               value: '',
               status: 'not_started' as const,
               description: 'Connect your legal documents and filing system',
@@ -3128,7 +3128,7 @@ function ClientDashboardContent() {
       asset.type === 'website'
         ? {
             ...asset,
-            name: clientWebsite?.name || "Business Website",
+            name: clientWebsite?.name || "Nexus",
             status: clientWebsite?.status || "inactive",
             is_active: Boolean(clientWebsite),
           }
