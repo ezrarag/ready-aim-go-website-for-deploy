@@ -90,6 +90,23 @@ function deriveCategory(value: string) {
   return "general"
 }
 
+function readPhone(...records: Array<Record<string, unknown>>) {
+  const fields = ["phone", "contactPhone", "mobilePhone", "smsPhone"]
+  for (const record of records) {
+    for (const field of fields) {
+      const value = record[field]
+      if (typeof value === "string" && value.trim()) return value.trim()
+    }
+
+    const fromNumbers = record.whatsappFromNumbers
+    if (Array.isArray(fromNumbers)) {
+      const value = fromNumbers.find((item): item is string => typeof item === "string" && item.trim().length > 0)
+      if (value) return value.trim()
+    }
+  }
+  return ""
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ProcessVideoBody
@@ -184,15 +201,16 @@ export async function POST(request: NextRequest) {
 
     const clientCommsDoc = await db.collection("clientComms").doc(clientId).get()
     const clientCommsData = clientCommsDoc.data() ?? {}
-    const commsPhone = typeof clientCommsData.phone === "string" ? clientCommsData.phone.trim() : ""
-    const clientPhone = typeof clientData.phone === "string" ? clientData.phone.trim() : ""
-    const phone = commsPhone || clientPhone
+    const phone = readPhone(clientCommsData, clientData)
 
     if (phone) {
-      await sendSMS({
+      const smsResult = await sendSMS({
         to: phone,
         text: `ReadyAimGo: Your ${title} is ready. Watch it here: ${downloadUrl}`,
       })
+      if (!smsResult.success) {
+        console.warn("[videos/process] SMS notification failed:", smsResult.error)
+      }
     }
 
     return NextResponse.json({

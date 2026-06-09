@@ -24,9 +24,32 @@ type SendSMSResult = {
   error?: string
 }
 
+export function normalizePhoneToE164(value: string | null | undefined): string {
+  const raw = typeof value === "string" ? value.trim() : ""
+  if (!raw) return ""
+
+  const digits = raw.replace(/\D/g, "")
+  if (!digits) return ""
+
+  if (raw.startsWith("+") && digits.length >= 8 && digits.length <= 15) {
+    return `+${digits}`
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`
+  }
+
+  return ""
+}
+
 export async function sendSMS({ to, text, from }: SendSMSOptions): Promise<SendSMSResult> {
   const apiKey = process.env.TELNYX_API_KEY
   const senderNumber = from ?? process.env.TELNYX_PHONE_NUMBER
+  const normalizedTo = normalizePhoneToE164(to)
 
   if (!apiKey) {
     console.error("[telnyx] TELNYX_API_KEY is not set")
@@ -38,6 +61,11 @@ export async function sendSMS({ to, text, from }: SendSMSOptions): Promise<SendS
     return { success: false, error: "TELNYX_PHONE_NUMBER not configured" }
   }
 
+  if (!normalizedTo) {
+    console.error("[telnyx] Invalid recipient phone number", { to })
+    return { success: false, error: "Invalid recipient phone number" }
+  }
+
   try {
     const res = await fetch(`${TELNYX_API_BASE}/messages`, {
       method: "POST",
@@ -47,7 +75,7 @@ export async function sendSMS({ to, text, from }: SendSMSOptions): Promise<SendS
       },
       body: JSON.stringify({
         from: senderNumber,
-        to,
+        to: normalizedTo,
         text,
         type: "SMS",
         use_profile_webhooks: true,   // Uses the messaging profile webhook settings
