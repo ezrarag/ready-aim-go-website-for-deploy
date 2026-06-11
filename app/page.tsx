@@ -120,7 +120,7 @@ export default function HomePage() {
   }, [showProjectsModal, projects.length])
 
   return (
-    <div className="h-screen overflow-hidden bg-black relative">
+    <div className="h-dvh overflow-hidden bg-black relative">
       <Hero 
         onWatchDemo={() => {}} 
         onViewProjects={handleViewProjects}

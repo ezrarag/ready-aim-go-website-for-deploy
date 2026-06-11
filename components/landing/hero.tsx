@@ -62,7 +62,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   }, [router, showActOverlay, showRoleOverlay])
 
   return (
-    <section className="fixed inset-0 z-0 flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+    <section className="fixed inset-0 z-0 flex h-dvh w-screen items-center justify-center overflow-hidden bg-black">
       <SceneVideoPlayer scene={activeScene} onLoadScene={loadScene} pause={menuOverlayOpen} />
 
       <div className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.34)_36%,rgba(0,0,0,0.08)_70%)]" />
