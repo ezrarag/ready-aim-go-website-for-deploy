@@ -8,9 +8,11 @@ import {
   BriefcaseBusiness,
   Building2,
   CheckCircle2,
+  ChevronDown,
   CircleDollarSign,
   Film,
   ListTodo,
+  Plus,
   RefreshCw,
   Search,
   Trash2,
@@ -20,9 +22,12 @@ import {
 
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
+import { RepoConnectModal } from "@/components/admin/repo-connect-modal"
+import { ClientManageModal } from "@/components/admin/client-manage-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import {
   getAdminHubHref,
@@ -40,7 +45,6 @@ import type {
   AdminHubPerson,
   AdminHubProject,
   AdminHubTask,
-  AdminHubWarning,
   AdminHubWorkspace,
 } from "@/lib/admin/ops-hub"
 import type {
@@ -191,12 +195,6 @@ function formatBuildVideoStatus(status: BuildVideoVisibilityStatus) {
   return status
 }
 
-function warningClass(severity: AdminHubWarning["severity"]) {
-  return severity === "danger"
-    ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
-    : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-}
-
 function searchText(values: Array<unknown>, query: string) {
   if (!query) return true
   return values
@@ -223,32 +221,6 @@ function ProductChips({ products }: { products: AdminProductKey[] }) {
   )
 }
 
-function SubscriptionGrid({ client }: { client: AdminHubClient }) {
-  return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {ADMIN_PRODUCT_KEYS.map((product) => {
-        const subscription = client.subscriptions[product]
-        return (
-          <div key={product} className="rounded-lg border border-border bg-background p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">{ADMIN_PRODUCT_LABELS[product]}</p>
-              <Badge className={statusClass(subscription.status)}>
-                {subscription.status}
-              </Badge>
-            </div>
-            <p className="mt-2 truncate font-mono text-xs text-muted-foreground">
-              {subscription.planId || (subscription.legacy ? "Legacy module fallback" : "No plan")}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Renewal {formatDate(subscription.renewalAt)}
-            </p>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 function EmptyRow({ label, colSpan }: { label: string; colSpan: number }) {
   return (
     <tr>
@@ -263,7 +235,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = normalizeAdminHubView(searchParams.get("view"))
-  const selectedClientId = searchParams.get("clientId")
   const [state, setState] = useState<AdminHubState>(emptyState)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -273,6 +244,9 @@ export default function DashboardPage() {
   const [mergePreviewLoading, setMergePreviewLoading] = useState<string | null>(null)
   const [purgePreview, setPurgePreview] = useState<WorkspacePurgePlan | null>(null)
   const [purgingWorkspaceId, setPurgingWorkspaceId] = useState<string | null>(null)
+  const [opsSummaryOpen, setOpsSummaryOpen] = useState(false)
+  const [repoConnectOpen, setRepoConnectOpen] = useState(false)
+  const [manageClient, setManageClient] = useState<AdminHubClient | null>(null)
   const [search, setSearch] = useState("")
   const [taskStatus, setTaskStatus] = useState("open")
   const [videoDiagnostics, setVideoDiagnostics] = useState<VideoDiagnosticsPayload | null>(null)
@@ -350,10 +324,6 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const selectedClient = useMemo(
-    () => state.clients.find((client) => client.id === selectedClientId) ?? state.clients[0] ?? null,
-    [selectedClientId, state.clients]
-  )
   const openTasks = useMemo(() => state.tasks.filter(isOpenTask), [state.tasks])
   const blockedTasks = useMemo(() => openTasks.filter(isBlockedTask), [openTasks])
   const unassignedPeople = useMemo(
@@ -664,15 +634,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <AdminMetricTile label="Clients" value={loading ? "..." : state.clients.length} trailing={<Building2 className="h-5 w-5 text-muted-foreground" />} />
-          <AdminMetricTile label="People" value={loading ? "..." : state.people.length} hint={`${unassignedPeople.length} pending`} trailing={<Users className="h-5 w-5 text-muted-foreground" />} />
-          <AdminMetricTile label="Workspaces" value={loading ? "..." : state.workspaces.length} trailing={<BriefcaseBusiness className="h-5 w-5 text-muted-foreground" />} />
-          <AdminMetricTile label="Open Work" value={loading ? "..." : openTasks.length} hint={`${blockedTasks.length} blocked`} trailing={<ListTodo className="h-5 w-5 text-muted-foreground" />} />
-          <AdminMetricTile label="Subscriptions" value={loading ? "..." : activeSubscriptions} hint="Active product lines" trailing={<CircleDollarSign className="h-5 w-5 text-muted-foreground" />} />
-          <AdminMetricTile label="Warnings" value={loading ? "..." : state.warnings.length} trailing={<AlertTriangle className="h-5 w-5 text-muted-foreground" />} />
-        </div>
-
         {state.error ? (
           <AdminPanel>
             <CardContent className="p-4">
@@ -695,85 +656,60 @@ export default function DashboardPage() {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["overview", "clients", "people", "workspaces", "tasks", "billing"] as AdminHubView[]).map((item) => (
+              {(["clients", "people", "workspaces", "tasks", "billing"] as AdminHubView[]).map((item) => (
                 <Button key={item} variant={view === item ? "default" : "outline"} onClick={() => setView(item)}>
-                  {item === "overview" ? "Overview" : item.charAt(0).toUpperCase() + item.slice(1)}
+                  {item.charAt(0).toUpperCase() + item.slice(1)}
                 </Button>
               ))}
             </div>
           </CardContent>
         </AdminPanel>
 
-        {view === "overview" ? (
-          <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-            <AdminPanel>
-              <CardHeader>
-                <AdminPanelTitle>Attention Queue</AdminPanelTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {state.warnings.length === 0 ? (
-                  <AdminPanelInset className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    No operational warnings.
-                  </AdminPanelInset>
-                ) : (
-                  state.warnings.slice(0, 12).map((warning) => (
-                    <Link key={warning.id} href={getAdminHubHref(warning.view, { clientId: warning.clientId })} className="block">
-                      <AdminPanelInset className={`p-3 transition hover:bg-muted/40 ${warningClass(warning.severity)}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium">{warning.label}</p>
-                            <p className="mt-1 line-clamp-2 text-sm opacity-85">{warning.detail}</p>
-                          </div>
-                          <Badge variant="outline">{warning.view}</Badge>
-                        </div>
-                      </AdminPanelInset>
-                    </Link>
-                  ))
-                )}
-              </CardContent>
-            </AdminPanel>
-
-            <AdminPanel>
-              <CardHeader>
-                <AdminPanelTitle>Current Operating Picture</AdminPanelTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <AdminPanelInset className="p-3">
-                  <p className="text-sm font-medium text-foreground">Unassigned portal people</p>
-                  <div className="mt-2 space-y-2">
-                    {unassignedPeople.slice(0, 5).map((person) => (
-                      <div key={person.id} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="truncate">{person.name}</span>
-                        <Badge className={statusClass(person.status)}>{person.status}</Badge>
-                      </div>
-                    ))}
-                    {unassignedPeople.length === 0 ? <p className="text-sm text-muted-foreground">No pending people.</p> : null}
-                  </div>
-                </AdminPanelInset>
-                <AdminPanelInset className="p-3">
-                  <p className="text-sm font-medium text-foreground">Blocked work</p>
-                  <div className="mt-2 space-y-2">
-                    {blockedTasks.slice(0, 5).map((task) => (
-                      <div key={task.id} className="text-sm">
-                        <p className="truncate font-medium">{task.title}</p>
-                        <p className="truncate text-xs text-muted-foreground">{task.clientName || task.clientId || "No client"}</p>
-                      </div>
-                    ))}
-                    {blockedTasks.length === 0 ? <p className="text-sm text-muted-foreground">No blocked work.</p> : null}
-                  </div>
-                </AdminPanelInset>
-                <p className="text-xs text-muted-foreground">Loaded {formatDateTime(state.loadedAt)}</p>
-              </CardContent>
-            </AdminPanel>
+        <Collapsible open={opsSummaryOpen} onOpenChange={setOpsSummaryOpen}>
+          <div className="overflow-hidden rounded-lg border border-border bg-background">
+            <CollapsibleTrigger asChild>
+              <button className="flex w-full flex-col gap-3 px-4 py-3 text-left transition hover:bg-muted/30 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Operations snapshot</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {state.warnings.length} warning{state.warnings.length === 1 ? "" : "s"} · {blockedTasks.length} blocked · {unassignedPeople.length} unassigned people
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{loading ? "..." : state.clients.length} clients</Badge>
+                  <Badge variant="outline">{loading ? "..." : state.people.length} people</Badge>
+                  <Badge variant="outline">{loading ? "..." : state.workspaces.length} workspaces</Badge>
+                  <Badge className={state.warnings.length ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}>
+                    {state.warnings.length ? `${state.warnings.length} warnings` : "clear"}
+                  </Badge>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${opsSummaryOpen ? "rotate-180" : ""}`} />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border bg-muted/20 p-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <AdminMetricTile label="Clients" value={loading ? "..." : state.clients.length} trailing={<Building2 className="h-5 w-5 text-muted-foreground" />} />
+                  <AdminMetricTile label="People" value={loading ? "..." : state.people.length} hint={`${unassignedPeople.length} pending`} trailing={<Users className="h-5 w-5 text-muted-foreground" />} />
+                  <AdminMetricTile label="Workspaces" value={loading ? "..." : state.workspaces.length} trailing={<BriefcaseBusiness className="h-5 w-5 text-muted-foreground" />} />
+                  <AdminMetricTile label="Open Work" value={loading ? "..." : openTasks.length} hint={`${blockedTasks.length} blocked`} trailing={<ListTodo className="h-5 w-5 text-muted-foreground" />} />
+                  <AdminMetricTile label="Subscriptions" value={loading ? "..." : activeSubscriptions} hint="Active product lines" trailing={<CircleDollarSign className="h-5 w-5 text-muted-foreground" />} />
+                  <AdminMetricTile label="Warnings" value={loading ? "..." : state.warnings.length} trailing={<AlertTriangle className="h-5 w-5 text-muted-foreground" />} />
+                </div>
+              </div>
+            </CollapsibleContent>
           </div>
-        ) : null}
+        </Collapsible>
 
         {view === "clients" ? (
-          <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+          <div className="grid gap-5">
             <AdminPanel className="overflow-hidden">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
                 <AdminPanelTitle>Clients</AdminPanelTitle>
+                <Button size="sm" onClick={() => setRepoConnectOpen(true)}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Connect repo
+                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -785,11 +721,12 @@ export default function DashboardPage() {
                         <th className="px-4 py-3 font-medium">Workspace</th>
                         <th className="px-4 py-3 font-medium">Portal</th>
                         <th className="px-4 py-3 font-medium">Updated</th>
+                        <th className="px-4 py-3 text-right font-medium">Manage</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleClients.length === 0 ? (
-                        <EmptyRow colSpan={5} label={loading ? "Loading clients..." : "No clients match this view."} />
+                        <EmptyRow colSpan={6} label={loading ? "Loading clients..." : "No clients match this view."} />
                       ) : (
                         visibleClients.map((client) => (
                           <tr key={client.id} className="border-b border-border transition hover:bg-muted/30">
@@ -803,40 +740,17 @@ export default function DashboardPage() {
                             <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{client.workspaceId || "Missing"}</td>
                             <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{client.portalEmail || client.contactEmail || "No contact"}</td>
                             <td className="px-4 py-3 text-muted-foreground">{formatDate(client.updatedAt)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <Button variant="outline" size="sm" onClick={() => setManageClient(client)}>
+                                Manage
+                              </Button>
+                            </td>
                           </tr>
                         ))
                       )}
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </AdminPanel>
-
-            <AdminPanel>
-              <CardHeader>
-                <AdminPanelTitle>{selectedClient?.name ?? "Client Detail"}</AdminPanelTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedClient ? (
-                  <>
-                    <div className="grid gap-3 text-sm">
-                      <AdminPanelInset className="p-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Status</p>
-                        <Badge className={`mt-2 ${statusClass(selectedClient.status)}`}>{selectedClient.status}</Badge>
-                      </AdminPanelInset>
-                      <AdminPanelInset className="p-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Links</p>
-                        <div className="mt-2 space-y-1 text-sm">
-                          <p className="truncate">{selectedClient.websiteUrl || selectedClient.deployUrl || "No public URL"}</p>
-                          <p className="truncate font-mono text-xs text-muted-foreground">{selectedClient.portalEmail || selectedClient.contactEmail || "No portal email"}</p>
-                        </div>
-                      </AdminPanelInset>
-                    </div>
-                    <SubscriptionGrid client={selectedClient} />
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No client selected.</p>
-                )}
               </CardContent>
             </AdminPanel>
           </div>
@@ -1550,6 +1464,26 @@ export default function DashboardPage() {
           </AdminPanel>
         ) : null}
       </div>
+
+      <RepoConnectModal
+        open={repoConnectOpen}
+        onOpenChange={setRepoConnectOpen}
+        onCreated={() => {
+          void loadOps()
+        }}
+      />
+
+      <ClientManageModal
+        open={manageClient !== null}
+        onOpenChange={(next) => {
+          if (!next) setManageClient(null)
+        }}
+        client={manageClient}
+        people={state.people}
+        onSaved={() => {
+          void loadOps()
+        }}
+      />
     </DashboardLayout>
   )
 }

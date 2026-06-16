@@ -1,4 +1,4 @@
-export type AdminHubView = "overview" | "clients" | "people" | "workspaces" | "tasks" | "billing"
+export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "billing"
 
 export type AdminNavItem = {
   id: AdminHubView
@@ -7,7 +7,6 @@ export type AdminNavItem = {
 }
 
 export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
-  { id: "overview", label: "Overview", href: "/dashboard" },
   { id: "clients", label: "Clients", href: "/dashboard?view=clients" },
   { id: "people", label: "People", href: "/dashboard?view=people" },
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
@@ -32,7 +31,7 @@ export const ADVANCED_ADMIN_TOOLS: AdminNavItem[] = ADMIN_HUB_VIEWS
 export const ADMIN_ROUTE_REDIRECTS: Record<string, string> = {
   "/dashboard/clients": "/dashboard?view=clients",
   "/dashboard/clients/access": "/dashboard?view=people",
-  "/dashboard/clients/activity": "/dashboard",
+  "/dashboard/clients/activity": "/dashboard?view=workspaces",
   "/dashboard/clients/assets": "/dashboard?view=workspaces",
   "/dashboard/clients/contracts": "/dashboard?view=billing",
   "/dashboard/clients/onboarding": "/dashboard?view=people",
@@ -51,12 +50,12 @@ export function normalizeAdminHubView(value: string | null | undefined): AdminHu
     value === "tasks" ||
     value === "billing"
     ? value
-    : "overview"
+    : "workspaces"
 }
 
 export function getAdminHubHref(view: AdminHubView, params?: Record<string, string | null | undefined>) {
   const search = new URLSearchParams()
-  if (view !== "overview") search.set("view", view)
+  search.set("view", view)
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value) search.set(key, value)
   }
