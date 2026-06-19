@@ -1,4 +1,4 @@
-export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "billing"
+export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "billing" | "guides"
 
 export type AdminNavItem = {
   id: AdminHubView
@@ -12,6 +12,7 @@ export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
   { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
+  { id: "guides", label: "Guides", href: "/dashboard?view=guides" },
 ]
 
 export const ADMIN_NAV_ITEMS = ADMIN_HUB_VIEWS
@@ -48,7 +49,8 @@ export function normalizeAdminHubView(value: string | null | undefined): AdminHu
     value === "people" ||
     value === "workspaces" ||
     value === "tasks" ||
-    value === "billing"
+    value === "billing" ||
+    value === "guides"
     ? value
     : "workspaces"
 }

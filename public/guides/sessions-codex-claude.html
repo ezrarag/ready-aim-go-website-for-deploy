@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Starting &amp; Ending a Session with Codex or Claude</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #121829;
+    --ink: #e8edf7;
+    --muted: #93a0bd;
+    --accent: #6ea8fe;
+    --accent-2: #7ce7c4;
+    --warn: #ffcf6e;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--sans);
+    background: radial-gradient(120% 120% at 50% 0%, #16203a 0%, var(--bg) 55%);
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .stage {
+    position: relative;
+    width: 100%; height: 100%;
+    max-width: 960px; aspect-ratio: 16 / 9;
+    margin: auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .frame {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 6% 8%;
+    opacity: 0; transform: translateY(14px) scale(.98);
+    transition: opacity .6s ease, transform .6s ease;
+    pointer-events: none;
+  }
+  .frame.active { opacity: 1; transform: none; pointer-events: auto; }
+  .kicker {
+    font-size: clamp(11px, 1.6vw, 14px);
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 14px; font-weight: 600;
+  }
+  h1 { font-size: clamp(22px, 4.4vw, 40px); line-height: 1.12; font-weight: 700; }
+  h2 { font-size: clamp(18px, 3.4vw, 30px); line-height: 1.18; font-weight: 650; }
+  p.lead { color: var(--muted); font-size: clamp(13px, 2.1vw, 18px); margin-top: 14px; max-width: 30ch; }
+  .cmd {
+    display: inline-block; font-family: var(--mono);
+    font-size: clamp(13px, 2.2vw, 19px);
+    background: #0a1120; border: 1px solid #25324f; color: var(--accent-2);
+    padding: 10px 16px; border-radius: 10px; margin-top: 8px;
+  }
+  .two { display: flex; gap: 18px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
+  .card {
+    background: var(--panel); border: 1px solid #222c45; border-radius: 14px;
+    padding: 18px 20px; width: min(300px, 40vw); text-align: left;
+  }
+  .card .tag { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .card h3 { font-size: clamp(15px, 2.3vw, 20px); margin: 6px 0 4px; }
+  .card small { color: var(--muted); font-size: clamp(11px, 1.8vw, 13px); line-height: 1.5; display: block; }
+  .num { color: var(--accent); font-weight: 700; }
+  .warn { color: var(--warn); }
+  .ok { color: var(--accent-2); }
+  /* progress + dots */
+  .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 20px; }
+  .bar { height: 3px; background: #1d2740; border-radius: 3px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s linear; }
+  .dots { display: flex; gap: 7px; justify-content: center; margin-top: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #2a3550; border: none; cursor: pointer; padding: 0; transition: transform .2s, background .2s; }
+  .dot.on { background: var(--accent); transform: scale(1.25); }
+  .brand { position: absolute; top: 16px; left: 20px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="brand">ReadyAimGo · Help</div>
+
+    <section class="frame">
+      <div class="kicker">Help Center</div>
+      <h1>Starting &amp; Ending a Session<br />with Codex or Claude</h1>
+      <p class="lead">The two-part ritual — and the one mistake that quietly loses your work.</p>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">First, the key idea</div>
+      <h2>Two separate things</h2>
+      <div class="two">
+        <div class="card">
+          <div class="tag">The state log</div>
+          <h3>A journal</h3>
+          <small>A markdown summary of where the project stands. Human + AI readable.</small>
+        </div>
+        <div class="card">
+          <div class="tag">The codebase</div>
+          <h3>The real source of truth</h3>
+          <small>Your repo, pushed to GitHub with <span style="font-family:var(--mono)">git</span>.</small>
+        </div>
+      </div>
+      <p class="lead"><span class="warn">“log this” summarizes the work — it does <b>not</b> push your code.</span></p>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">Starting a session</div>
+      <h2>Tell the assistant where you left off</h2>
+      <div class="cmd">/init state</div>
+      <p class="lead">It reads the state log and recaps the last session.</p>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">Ending a session</div>
+      <h2>Two parts — in this order</h2>
+      <div class="two">
+        <div class="card">
+          <div class="tag"><span class="num">1</span> · In your terminal</div>
+          <div class="cmd" style="margin-top:10px">git add -A &amp;&amp; git commit -m "…" &amp;&amp; git push</div>
+          <small style="margin-top:8px" class="ok">This actually saves your code to GitHub.</small>
+        </div>
+        <div class="card">
+          <div class="tag"><span class="num">2</span> · To the assistant</div>
+          <div class="cmd" style="margin-top:10px">log this</div>
+          <small style="margin-top:8px">This records what you did in the journal.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">The honest catch</div>
+      <h2><span class="warn">“log this” does not push your code</span></h2>
+      <p class="lead">Log only, and the journal will <i>say</i> the code is saved while it sits unpushed on your Mac. Safer:</p>
+      <div class="cmd">check git status, then log this</div>
+      <p class="lead">Now the assistant verifies the repo first, then logs reality.</p>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">Best practice</div>
+      <h2>Keep the log in the repo</h2>
+      <div class="cmd">scripts/STATE_LOG.md</div>
+      <p class="lead">Both Codex and Claude can read &amp; edit it, and <span style="font-family:var(--mono)">git</span> tracks every change. Mirror to Drive only when you want it on mobile / NotebookLM.</p>
+    </section>
+
+    <section class="frame">
+      <div class="kicker">Remember</div>
+      <h1>Two parts, every session:<br /><span class="ok">push your code, then log it.</span></h1>
+    </section>
+
+    <div class="hud">
+      <div class="bar"><span id="prog"></span></div>
+      <div class="dots" id="dots"></div>
+    </div>
+  </div>
+
+<script>
+  (function () {
+    var frames = Array.prototype.slice.call(document.querySelectorAll(".frame"));
+    var dotsWrap = document.getElementById("dots");
+    var prog = document.getElementById("prog");
+    var i = 0, paused = false, t0 = Date.now();
+    var DUR = 5200; // ms per frame
+
+    frames.forEach(function (_, idx) {
+      var d = document.createElement("button");
+      d.className = "dot"; d.setAttribute("aria-label", "Frame " + (idx + 1));
+      d.addEventListener("click", function () { go(idx); });
+      dotsWrap.appendChild(d);
+    });
+    var dots = Array.prototype.slice.call(dotsWrap.children);
+
+    function render() {
+      frames.forEach(function (f, idx) { f.classList.toggle("active", idx === i); });
+      dots.forEach(function (d, idx) { d.classList.toggle("on", idx === i); });
+    }
+    function go(idx) { i = (idx + frames.length) % frames.length; t0 = Date.now(); render(); }
+
+    var stage = document.getElementById("stage");
+    stage.addEventListener("mouseenter", function () { paused = true; });
+    stage.addEventListener("mouseleave", function () { paused = false; t0 = Date.now() - (DUR * (parseFloat(prog.style.width) || 0) / 100); });
+
+    render();
+    requestAnimationFrame(function loop() {
+      if (!paused) {
+        var pct = Math.min((Date.now() - t0) / DUR, 1);
+        prog.style.width = (pct * 100) + "%";
+        if (pct >= 1) go(i + 1);
+      }
+      requestAnimationFrame(loop);
+    });
+  })();
+</script>
+</body>
+</html>

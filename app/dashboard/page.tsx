@@ -24,6 +24,7 @@ import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
 import { RepoConnectModal } from "@/components/admin/repo-connect-modal"
 import { ClientManageModal } from "@/components/admin/client-manage-modal"
+import { GuidesView } from "@/components/admin/guides-view"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
@@ -656,7 +657,7 @@ export default function DashboardPage() {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["clients", "people", "workspaces", "tasks", "billing"] as AdminHubView[]).map((item) => (
+              {(["clients", "people", "workspaces", "tasks", "billing", "guides"] as AdminHubView[]).map((item) => (
                 <Button key={item} variant={view === item ? "default" : "outline"} onClick={() => setView(item)}>
                   {item.charAt(0).toUpperCase() + item.slice(1)}
                 </Button>
@@ -1463,6 +1464,8 @@ export default function DashboardPage() {
             </CardContent>
           </AdminPanel>
         ) : null}
+
+        {view === "guides" ? <GuidesView /> : null}
       </div>
 
       <RepoConnectModal
