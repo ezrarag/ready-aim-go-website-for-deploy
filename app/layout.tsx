@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   description:
     "C-Suite-as-a-Service platform that centralizes communication, deployments, calendars, email, and operations with AI-powered insights. Transform your business operations with ReadyAimGo Pulse.",
   keywords: ["C-Suite-as-a-Service", "business operations", "AI Pulse", "executive dashboard", "automation", "operations management"],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/placeholder-logo.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+  },
   openGraph: {
     title: "ReadyAimGo - C-Suite-as-a-Service Platform",
     description: "C-Suite-as-a-Service platform that centralizes communication, deployments, calendars, email, and operations with AI-powered insights.",

@@ -161,7 +161,7 @@
     var frames = Array.prototype.slice.call(document.querySelectorAll(".frame"));
     var dotsWrap = document.getElementById("dots");
     var prog = document.getElementById("prog");
-    var i = 0, paused = false, t0 = Date.now();
+    var i = 0, t0 = Date.now();
     var DUR = 5200; // ms per frame
 
     frames.forEach(function (_, idx) {
@@ -178,17 +178,11 @@
     }
     function go(idx) { i = (idx + frames.length) % frames.length; t0 = Date.now(); render(); }
 
-    var stage = document.getElementById("stage");
-    stage.addEventListener("mouseenter", function () { paused = true; });
-    stage.addEventListener("mouseleave", function () { paused = false; t0 = Date.now() - (DUR * (parseFloat(prog.style.width) || 0) / 100); });
-
     render();
     requestAnimationFrame(function loop() {
-      if (!paused) {
-        var pct = Math.min((Date.now() - t0) / DUR, 1);
-        prog.style.width = (pct * 100) + "%";
-        if (pct >= 1) go(i + 1);
-      }
+      var pct = Math.min((Date.now() - t0) / DUR, 1);
+      prog.style.width = (pct * 100) + "%";
+      if (pct >= 1) go(i + 1);
       requestAnimationFrame(loop);
     });
   })();
