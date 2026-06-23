@@ -90,20 +90,15 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
             </h2>
           </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowRoleOverlay(true)}
-              className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            >
-              <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
-                Roster
-              </h2>
-            </button>
-            <span className="bg-orange-500 px-2 py-1 text-xs font-black uppercase text-white md:text-sm">
-              New
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowRoleOverlay(true)}
+            className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
+          >
+            <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
+              Roster
+            </h2>
+          </button>
         </motion.div>
       </div>
 

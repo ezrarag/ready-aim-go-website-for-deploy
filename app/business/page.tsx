@@ -59,6 +59,7 @@ export default function BusinessPage() {
     },
     { id: "FLEET_OPS", label: "FLEET OPS", href: "/fleet" },
     { id: "PROPERTY_OPS", label: "PROPERTY OPS", href: "/property-ops" },
+    { id: "OUR_WORK", label: "OUR WORK", href: "/work" },
   ]
 
   const socialItems = [
@@ -67,6 +68,7 @@ export default function BusinessPage() {
   ]
 
   const businessOptions = [
+    { id: "WORK", label: "OUR WORK", href: "/work", note: "Client websites and the products they use" },
     { id: "CLIENTS", label: "CLIENTS", href: "/clients", note: "Client directory and claim flow" },
     { id: "PARTNERS", label: "PARTNERS", href: "/partner", note: "Space, referral, and BEAM partnerships" },
     { id: "ADMIN", label: "ADMIN", href: "/dashboard", note: "ReadyAimGo ops console" },
