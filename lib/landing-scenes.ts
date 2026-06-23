@@ -46,32 +46,33 @@ export const COHORT_SIGNUP_URL =
   "https://clients.readyaimgo.biz/auth?redirectTo=/checkout&plan=cohort_100"
 
 // ── Space Network video URLs ───────────────────────────────────────────────────
-// Scene A and B are uploaded. C–H use Scene A as placeholder until uploads complete.
-// Replace each PLACEHOLDER comment with the real Firebase Storage URL when ready.
+// All scenes are H.264/MP4, transcoded from the original HEVC .mov uploads so
+// desktop Chrome/Firefox can decode them (HEVC only plays on Safari / with HW
+// support). The original *.mov objects remain in Firebase Storage untouched.
 
 export const SPACE_SCENE_A_VIDEO_URL =
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20A.mov?alt=media&token=e4c12473-0145-4532-8a7f-3127ce13e915"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20A.mp4?alt=media&token=6d7f3f7c-43bb-4a69-a65b-5e07fe57c1b9"
 
 export const SPACE_SCENE_B_VIDEO_URL =
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20B.mov?alt=media&token=d0e81d77-64b2-4f10-a076-e2b0a6bcf8ca"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20B.mp4?alt=media&token=e98e5029-a45d-4ca1-b471-7ea0a59f2631"
 
 export const SPACE_SCENE_C_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20C.mov?alt=media&token=0e2824c7-4608-453d-8bff-d096fc12e535"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20C.mp4?alt=media&token=740ca5b7-f561-4a26-8767-52603cb06d96"
 
 export const SPACE_SCENE_D_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20D.mov?alt=media&token=776fa524-4d85-4947-9508-41db95b4aeb5"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20D.mp4?alt=media&token=e4c5d8ea-4ed3-4e67-bc3e-4819e11f969b"
 
 export const SPACE_SCENE_E_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20F.mov?alt=media&token=a4c185b6-9100-411c-8ad2-6f16947c9ac9"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20F.mp4?alt=media&token=94c2617f-5bff-406d-9bd2-7d8faa600173"
 
 export const SPACE_SCENE_F_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20F2.mov?alt=media&token=31f08a7a-cf42-40e1-ae09-1b3d0c04bb8d"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20F2.mp4?alt=media&token=db116cd6-cc3b-48b2-b494-995548e7c3ac"
 
 export const SPACE_SCENE_G_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20G.mov?alt=media&token=148f19c7-698b-4bb7-81cd-00667441902b"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20G.mp4?alt=media&token=0b21b4d7-8f34-4b78-8105-d9c824006b7e"
 
 export const SPACE_SCENE_H_VIDEO_URL = 
-  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20H.mov?alt=media&token=7fc61222-7aa0-45e8-8896-199952196706"
+  "https://firebasestorage.googleapis.com/v0/b/readyaimgo-ab187.firebasestorage.app/o/Business%20Area%20Asset%20Videos%2FSpace%2FScene%20H.mp4?alt=media&token=bceddbb8-4c10-47ac-a0fe-2efceb922f22"
 
 // ── Motion Network video URLs ──────────────────────────────────────────────────
 // All placeholders until Motion videos are uploaded.

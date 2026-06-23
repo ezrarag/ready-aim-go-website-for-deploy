@@ -149,7 +149,7 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
           onEnded={handleVideoEnded}
           onError={() => setVideoFailed(true)}
         >
-          <source src={scene.videoSrc} />
+          <source src={scene.videoSrc} type="video/mp4" />
         </video>
       ) : (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(249,115,22,0.28),transparent_28%),radial-gradient(circle_at_30%_70%,rgba(59,130,246,0.22),transparent_28%),linear-gradient(135deg,#050608,#111827_48%,#020617)]" />
