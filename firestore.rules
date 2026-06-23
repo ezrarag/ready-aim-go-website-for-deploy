@@ -2,6 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
     function signedIn() {
       return request.auth != null;
     }
@@ -16,6 +19,30 @@ service cloud.firestore {
         && get(userPath(request.auth.uid)).data.role == "admin";
     }
 
+    // Returns the portalUsers doc for the requesting uid, or null if missing.
+    function portalUserDoc() {
+      return get(/databases/$(database)/documents/portalUsers/$(request.auth.uid));
+    }
+
+    // True when the caller has a portalUsers record linked to clientId.
+    function isPortalUserFor(clientId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/portalUsers/$(request.auth.uid))
+        && portalUserDoc().data.clientId == clientId
+        && portalUserDoc().data.disabled != true;
+    }
+
+    // True when the caller is a portal user with access to projectId.
+    function isPortalUserForProject(projectId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/portalUsers/$(request.auth.uid))
+        && portalUserDoc().data.disabled != true
+        && projectId in portalUserDoc().data.projectIds;
+    }
+
+
+    // ── Existing collections ──────────────────────────────────────────────────
+
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow list: if isAdmin();
@@ -27,6 +54,122 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+
+    // ── ragIntelligence ───────────────────────────────────────────────────────
+    //
+    // Service writes (Admin SDK) bypass these rules entirely.
+    // These rules govern client-SDK reads from raCommand (admin) and the portal.
+    //
+    match /ragIntelligence/{intelligenceId} {
+      // Operators see everything.
+      allow read, write: if isAdmin();
+
+      // Portal users see records that are explicitly shared with their client
+      // and are not marked internal.
+      allow get: if
+        isPortalUserFor(resource.data.subject.clientId)
+        && resource.data.visibility != 'internal';
+
+      allow list: if
+        signedIn()
+        && exists(/databases/$(database)/documents/portalUsers/$(request.auth.uid))
+        && portalUserDoc().data.disabled != true
+        && request.query.filters.size() > 0;  // must filter; no unbounded lists
+
+      // Append-only sync event sub-collection — admin SDK writes only from gateway.
+      match /events/{eventId} {
+        allow read: if isAdmin();
+        allow write: if false; // Admin SDK only
+      }
+
+      // Artifacts sub-collection — admin reads only.
+      match /artifacts/{artifactId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+
+    // ── auditLog ──────────────────────────────────────────────────────────────
+    //
+    // Append-only via Admin SDK. Client SDK may never write.
+    // Operators can read for incident review; no client portal access.
+    //
+    match /auditLog/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false; // Admin SDK only
+    }
+
+
+    // ── projectTasks ──────────────────────────────────────────────────────────
+    //
+    // Operators full access. Portal users read tasks scoped to their project
+    // when the task is marked clientVisible.
+    //
+    match /projectTasks/{taskId} {
+      allow read, write: if isAdmin();
+
+      allow get: if
+        isPortalUserForProject(resource.data.projectId)
+        && resource.data.clientVisible == true;
+
+      allow list: if
+        isPortalUserForProject(request.query.filters[0].value) // projectId filter required
+        && signedIn();
+    }
+
+
+    // ── portalUsers ───────────────────────────────────────────────────────────
+    //
+    // Operators manage; portal users read their own record only.
+    //
+    match /portalUsers/{userId} {
+      allow read, write: if isAdmin();
+      allow get: if signedIn() && request.auth.uid == userId;
+    }
+
+
+    // ── clients ───────────────────────────────────────────────────────────────
+    //
+    // Operators full access. Portal users read their own client record.
+    //
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+      allow get: if isPortalUserFor(clientId);
+    }
+
+
+    // ── projects ──────────────────────────────────────────────────────────────
+    //
+    // Operators full access. Portal users read projects they have access to.
+    //
+    match /projects/{projectId} {
+      allow read, write: if isAdmin();
+      allow get: if
+        isPortalUserForProject(projectId)
+        && resource.data.clientVisible == true;
+    }
+
+
+    // ── portalFeedback ────────────────────────────────────────────────────────
+    //
+    // Portal users create feedback for their own projects; operators manage all.
+    //
+    match /portalFeedback/{feedbackId} {
+      allow read, write: if isAdmin();
+
+      allow get, list: if isPortalUserFor(resource.data.clientId);
+
+      allow create: if
+        signedIn()
+        && exists(/databases/$(database)/documents/portalUsers/$(request.auth.uid))
+        && portalUserDoc().data.disabled != true
+        && request.resource.data.submittedByUserId == request.auth.uid
+        && isPortalUserFor(request.resource.data.clientId)
+        && isPortalUserForProject(request.resource.data.projectId);
+    }
+
+
+    // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }
