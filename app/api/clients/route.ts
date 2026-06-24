@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAllClientDirectoryEntries, createClientDocument } from "@/lib/firestore"
 import { getDefaultModules } from "@/lib/client-directory"
+import { toShowcaseClients } from "@/lib/client-showcase"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { provisionClientPortalAccess } from "@/lib/provision-client-portal"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? null
   const collection = "clients"
+  // Public mode returns a minimal, PII-free projection for the /work showcase.
+  const isPublic =
+    request.nextUrl.searchParams.get("public") === "1" ||
+    request.nextUrl.searchParams.get("view") === "public"
 
   try {
     const firebaseClients = await getAllClientDirectoryEntries()
+
+    if (isPublic) {
+      return NextResponse.json({
+        success: true,
+        source: "firestore",
+        clients: toShowcaseClients(firebaseClients),
+      })
+    }
 
     if (firebaseClients.length === 0) {
       return NextResponse.json({

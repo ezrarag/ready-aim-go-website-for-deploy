@@ -1,64 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ArrowUpRight, Globe, Briefcase } from "lucide-react"
-import type { ClientDirectoryEntry, ModuleKey } from "@/lib/client-directory"
-import { isVisible, resolveDisplayName } from "@/lib/types/client-public-profile"
-
-const MODULE_LABELS: Record<ModuleKey, string> = {
-  web: "Web",
-  app: "App",
-  rd: "R&D",
-  housing: "Housing",
-  transportation: "Transportation",
-  insurance: "Insurance",
-}
-
-const MODULE_URL_FIELDS: Record<ModuleKey, keyof ClientDirectoryEntry> = {
-  web: "websiteUrl",
-  app: "appUrl",
-  rd: "rdUrl",
-  housing: "housingUrl",
-  transportation: "transportationUrl",
-  insurance: "insuranceUrl",
-}
-
-const MODULE_ORDER: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
-
-/**
- * Resolve the best PUBLIC site URL for screenshots and the visit link.
- * Prefer a real website / custom domain over the immutable *.vercel.app
- * deployment URL, which is protected by Vercel Deployment Protection and
- * would screenshot the "Log in to Vercel" wall.
- */
-function resolvePublicSiteUrl(entry: ClientDirectoryEntry): string | null {
-  const domains = entry.vercelProjectDomains ?? []
-  const customDomain = domains.find((d) => d && !d.endsWith(".vercel.app"))
-
-  const candidates = [
-    entry.websiteUrl,
-    customDomain,
-    ...domains,
-    entry.deployUrl,
-  ]
-
-  const raw = candidates.find((value) => Boolean(value && value.trim()))
-  if (!raw) return null
-
-  const trimmed = raw.trim()
-  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`
-}
-
-/** ReadyAimGo products a client is actively utilizing (enabled modules). */
-function getProductsInUse(entry: ClientDirectoryEntry): ModuleKey[] {
-  return MODULE_ORDER.filter((key) => {
-    const module = entry.modules?.[key]
-    if (module) return module.enabled
-    // Legacy clients without a modules map: infer from the area URL fields.
-    return Boolean(entry[MODULE_URL_FIELDS[key]])
-  })
-}
+import { MODULE_LABELS, type PublicShowcaseClient } from "@/lib/client-showcase"
 
 function screenshotUrl(siteUrl: string): string {
   return `https://api.microlink.io/?url=${encodeURIComponent(
@@ -70,13 +15,8 @@ function stripProtocol(url: string): string {
   return url.replace(/^https?:\/\//, "").replace(/\/$/, "")
 }
 
-type ShowcaseClient = {
-  entry: ClientDirectoryEntry
-  siteUrl: string
-}
-
 export default function WorkPage() {
-  const [clients, setClients] = useState<ClientDirectoryEntry[]>([])
+  const [clients, setClients] = useState<PublicShowcaseClient[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,7 +25,8 @@ export default function WorkPage() {
 
     const load = async () => {
       try {
-        const res = await fetch("/api/clients")
+        // Public projection: PII-free, server-filtered to front-end clients.
+        const res = await fetch("/api/clients?public=1")
         const data = await res.json()
         if (!active) return
         if (data?.success === false) {
@@ -104,22 +45,6 @@ export default function WorkPage() {
       active = false
     }
   }, [])
-
-  const showcase = useMemo<ShowcaseClient[]>(() => {
-    return clients
-      .filter((entry) => {
-        // Respect explicit hides; otherwise show any client with a public site.
-        if (entry.showOnFrontend === false) return false
-        if (!isVisible(entry.publicProfile, "roster")) return false
-        return Boolean(resolvePublicSiteUrl(entry))
-      })
-      .map((entry) => ({ entry, siteUrl: resolvePublicSiteUrl(entry) as string }))
-      .sort((a, b) =>
-        resolveDisplayName(a.entry.name, a.entry.publicProfile).localeCompare(
-          resolveDisplayName(b.entry.name, b.entry.publicProfile),
-        ),
-      )
-  }, [clients])
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -159,7 +84,7 @@ export default function WorkPage() {
               </div>
             ))}
           </div>
-        ) : showcase.length === 0 ? (
+        ) : clients.length === 0 ? (
           <div className="flex flex-col items-center justify-center border border-white/10 bg-white/[0.03] px-6 py-24 text-center">
             <Briefcase className="mb-4 h-12 w-12 text-white/30" />
             <p className="text-lg font-bold uppercase tracking-[0.16em] text-white/70">
@@ -174,92 +99,82 @@ export default function WorkPage() {
         ) : (
           <>
             <div className="mb-6 text-xs font-black uppercase tracking-[0.3em] text-orange-400">
-              {showcase.length} {showcase.length === 1 ? "client" : "clients"}
+              {clients.length} {clients.length === 1 ? "client" : "clients"}
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {showcase.map(({ entry, siteUrl }) => {
-                const name = resolveDisplayName(entry.name, entry.publicProfile)
-                const tagline =
-                  entry.publicProfile?.identity?.tagline ||
-                  entry.publicProfile?.taxonomy?.industry ||
-                  entry.pulseSummary ||
-                  null
-                const products = getProductsInUse(entry)
-
-                return (
-                  <article
-                    key={entry.id}
-                    className="group flex flex-col overflow-hidden border border-white/12 bg-white/[0.03] transition hover:border-white/30"
+              {clients.map((client) => (
+                <article
+                  key={client.id}
+                  className="group flex flex-col overflow-hidden border border-white/12 bg-white/[0.03] transition hover:border-white/30"
+                >
+                  <a
+                    href={client.siteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative block aspect-[16/10] w-full overflow-hidden bg-neutral-900"
                   >
-                    <a
-                      href={siteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative block aspect-[16/10] w-full overflow-hidden bg-neutral-900"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={screenshotUrl(siteUrl)}
-                        alt={`${name} website preview`}
-                        loading="lazy"
-                        className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.03]"
-                        onError={(e) => {
-                          ;(e.target as HTMLImageElement).style.display = "none"
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-                    </a>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={screenshotUrl(client.siteUrl)}
+                      alt={`${client.name} website preview`}
+                      loading="lazy"
+                      className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.03]"
+                      onError={(e) => {
+                        ;(e.target as HTMLImageElement).style.display = "none"
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                  </a>
 
-                    <div className="flex flex-1 flex-col p-5">
-                      <h2 className="text-xl font-black uppercase leading-tight tracking-tight">
-                        {name}
-                      </h2>
-                      {tagline ? (
-                        <p className="mt-2 line-clamp-2 text-sm text-white/55">{tagline}</p>
-                      ) : null}
+                  <div className="flex flex-1 flex-col p-5">
+                    <h2 className="text-xl font-black uppercase leading-tight tracking-tight">
+                      {client.name}
+                    </h2>
+                    {client.tagline ? (
+                      <p className="mt-2 line-clamp-2 text-sm text-white/55">{client.tagline}</p>
+                    ) : null}
 
-                      {products.length > 0 ? (
-                        <div className="mt-4">
-                          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/40">
-                            Products in use
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {products.map((key) => (
-                              <span
-                                key={key}
-                                className="border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-300"
-                              >
-                                {MODULE_LABELS[key]}
-                              </span>
-                            ))}
-                          </div>
+                    {client.products.length > 0 ? (
+                      <div className="mt-4">
+                        <div className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/40">
+                          Products in use
                         </div>
-                      ) : null}
-
-                      <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
-                        <a
-                          href={siteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white transition hover:text-orange-300"
-                        >
-                          <Globe className="h-3.5 w-3.5" />
-                          {stripProtocol(siteUrl)}
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </a>
-                        {entry.storyId ? (
-                          <Link
-                            href={`/story/${encodeURIComponent(entry.storyId)}/website`}
-                            className="ml-auto text-xs font-black uppercase tracking-[0.16em] text-white/45 transition hover:text-white"
-                          >
-                            Story
-                          </Link>
-                        ) : null}
+                        <div className="flex flex-wrap gap-1.5">
+                          {client.products.map((key) => (
+                            <span
+                              key={key}
+                              className="border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-300"
+                            >
+                              {MODULE_LABELS[key]}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    ) : null}
+
+                    <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
+                      <a
+                        href={client.siteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white transition hover:text-orange-300"
+                      >
+                        <Globe className="h-3.5 w-3.5" />
+                        {stripProtocol(client.siteUrl)}
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                      {client.storyId ? (
+                        <Link
+                          href={`/story/${encodeURIComponent(client.storyId)}/website`}
+                          className="ml-auto text-xs font-black uppercase tracking-[0.16em] text-white/45 transition hover:text-white"
+                        >
+                          Story
+                        </Link>
+                      ) : null}
                     </div>
-                  </article>
-                )
-              })}
+                  </div>
+                </article>
+              ))}
             </div>
           </>
         )}
