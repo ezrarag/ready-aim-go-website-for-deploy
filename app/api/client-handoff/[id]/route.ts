@@ -67,6 +67,8 @@ export async function GET(
         role: typeof data.role === "string" ? data.role : "",
         organizationType:
           typeof data.organizationType === "string" ? data.organizationType : "",
+        existingWorkspaceId:
+          typeof data.existingWorkspaceId === "string" ? data.existingWorkspaceId : null,
         serviceInterests: Array.isArray(data.serviceInterests)
           ? data.serviceInterests.filter((value): value is string => typeof value === "string")
           : [],

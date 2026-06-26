@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     const role = readTrimmedString(body?.role, 120)
     const companyNameInput = readTrimmedString(body?.companyName, 160)
     const organizationType = readTrimmedString(body?.organizationType, 120)
+    const existingWorkspaceId = readTrimmedString(body?.existingWorkspaceId, 160)
     const notes = readTrimmedString(body?.notes, 2000)
     const serviceInterests = normalizeClientServiceInterests(body?.serviceInterests)
 
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
       phone: phone || null,
       role: role || null,
       organizationType: organizationType || null,
+      existingWorkspaceId: existingWorkspaceId || null,
       serviceInterests,
       notes: notes || null,
       claimedClientId: claimedClient?.id ?? null,

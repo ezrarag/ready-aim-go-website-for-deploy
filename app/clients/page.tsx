@@ -41,6 +41,7 @@ type ClientHandoffForm = {
   role: string
   companyName: string
   organizationType: string
+  existingWorkspaceId: string
   serviceInterests: ClientServiceInterestKey[]
   notes: string
 }
@@ -56,9 +57,16 @@ type ClientPortalHandoff = {
   phone: string
   role: string
   organizationType: string
+  existingWorkspaceId: string | null
   serviceInterests: ClientServiceInterestKey[]
   notes: string
   claimedClientId: string | null
+}
+
+type WorkspaceOption = {
+  id: string
+  name: string
+  clientId: string | null
 }
 
 const ORGANIZATION_TYPES = [
@@ -80,6 +88,7 @@ const EMPTY_FORM: ClientHandoffForm = {
   role: "",
   companyName: "",
   organizationType: "",
+  existingWorkspaceId: "",
   serviceInterests: [],
   notes: "",
 }
@@ -140,6 +149,7 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("")
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [form, setForm] = useState<ClientHandoffForm>(EMPTY_FORM)
+  const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>([])
   const [loading, setLoading] = useState(true)
   const [handoffLoading, setHandoffLoading] = useState(false)
   const [error, setError] = useState("")
@@ -182,6 +192,7 @@ export default function ClientsPage() {
           role: handoff.role,
           companyName: handoff.companyName,
           organizationType: handoff.organizationType,
+          existingWorkspaceId: handoff.existingWorkspaceId || "",
           serviceInterests: normalizeClientServiceInterests(handoff.serviceInterests),
           notes: handoff.notes,
         })
@@ -213,12 +224,15 @@ export default function ClientsPage() {
     const loadClients = async () => {
       try {
         setLoading(true)
-        const response = await fetch("/api/clients", { cache: "no-store" })
-        if (!response.ok) {
+        const [clientsResponse, workspacesResponse] = await Promise.all([
+          fetch("/api/clients", { cache: "no-store" }),
+          fetch("/api/admin/workspaces", { cache: "no-store" }),
+        ])
+        if (!clientsResponse.ok) {
           throw new Error("Failed to load clients.")
         }
 
-        const payload = await response.json()
+        const payload = await clientsResponse.json()
         const nextClients = Array.isArray(payload.clients)
           ? (payload.clients as ClientDirectoryEntry[]).filter(
               (client) => client.showOnFrontend !== false
@@ -226,6 +240,26 @@ export default function ClientsPage() {
           : []
 
         setClients(nextClients)
+
+        if (workspacesResponse.ok) {
+          const workspacePayload = await workspacesResponse.json()
+          const nextWorkspaces = Array.isArray(workspacePayload.workspaces)
+            ? workspacePayload.workspaces
+                .filter((workspace): workspace is WorkspaceOption =>
+                  Boolean(
+                    workspace &&
+                    typeof workspace.id === "string" &&
+                    typeof workspace.name === "string"
+                  )
+                )
+                .map((workspace) => ({
+                  id: workspace.id,
+                  name: workspace.name,
+                  clientId: typeof workspace.clientId === "string" ? workspace.clientId : null,
+                }))
+            : []
+          setWorkspaceOptions(nextWorkspaces)
+        }
       } catch (fetchError) {
         console.error(fetchError)
         setError("Unable to load the current client roster.")
@@ -312,6 +346,7 @@ export default function ClientsPage() {
           role: form.role,
           companyName: mode === "claim" ? selectedClient?.name ?? form.companyName : form.companyName,
           organizationType: form.organizationType,
+          existingWorkspaceId: mode === "new" ? form.existingWorkspaceId || null : null,
           serviceInterests: form.serviceInterests,
           notes: form.notes,
         }),
@@ -790,6 +825,33 @@ export default function ClientsPage() {
                     </select>
                   </div>
                 </div>
+
+                {mode === "new" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="existing-workspace" className={claimLabelClassName}>
+                      Existing workspace (optional)
+                    </Label>
+                    <select
+                      id="existing-workspace"
+                      value={form.existingWorkspaceId}
+                      onChange={(event) =>
+                        handleFieldChange("existingWorkspaceId", event.target.value)
+                      }
+                      className={claimSelectClassName}
+                    >
+                      <option value="">No existing workspace</option>
+                      {workspaceOptions.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.name} ({workspace.id})
+                          {workspace.clientId ? ` - linked to ${workspace.clientId}` : " - unlinked"}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500">
+                      Choose an existing workspace to link when this new client record is created.
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="space-y-3">
                   <Label className={claimLabelClassName}>Service areas to discuss</Label>

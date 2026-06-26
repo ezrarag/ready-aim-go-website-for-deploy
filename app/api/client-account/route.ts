@@ -75,6 +75,52 @@ async function findExistingSignupClientId(
   return byEmail.empty ? null : byEmail.docs[0].id
 }
 
+async function linkWorkspaceToClient(input: {
+  db: FirebaseFirestore.Firestore
+  workspaceId: string
+  clientId: string
+  clientName: string
+  clientEmail: string
+}) {
+  const workspaceId = readTrimmedString(input.workspaceId, 160)
+  if (!workspaceId) return
+
+  const workspaceRef = input.db.collection("workspaces").doc(workspaceId)
+  const workspaceSnap = await workspaceRef.get()
+  if (!workspaceSnap.exists) {
+    throw new Error(`Workspace "${workspaceId}" was not found.`)
+  }
+
+  const workspaceData = workspaceSnap.data() ?? {}
+  const existingClientId =
+    typeof workspaceData.clientId === "string" ? workspaceData.clientId.trim() : ""
+
+  if (existingClientId && existingClientId !== input.clientId) {
+    throw new Error(`Workspace "${workspaceId}" is already linked to client "${existingClientId}".`)
+  }
+
+  await Promise.all([
+    input.db.collection("clients").doc(input.clientId).set(
+      {
+        workspaceId,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    ),
+    workspaceRef.set(
+      {
+        clientId: input.clientId,
+        clientEmail: input.clientEmail,
+        updatedAt: new Date().toISOString(),
+        ...(typeof workspaceData.name === "string" && workspaceData.name.trim()
+          ? {}
+          : { name: input.clientName }),
+      },
+      { merge: true }
+    ),
+  ])
+}
+
 async function findPortalPersonRef(
   db: FirebaseFirestore.Firestore,
   uid: string,
@@ -251,6 +297,7 @@ async function createClientSignupRecord(input: {
   mode: "claim" | "new"
   notes: string
   serviceInterests: string[]
+  existingWorkspaceId: string | null
 }) {
   const existingClientId = await findExistingSignupClientId(input.db, input.uid, input.email)
   const now = new Date().toISOString()
@@ -271,6 +318,7 @@ async function createClientSignupRecord(input: {
     await input.db.collection("clients").doc(existingClientId).set(
       {
         name: input.companyName,
+        ...(input.existingWorkspaceId ? { workspaceId: input.existingWorkspaceId } : {}),
         clientPortalEmail: input.email,
         contactEmail: input.email,
         contactName: input.fullName,
@@ -285,6 +333,15 @@ async function createClientSignupRecord(input: {
       },
       { merge: true }
     )
+    if (input.existingWorkspaceId) {
+      await linkWorkspaceToClient({
+        db: input.db,
+        workspaceId: input.existingWorkspaceId,
+        clientId: existingClientId,
+        clientName: input.companyName,
+        clientEmail: input.email,
+      })
+    }
     return existingClientId
   }
 
@@ -293,6 +350,7 @@ async function createClientSignupRecord(input: {
 
   await ref.set({
     recordType: "portal_person",
+    workspaceId: input.existingWorkspaceId || null,
     storyId,
     name: input.companyName,
     brands: [],
@@ -333,6 +391,16 @@ async function createClientSignupRecord(input: {
       createdAt: now,
     },
   })
+
+  if (input.existingWorkspaceId) {
+    await linkWorkspaceToClient({
+      db: input.db,
+      workspaceId: input.existingWorkspaceId,
+      clientId: ref.id,
+      clientName: input.companyName,
+      clientEmail: input.email,
+    })
+  }
 
   return ref.id
 }
@@ -376,6 +444,7 @@ export async function POST(request: NextRequest) {
     const notesInput = readTrimmedString(body?.notes, 2000)
     const roleInput = readTrimmedString(body?.role, 120)
     const handoffId = readTrimmedString(body?.handoffId, 120)
+    const existingWorkspaceIdInput = readTrimmedString(body?.existingWorkspaceId, 160)
     const serviceInterestsInput = normalizeClientServiceInterests(body?.serviceInterests)
 
     const authEmail =
@@ -464,6 +533,9 @@ export async function POST(request: NextRequest) {
     const role =
       roleInput ||
       (typeof handoffData?.role === "string" ? handoffData.role : "")
+    const existingWorkspaceId =
+      existingWorkspaceIdInput ||
+      (typeof handoffData?.existingWorkspaceId === "string" ? handoffData.existingWorkspaceId : "")
 
     const now = new Date().toISOString()
     const claimedClientId =
@@ -498,6 +570,7 @@ export async function POST(request: NextRequest) {
             mode,
             notes,
             serviceInterests,
+            existingWorkspaceId: existingWorkspaceId || null,
           })
     const activeClientId = claimedClientId || existingLinkedClientId || null
     const activeMemberships = activeClientId ? buildOwnerMembership(activeClientId) : null
@@ -522,6 +595,7 @@ export async function POST(request: NextRequest) {
           claimed_story_id: claimedStoryId,
           claimed_client_name: claimedClientName,
           company_name: companyName,
+          existing_workspace_id: existingWorkspaceId || null,
           service_interests: serviceInterests,
           notes: notes || null,
           completed_at: now,
@@ -586,6 +660,7 @@ export async function POST(request: NextRequest) {
           fullName,
           companyName,
           organizationType: organizationType || null,
+          existingWorkspaceId: existingWorkspaceId || null,
           notes: notes || null,
           phone,
           serviceInterests,

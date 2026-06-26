@@ -278,6 +278,7 @@ export default function DashboardPage() {
   const [purgePreview, setPurgePreview] = useState<WorkspacePurgePlan | null>(null)
   const [purgingWorkspaceId, setPurgingWorkspaceId] = useState<string | null>(null)
   const [opsSummaryOpen, setOpsSummaryOpen] = useState(false)
+  const [workspaceDiagnosticsOpen, setWorkspaceDiagnosticsOpen] = useState(false)
   const [repoConnectOpen, setRepoConnectOpen] = useState(false)
   const [manageClient, setManageClient] = useState<AdminHubClient | null>(null)
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditorState>(emptyWorkspaceEditor)
@@ -942,6 +943,30 @@ export default function DashboardPage() {
 
         {view === "workspaces" ? (
           <div className="space-y-5">
+            <Collapsible open={workspaceDiagnosticsOpen} onOpenChange={setWorkspaceDiagnosticsOpen}>
+              <div className="overflow-hidden rounded-lg border border-border bg-background">
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full flex-col gap-3 px-4 py-3 text-left transition hover:bg-muted/30 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">Workspace diagnostics</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Duplicate audit, Drive video scan diagnostics, and portal video visibility.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{duplicateClusters.length} duplicate cluster{duplicateClusters.length === 1 ? "" : "s"}</Badge>
+                      <Badge variant="outline">
+                        {videoDiagnostics ? `${videoDiagnostics.total} Drive file${videoDiagnostics.total === 1 ? "" : "s"}` : "Drive scan idle"}
+                      </Badge>
+                      <Badge variant="outline">
+                        {buildVideoVisibility ? `${buildVideoVisibility.rows.length} processed video${buildVideoVisibility.rows.length === 1 ? "" : "s"}` : "visibility loading"}
+                      </Badge>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${workspaceDiagnosticsOpen ? "rotate-180" : ""}`} />
+                    </div>
+                  </button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="mt-5 space-y-5">
             <AdminPanel>
               <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -1385,6 +1410,8 @@ export default function DashboardPage() {
                 ) : null}
               </CardContent>
             </AdminPanel>
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
             <AdminPanel className="overflow-hidden">
