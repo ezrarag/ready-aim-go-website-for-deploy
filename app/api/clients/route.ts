@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAllClientDirectoryEntries, createClientDocument } from "@/lib/firestore"
 import { getDefaultModules } from "@/lib/client-directory"
-import { toShowcaseClients } from "@/lib/client-showcase"
+import { toShowcaseClients, type WorkspaceShowcaseSeed } from "@/lib/client-showcase"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { provisionClientPortalAccess } from "@/lib/provision-client-portal"
 
@@ -17,10 +17,26 @@ export async function GET(request: NextRequest) {
     const firebaseClients = await getAllClientDirectoryEntries()
 
     if (isPublic) {
+      const db = (await import("@/lib/firestore")).getFirestoreDb()
+      let workspaceSeeds: WorkspaceShowcaseSeed[] = []
+      if (db) {
+        const workspacesSnap = await db.collection("workspaces").limit(500).get()
+        workspaceSeeds = workspacesSnap.docs.map((doc) => {
+          const data = doc.data() as Record<string, unknown>
+          return {
+            id: doc.id,
+            name: typeof data.name === "string" && data.name.trim() ? data.name.trim() : doc.id,
+            clientId: typeof data.clientId === "string" && data.clientId.trim() ? data.clientId.trim() : null,
+            publicUrl: typeof data.publicUrl === "string" && data.publicUrl.trim() ? data.publicUrl.trim() : null,
+            showOnFrontend: data.showOnFrontend === true,
+          }
+        })
+      }
+
       return NextResponse.json({
         success: true,
         source: "firestore",
-        clients: toShowcaseClients(firebaseClients),
+        clients: toShowcaseClients(firebaseClients, workspaceSeeds),
       })
     }
 

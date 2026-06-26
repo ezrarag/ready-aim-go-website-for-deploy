@@ -40,6 +40,14 @@ export interface PublicShowcaseClient {
   storyId: string | null
 }
 
+export interface WorkspaceShowcaseSeed {
+  id: string
+  name: string
+  clientId: string | null
+  publicUrl: string | null
+  showOnFrontend: boolean
+}
+
 /**
  * Resolve the best PUBLIC site URL. Prefer a real website / custom domain over
  * the immutable *.vercel.app deployment URL, which is protected by Vercel
@@ -71,8 +79,11 @@ export function getProductsInUse(entry: ClientDirectoryEntry): ModuleKey[] {
  * Project the full directory down to public-safe showcase entries: only
  * clients with a public site that are not explicitly hidden, sorted by name.
  */
-export function toShowcaseClients(entries: ClientDirectoryEntry[]): PublicShowcaseClient[] {
-  return entries
+export function toShowcaseClients(
+  entries: ClientDirectoryEntry[],
+  workspaces: WorkspaceShowcaseSeed[] = []
+): PublicShowcaseClient[] {
+  const showcase: PublicShowcaseClient[] = entries
     .filter((entry) => {
       if (entry.showOnFrontend === false) return false
       if (!isVisible(entry.publicProfile, "roster")) return false
@@ -89,5 +100,41 @@ export function toShowcaseClients(entries: ClientDirectoryEntry[]): PublicShowca
       products: getProductsInUse(entry),
       storyId: entry.storyId ?? null,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const byId = new Map<string, PublicShowcaseClient>(showcase.map((entry) => [entry.id, entry]))
+
+  for (const workspace of workspaces) {
+    const workspacePublicUrl = workspace.publicUrl
+    if (!workspace.showOnFrontend || !workspacePublicUrl) continue
+    const client = workspace.clientId ? entries.find((entry) => entry.id === workspace.clientId) : null
+
+    if (client) {
+      const clientSiteUrl = resolvePublicSiteUrl(client)
+      if (!clientSiteUrl) {
+        byId.set(client.id, {
+          id: client.id,
+          name: resolveDisplayName(client.name, client.publicProfile),
+          tagline:
+            client.publicProfile?.identity?.tagline ||
+            client.publicProfile?.taxonomy?.industry ||
+            null,
+          siteUrl: workspacePublicUrl,
+          products: getProductsInUse(client),
+          storyId: client.storyId ?? null,
+        })
+      }
+      continue
+    }
+
+    byId.set(`workspace:${workspace.id}`, {
+      id: `workspace:${workspace.id}`,
+      name: workspace.name,
+      tagline: null,
+      siteUrl: workspacePublicUrl,
+      products: ["web"],
+      storyId: null,
+    })
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name))
 }

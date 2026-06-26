@@ -5,6 +5,7 @@ import {
   type AdminProductKey,
   type AdminProductSubscription,
 } from "@/lib/admin/products"
+import { getSuggestedWorkspacePublicUrl } from "@/lib/admin/workspace-frontend"
 import { contractFromUserDoc, type ClientMembership } from "@/lib/types/client-membership"
 
 export type AdminHubClient = {
@@ -43,6 +44,9 @@ export type AdminHubWorkspace = {
   name: string
   clientId: string | null
   ownerUid: string | null
+  showOnFrontend: boolean
+  publicUrl: string | null
+  suggestedPublicUrl: string | null
   memberCount: number
   repoCount: number
   vercelCount: number
@@ -261,6 +265,9 @@ export function normalizeAdminHubWorkspace(id: string, input: unknown): AdminHub
     name: readString(record.name) || id,
     clientId: readString(record.clientId),
     ownerUid: readString(record.ownerUid),
+    showOnFrontend: readBoolean(record.showOnFrontend, false),
+    publicUrl: readString(record.publicUrl),
+    suggestedPublicUrl: getSuggestedWorkspacePublicUrl(record),
     memberCount: readNumber(record.memberCount),
     repoCount: repos.length,
     vercelCount: vercelProjects.length,

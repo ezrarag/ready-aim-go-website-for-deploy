@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getAdminDb } from "@/lib/firebase/admin"
-import { isBeamRequestAuthorized } from "@/lib/beam-api"
+import { getSuggestedWorkspacePublicUrl } from "@/lib/admin/workspace-frontend"
+import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -15,8 +16,7 @@ function toIso(value: unknown): string {
 }
 
 export async function GET(request: NextRequest) {
-  const authorized = await isBeamRequestAuthorized(request)
-  if (!authorized) {
+  if (!isInternalReadAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
   }
 
@@ -52,7 +52,11 @@ export async function GET(request: NextRequest) {
         return {
           id: doc.id,
           name: typeof data.name === "string" ? data.name : "",
+          clientId: typeof data.clientId === "string" ? data.clientId : null,
           ownerUid: typeof data.ownerUid === "string" ? data.ownerUid : "",
+          showOnFrontend: data.showOnFrontend === true,
+          publicUrl: typeof data.publicUrl === "string" ? data.publicUrl : null,
+          suggestedPublicUrl: getSuggestedWorkspacePublicUrl(data),
           repoCount: repos.length,
           vercelCount: vercelProjects.length,
           memberCount: typeof data.memberCount === "number" ? data.memberCount : 0,

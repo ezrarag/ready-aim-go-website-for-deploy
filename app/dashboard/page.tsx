@@ -13,6 +13,7 @@ import {
   Film,
   ListTodo,
   Plus,
+  Pencil,
   RefreshCw,
   Search,
   Trash2,
@@ -28,7 +29,16 @@ import { GuidesView } from "@/components/admin/guides-view"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   getAdminHubHref,
@@ -130,6 +140,16 @@ type BuildVideoVerifyResult = {
   message: string
 }
 
+type WorkspaceEditorState = {
+  workspace: AdminHubWorkspace | null
+  publicUrl: string
+  showOnFrontend: boolean
+  saving: boolean
+  error: string | null
+}
+
+type WorkspaceBulkAction = "show" | "hide" | "autofill" | "clearUrl"
+
 const emptyState: AdminHubState = {
   clients: [],
   people: [],
@@ -138,6 +158,14 @@ const emptyState: AdminHubState = {
   tasks: [],
   warnings: [],
   loadedAt: "",
+  error: null,
+}
+
+const emptyWorkspaceEditor: WorkspaceEditorState = {
+  workspace: null,
+  publicUrl: "",
+  showOnFrontend: false,
+  saving: false,
   error: null,
 }
 
@@ -248,6 +276,9 @@ export default function DashboardPage() {
   const [opsSummaryOpen, setOpsSummaryOpen] = useState(false)
   const [repoConnectOpen, setRepoConnectOpen] = useState(false)
   const [manageClient, setManageClient] = useState<AdminHubClient | null>(null)
+  const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditorState>(emptyWorkspaceEditor)
+  const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([])
+  const [workspaceBulkSaving, setWorkspaceBulkSaving] = useState(false)
   const [search, setSearch] = useState("")
   const [taskStatus, setTaskStatus] = useState("open")
   const [videoDiagnostics, setVideoDiagnostics] = useState<VideoDiagnosticsPayload | null>(null)
@@ -375,7 +406,7 @@ export default function DashboardPage() {
   const visibleWorkspaces = useMemo(
     () =>
       state.workspaces.filter((workspace) =>
-        searchText([workspace.name, workspace.id, workspace.clientId, workspace.ownerUid], search)
+        searchText([workspace.name, workspace.id, workspace.clientId, workspace.ownerUid, workspace.publicUrl], search)
       ),
     [state.workspaces, search]
   )
@@ -420,6 +451,25 @@ export default function DashboardPage() {
       return matchesClient && matchesWorkspace && matchesStatus
     })
   }, [buildVideoClientFilter, buildVideoStatusFilter, buildVideoVisibility?.rows, buildVideoWorkspaceFilter])
+
+  const openWorkspaceEditor = (workspace: AdminHubWorkspace) => {
+    setWorkspaceEditor({
+      workspace,
+      publicUrl: workspace.publicUrl || "",
+      showOnFrontend: workspace.showOnFrontend,
+      saving: false,
+      error: null,
+    })
+  }
+
+  const closeWorkspaceEditor = () => {
+    setWorkspaceEditor(emptyWorkspaceEditor)
+  }
+
+  const allVisibleWorkspaceIds = visibleWorkspaces.map((workspace) => workspace.id)
+  const allVisibleSelected =
+    allVisibleWorkspaceIds.length > 0 &&
+    allVisibleWorkspaceIds.every((workspaceId) => selectedWorkspaceIds.includes(workspaceId))
 
   const setView = (nextView: AdminHubView) => router.push(getAdminHubHref(nextView))
 
@@ -554,6 +604,69 @@ export default function DashboardPage() {
       }))
     } finally {
       setBuildVideoVerifyingKey(null)
+    }
+  }
+
+  const saveWorkspaceVisibility = async () => {
+    if (!workspaceEditor.workspace) return
+
+    setWorkspaceEditor((current) => ({ ...current, saving: true, error: null }))
+    try {
+      const response = await fetch(
+        `/api/admin/workspaces/${encodeURIComponent(workspaceEditor.workspace.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            showOnFrontend: workspaceEditor.showOnFrontend,
+            publicUrl: workspaceEditor.publicUrl.trim(),
+          }),
+        }
+      )
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Workspace update returned ${response.status}`)
+      }
+      closeWorkspaceEditor()
+      await loadOps()
+    } catch (error) {
+      setWorkspaceEditor((current) => ({
+        ...current,
+        saving: false,
+        error: error instanceof Error ? error.message : "Unable to save workspace settings.",
+      }))
+    }
+  }
+
+  const runWorkspaceBulkAction = async (action: WorkspaceBulkAction) => {
+    if (selectedWorkspaceIds.length === 0) return
+
+    setWorkspaceBulkSaving(true)
+    try {
+      const body: Record<string, unknown> = { workspaceIds: selectedWorkspaceIds }
+      if (action === "show") body.showOnFrontend = true
+      if (action === "hide") body.showOnFrontend = false
+      if (action === "autofill") body.useSuggestedPublicUrl = true
+      if (action === "clearUrl") body.clearPublicUrl = true
+
+      const response = await fetch("/api/admin/workspaces/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Workspace bulk update returned ${response.status}`)
+      }
+      setSelectedWorkspaceIds([])
+      await loadOps()
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to bulk update workspaces.",
+      }))
+    } finally {
+      setWorkspaceBulkSaving(false)
     }
   }
 
@@ -1266,26 +1379,91 @@ export default function DashboardPage() {
             <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
             <AdminPanel className="overflow-hidden">
               <CardHeader>
-                <AdminPanelTitle>Workspaces</AdminPanelTitle>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <AdminPanelTitle>Workspaces</AdminPanelTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Set which workspaces should appear on <code>/work</code>, and map each one to a public URL.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runWorkspaceBulkAction("show")}
+                      disabled={workspaceBulkSaving || selectedWorkspaceIds.length === 0}
+                    >
+                      Show selected
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runWorkspaceBulkAction("hide")}
+                      disabled={workspaceBulkSaving || selectedWorkspaceIds.length === 0}
+                    >
+                      Hide selected
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runWorkspaceBulkAction("autofill")}
+                      disabled={workspaceBulkSaving || selectedWorkspaceIds.length === 0}
+                    >
+                      Autofill URLs
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runWorkspaceBulkAction("clearUrl")}
+                      disabled={workspaceBulkSaving || selectedWorkspaceIds.length === 0}
+                    >
+                      Clear URLs
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="w-full min-w-[1020px] text-sm">
                     <thead className="border-y border-border bg-muted/40 text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
                       <tr>
+                        <th className="px-4 py-3 font-medium">
+                          <Checkbox
+                            checked={allVisibleSelected}
+                            onCheckedChange={(checked) =>
+                              setSelectedWorkspaceIds(checked === true ? allVisibleWorkspaceIds : [])
+                            }
+                            aria-label="Select visible workspaces"
+                          />
+                        </th>
                         <th className="px-4 py-3 font-medium">Workspace</th>
                         <th className="px-4 py-3 font-medium">Client</th>
                         <th className="px-4 py-3 font-medium">Repos</th>
+                        <th className="px-4 py-3 font-medium">Front End</th>
+                        <th className="px-4 py-3 font-medium">Public URL</th>
                         <th className="px-4 py-3 font-medium">Members</th>
                         <th className="px-4 py-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleWorkspaces.length === 0 ? (
-                        <EmptyRow colSpan={5} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
+                        <EmptyRow colSpan={8} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
                       ) : (
                         visibleWorkspaces.map((workspace) => (
                           <tr key={workspace.id} className="border-b border-border transition hover:bg-muted/30">
+                            <td className="px-4 py-3">
+                              <Checkbox
+                                checked={selectedWorkspaceIds.includes(workspace.id)}
+                                onCheckedChange={(checked) =>
+                                  setSelectedWorkspaceIds((current) =>
+                                    checked === true
+                                      ? [...new Set([...current, workspace.id])]
+                                      : current.filter((id) => id !== workspace.id)
+                                  )
+                                }
+                                aria-label={`Select workspace ${workspace.name}`}
+                              />
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="font-medium text-foreground">{workspace.name}</p>
@@ -1301,18 +1479,44 @@ export default function DashboardPage() {
                             </td>
                             <td className="px-4 py-3">{workspace.clientId ? clientById.get(workspace.clientId)?.name || workspace.clientId : "Unlinked"}</td>
                             <td className="px-4 py-3 text-muted-foreground">{workspace.repoCount} repos / {workspace.vercelCount} deploys</td>
+                            <td className="px-4 py-3">
+                              <Badge className={workspace.showOnFrontend ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300"}>
+                                {workspace.showOnFrontend ? "Shown" : "Hidden"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {workspace.publicUrl ? (
+                                <a href={workspace.publicUrl} target="_blank" rel="noreferrer" className="break-all text-foreground hover:underline">
+                                  {workspace.publicUrl}
+                                </a>
+                              ) : workspace.suggestedPublicUrl ? (
+                                <span className="break-all">Suggested: {workspace.suggestedPublicUrl}</span>
+                              ) : (
+                                "Missing"
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-muted-foreground">{workspace.memberCount}</td>
                             <td className="px-4 py-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void purgeWorkspace(workspace)}
-                                disabled={purgingWorkspaceId === workspace.id}
-                                className="border-red-500/30 text-red-700 hover:bg-red-500/10 dark:text-red-300"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {purgingWorkspaceId === workspace.id ? "Purging..." : "Purge"}
-                              </Button>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openWorkspaceEditor(workspace)}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit visibility
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void purgeWorkspace(workspace)}
+                                  disabled={purgingWorkspaceId === workspace.id}
+                                  className="border-red-500/30 text-red-700 hover:bg-red-500/10 dark:text-red-300"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {purgingWorkspaceId === workspace.id ? "Purging..." : "Purge"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1467,6 +1671,95 @@ export default function DashboardPage() {
 
         {view === "guides" ? <GuidesView /> : null}
       </div>
+
+      <Dialog open={workspaceEditor.workspace !== null} onOpenChange={(next) => { if (!next) closeWorkspaceEditor() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Workspace Front-End Settings</DialogTitle>
+            <DialogDescription>
+              Control whether this workspace should surface on <code>/work</code> and which public URL should represent it. Saving also mirrors these values onto the linked client record when one exists.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {workspaceEditor.workspace ? (
+              <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                <p className="font-medium text-foreground">{workspaceEditor.workspace.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{workspaceEditor.workspace.id}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Client: {workspaceEditor.workspace.clientId ? clientById.get(workspaceEditor.workspace.clientId)?.name || workspaceEditor.workspace.clientId : "Unlinked"}
+                </p>
+              </div>
+            ) : null}
+
+            {workspaceEditor.error ? (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                {workspaceEditor.error}
+              </div>
+            ) : null}
+
+            <label className="flex items-start gap-3 rounded-lg border border-border p-3">
+              <Checkbox
+                checked={workspaceEditor.showOnFrontend}
+                onCheckedChange={(checked) =>
+                  setWorkspaceEditor((current) => ({ ...current, showOnFrontend: checked === true }))
+                }
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">Show on front end</p>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, this workspace’s linked client can appear on <code>/work</code>.
+                </p>
+              </div>
+            </label>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                  Public URL
+                </label>
+                {workspaceEditor.workspace?.suggestedPublicUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setWorkspaceEditor((current) => ({
+                        ...current,
+                        publicUrl: current.workspace?.suggestedPublicUrl || current.publicUrl,
+                      }))
+                    }
+                  >
+                    Use suggested URL
+                  </Button>
+                ) : null}
+              </div>
+              <Input
+                value={workspaceEditor.publicUrl}
+                onChange={(event) =>
+                  setWorkspaceEditor((current) => ({ ...current, publicUrl: event.target.value }))
+                }
+                placeholder={workspaceEditor.workspace?.suggestedPublicUrl || "https://client-site.com"}
+              />
+              {workspaceEditor.workspace?.suggestedPublicUrl && !workspaceEditor.publicUrl ? (
+                <p className="text-xs text-muted-foreground">
+                  Suggested from current deploy data: {workspaceEditor.workspace.suggestedPublicUrl}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeWorkspaceEditor} disabled={workspaceEditor.saving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveWorkspaceVisibility()} disabled={workspaceEditor.saving}>
+              {workspaceEditor.saving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RepoConnectModal
         open={repoConnectOpen}
