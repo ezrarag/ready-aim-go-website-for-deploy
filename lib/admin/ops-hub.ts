@@ -5,6 +5,7 @@ import {
   type AdminProductKey,
   type AdminProductSubscription,
 } from "@/lib/admin/products"
+import type { ModuleKey } from "@/lib/client-directory"
 import { getSuggestedWorkspacePublicUrl } from "@/lib/admin/workspace-frontend"
 import { contractFromUserDoc, type ClientMembership } from "@/lib/types/client-membership"
 
@@ -20,6 +21,7 @@ export type AdminHubClient = {
   websiteUrl: string | null
   deployUrl: string | null
   showOnFrontend: boolean
+  storyModules: ModuleKey[]
   subscriptions: Record<AdminProductKey, AdminProductSubscription>
   activeProducts: AdminProductKey[]
   legacyProductData: boolean
@@ -47,6 +49,7 @@ export type AdminHubWorkspace = {
   showOnFrontend: boolean
   publicUrl: string | null
   suggestedPublicUrl: string | null
+  frontEndProducts: ModuleKey[]
   memberCount: number
   repoCount: number
   vercelCount: number
@@ -175,6 +178,26 @@ function normalizeProduct(value: unknown): AdminProductKey | null {
   return ADMIN_PRODUCT_KEYS.includes(value as AdminProductKey) ? (value as AdminProductKey) : null
 }
 
+const MODULE_KEYS: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
+
+function readModuleKeys(record: Record<string, unknown>): ModuleKey[] {
+  const modules = asRecord(record.modules)
+  return MODULE_KEYS.filter((key) => {
+    const moduleValue = modules[key]
+    if (moduleValue === true) return true
+    const moduleRecord = asRecord(moduleValue)
+    if ("enabled" in moduleRecord) return moduleRecord.enabled === true
+
+    if (key === "web") return Boolean(readString(record.websiteUrl))
+    if (key === "app") return Boolean(readString(record.appUrl))
+    if (key === "rd") return Boolean(readString(record.rdUrl))
+    if (key === "housing") return Boolean(readString(record.housingUrl))
+    if (key === "transportation") return Boolean(readString(record.transportationUrl))
+    if (key === "insurance") return Boolean(readString(record.insuranceUrl))
+    return false
+  })
+}
+
 export function normalizeAdminHubClient(id: string, input: unknown): AdminHubClient | null {
   const record = asRecord(input)
   if (isPortalPersonRecord(record, id)) return null
@@ -194,6 +217,7 @@ export function normalizeAdminHubClient(id: string, input: unknown): AdminHubCli
     websiteUrl: readString(record.websiteUrl),
     deployUrl: readString(record.deployUrl),
     showOnFrontend: readBoolean(record.showOnFrontend, true),
+    storyModules: readModuleKeys(record),
     subscriptions,
     activeProducts,
     legacyProductData: activeProducts.some((key) => subscriptions[key].legacy),
@@ -268,6 +292,9 @@ export function normalizeAdminHubWorkspace(id: string, input: unknown): AdminHub
     showOnFrontend: readBoolean(record.showOnFrontend, false),
     publicUrl: readString(record.publicUrl),
     suggestedPublicUrl: getSuggestedWorkspacePublicUrl(record),
+    frontEndProducts: readStringArray(record.frontEndProducts).filter((value): value is ModuleKey =>
+      MODULE_KEYS.includes(value as ModuleKey)
+    ),
     memberCount: readNumber(record.memberCount),
     repoCount: repos.length,
     vercelCount: vercelProjects.length,

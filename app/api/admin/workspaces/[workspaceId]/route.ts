@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+import type { ModuleKey } from "@/lib/client-directory"
 import { getFirestoreDb } from "@/lib/firestore"
 import { updateWorkspaceFrontEndSettings } from "@/lib/admin/workspace-frontend"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
@@ -14,6 +15,12 @@ function readString(value: unknown): string | null {
 
 function readBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined
+}
+
+function readModuleKeys(value: unknown): ModuleKey[] | undefined {
+  const keys: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
+  if (!Array.isArray(value)) return undefined
+  return value.filter((item): item is ModuleKey => typeof item === "string" && keys.includes(item as ModuleKey))
 }
 
 export async function GET(request: NextRequest, context: Params) {
@@ -39,6 +46,7 @@ export async function GET(request: NextRequest, context: Params) {
       clientId: readString(data.clientId),
       showOnFrontend: data.showOnFrontend === true,
       publicUrl: readString(data.publicUrl),
+      frontEndProducts: readModuleKeys(data.frontEndProducts) || [],
     },
   })
 }
@@ -63,10 +71,11 @@ export async function PATCH(request: NextRequest, context: Params) {
   const showOnFrontend = readBoolean(body.showOnFrontend)
   const publicUrlRaw = body.publicUrl
   const publicUrl = typeof publicUrlRaw === "string" ? publicUrlRaw.trim() : undefined
+  const frontEndProducts = readModuleKeys(body.frontEndProducts)
 
-  if (showOnFrontend === undefined && publicUrl === undefined) {
+  if (showOnFrontend === undefined && publicUrl === undefined && frontEndProducts === undefined) {
     return NextResponse.json(
-      { success: false, error: "showOnFrontend or publicUrl is required." },
+      { success: false, error: "showOnFrontend, publicUrl, or frontEndProducts is required." },
       { status: 400 }
     )
   }
@@ -74,6 +83,7 @@ export async function PATCH(request: NextRequest, context: Params) {
   const result = await updateWorkspaceFrontEndSettings(db, id, {
     showOnFrontend,
     publicUrl: publicUrl !== undefined ? publicUrl || null : undefined,
+    frontEndProducts,
   })
 
   return NextResponse.json({

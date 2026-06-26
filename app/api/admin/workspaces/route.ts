@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+import type { ModuleKey } from "@/lib/client-directory"
 import { getAdminDb } from "@/lib/firebase/admin"
 import { getSuggestedWorkspacePublicUrl } from "@/lib/admin/workspace-frontend"
 import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
@@ -57,6 +58,9 @@ export async function GET(request: NextRequest) {
           showOnFrontend: data.showOnFrontend === true,
           publicUrl: typeof data.publicUrl === "string" ? data.publicUrl : null,
           suggestedPublicUrl: getSuggestedWorkspacePublicUrl(data),
+          frontEndProducts: Array.isArray(data.frontEndProducts)
+            ? data.frontEndProducts.filter((item): item is ModuleKey => typeof item === "string")
+            : [],
           repoCount: repos.length,
           vercelCount: vercelProjects.length,
           memberCount: typeof data.memberCount === "number" ? data.memberCount : 0,

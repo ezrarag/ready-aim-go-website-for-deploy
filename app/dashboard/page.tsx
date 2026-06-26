@@ -50,6 +50,8 @@ import {
   ADMIN_PRODUCT_LABELS,
   type AdminProductKey,
 } from "@/lib/admin/products"
+import { MODULE_LABELS } from "@/lib/client-showcase"
+import type { ModuleKey } from "@/lib/client-directory"
 import type {
   AdminHubClient,
   AdminHubPayload,
@@ -144,6 +146,7 @@ type WorkspaceEditorState = {
   workspace: AdminHubWorkspace | null
   publicUrl: string
   showOnFrontend: boolean
+  frontEndProducts: ModuleKey[]
   saving: boolean
   error: string | null
 }
@@ -165,6 +168,7 @@ const emptyWorkspaceEditor: WorkspaceEditorState = {
   workspace: null,
   publicUrl: "",
   showOnFrontend: false,
+  frontEndProducts: [],
   saving: false,
   error: null,
 }
@@ -453,10 +457,15 @@ export default function DashboardPage() {
   }, [buildVideoClientFilter, buildVideoStatusFilter, buildVideoVisibility?.rows, buildVideoWorkspaceFilter])
 
   const openWorkspaceEditor = (workspace: AdminHubWorkspace) => {
+    const linkedClient = workspace.clientId ? clientById.get(workspace.clientId) : null
     setWorkspaceEditor({
       workspace,
       publicUrl: workspace.publicUrl || "",
       showOnFrontend: workspace.showOnFrontend,
+      frontEndProducts:
+        workspace.frontEndProducts.length > 0
+          ? workspace.frontEndProducts
+          : linkedClient?.storyModules ?? [],
       saving: false,
       error: null,
     })
@@ -620,6 +629,7 @@ export default function DashboardPage() {
           body: JSON.stringify({
             showOnFrontend: workspaceEditor.showOnFrontend,
             publicUrl: workspaceEditor.publicUrl.trim(),
+            frontEndProducts: workspaceEditor.frontEndProducts,
           }),
         }
       )
@@ -1746,6 +1756,42 @@ export default function DashboardPage() {
                   Suggested from current deploy data: {workspaceEditor.workspace.suggestedPublicUrl}
                 </p>
               ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Products in use
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(MODULE_LABELS).map(([key, label]) => {
+                  const moduleKey = key as ModuleKey
+                  const active = workspaceEditor.frontEndProducts.includes(moduleKey)
+                  return (
+                    <button
+                      key={moduleKey}
+                      type="button"
+                      onClick={() =>
+                        setWorkspaceEditor((current) => ({
+                          ...current,
+                          frontEndProducts: current.frontEndProducts.includes(moduleKey)
+                            ? current.frontEndProducts.filter((item) => item !== moduleKey)
+                            : [...current.frontEndProducts, moduleKey],
+                        }))
+                      }
+                      className={
+                        active
+                          ? "rounded-full border border-primary bg-primary/10 px-3 py-1 text-sm text-primary"
+                          : "rounded-full border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-muted/40"
+                      }
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These tags feed the <code>/work</code> “Products in use” badges for the linked client.
+              </p>
             </div>
           </div>
 

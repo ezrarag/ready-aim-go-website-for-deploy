@@ -46,6 +46,7 @@ export interface WorkspaceShowcaseSeed {
   clientId: string | null
   publicUrl: string | null
   showOnFrontend: boolean
+  frontEndProducts: ModuleKey[]
 }
 
 /**
@@ -131,7 +132,7 @@ export function toShowcaseClients(
       name: workspace.name,
       tagline: null,
       siteUrl: workspacePublicUrl,
-      products: ["web"],
+      products: workspace.frontEndProducts.length > 0 ? workspace.frontEndProducts : ["web"],
       storyId: null,
     })
   }

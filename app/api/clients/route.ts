@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAllClientDirectoryEntries, createClientDocument } from "@/lib/firestore"
-import { getDefaultModules } from "@/lib/client-directory"
+import { getDefaultModules, type ModuleKey } from "@/lib/client-directory"
 import { toShowcaseClients, type WorkspaceShowcaseSeed } from "@/lib/client-showcase"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { provisionClientPortalAccess } from "@/lib/provision-client-portal"
@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
             clientId: typeof data.clientId === "string" && data.clientId.trim() ? data.clientId.trim() : null,
             publicUrl: typeof data.publicUrl === "string" && data.publicUrl.trim() ? data.publicUrl.trim() : null,
             showOnFrontend: data.showOnFrontend === true,
+            frontEndProducts: Array.isArray(data.frontEndProducts)
+              ? data.frontEndProducts.filter((item): item is ModuleKey => typeof item === "string")
+              : [],
           }
         })
       }
