@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ADMIN_PRODUCT_KEYS, ADMIN_PRODUCT_LABELS, type AdminProductKey } from "@/lib/admin/products"
-import type { AdminHubClient, AdminHubPerson } from "@/lib/admin/ops-hub"
+import type { AdminHubClient, AdminHubPerson, AdminHubWorkspace } from "@/lib/admin/ops-hub"
 import { cn } from "@/lib/utils"
 
 export function ClientManageModal({
@@ -22,16 +22,19 @@ export function ClientManageModal({
   onOpenChange,
   client,
   people,
+  workspaces,
   onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   client: AdminHubClient | null
   people: AdminHubPerson[]
+  workspaces: AdminHubWorkspace[]
   /** Called after any persisted change so the dashboard can refresh. */
   onSaved: () => void
 }) {
   const [name, setName] = useState("")
+  const [workspaceId, setWorkspaceId] = useState("")
   const [products, setProducts] = useState<Set<AdminProductKey>>(new Set())
   const [assignedUids, setAssignedUids] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -47,6 +50,7 @@ export function ClientManageModal({
   useEffect(() => {
     if (!open || !client) return
     setName(client.name)
+    setWorkspaceId(client.workspaceId || "")
     setProducts(new Set(client.activeProducts))
     setAssignedUids(
       new Set(
@@ -75,7 +79,11 @@ export function ClientManageModal({
       const res = await fetch(`/api/admin/clients/${encodeURIComponent(client.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), activeProducts: Array.from(products) }),
+        body: JSON.stringify({
+          name: name.trim(),
+          activeProducts: Array.from(products),
+          workspaceId: workspaceId.trim() || null,
+        }),
       })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok || payload?.success !== true) {
@@ -146,6 +154,27 @@ export function ClientManageModal({
                 Name
               </label>
               <Input value={name} onChange={(event) => setName(event.target.value)} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Canonical workspace
+              </label>
+              <select
+                value={workspaceId}
+                onChange={(event) => setWorkspaceId(event.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">No linked workspace</option>
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.name} ({workspace.id})
+                    {workspace.clientId && workspace.clientId !== client.id
+                      ? ` - linked to ${workspace.clientId}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

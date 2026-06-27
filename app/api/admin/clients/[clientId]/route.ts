@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { FieldValue } from "firebase-admin/firestore"
 import { getFirestoreDb } from "@/lib/firestore"
 import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
@@ -6,6 +7,10 @@ import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 import { normalizePhoneToE164 } from "@/lib/telnyx"
 
 type Params = { params: Promise<{ clientId: string }> }
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
 
 // GET /api/admin/clients/[clientId]
 export async function GET(request: NextRequest, context: Params) {
@@ -60,7 +65,59 @@ export async function PATCH(request: NextRequest, context: Params) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })
     }
 
+    const currentData = existing.data() as Record<string, unknown>
+    const currentWorkspaceId = readString(currentData.workspaceId)
+    const requestedWorkspaceId =
+      body.workspaceId === null ? null : readString(body.workspaceId)
+
+    if ("workspaceId" in body) {
+      if (requestedWorkspaceId) {
+        const workspaceRef = db.collection("workspaces").doc(requestedWorkspaceId)
+        const workspaceSnap = await workspaceRef.get()
+        if (!workspaceSnap.exists) {
+          return NextResponse.json(
+            { success: false, error: `Workspace "${requestedWorkspaceId}" not found.` },
+            { status: 404 }
+          )
+        }
+        const workspaceData = workspaceSnap.data() as Record<string, unknown>
+        const linkedClientId = readString(workspaceData.clientId)
+        if (linkedClientId && linkedClientId !== clientId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Workspace "${requestedWorkspaceId}" is already linked to client "${linkedClientId}".`,
+            },
+            { status: 409 }
+          )
+        }
+      }
+      patch.workspaceId = requestedWorkspaceId
+    }
+
     await ref.update(patch)
+
+    if ("workspaceId" in body) {
+      if (currentWorkspaceId && currentWorkspaceId !== requestedWorkspaceId) {
+        await db.collection("workspaces").doc(currentWorkspaceId).set(
+          {
+            clientId: FieldValue.delete(),
+            updatedAt: patch.updatedAt,
+          },
+          { merge: true }
+        )
+      }
+
+      if (requestedWorkspaceId) {
+        await db.collection("workspaces").doc(requestedWorkspaceId).set(
+          {
+            clientId,
+            updatedAt: patch.updatedAt,
+          },
+          { merge: true }
+        )
+      }
+    }
 
     if (typeof patch.phone === "string") {
       await db.collection("clientComms").doc(clientId).set(

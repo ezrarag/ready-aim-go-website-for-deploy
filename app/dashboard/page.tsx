@@ -1849,6 +1849,7 @@ export default function DashboardPage() {
         }}
         client={manageClient}
         people={state.people}
+        workspaces={state.workspaces}
         onSaved={() => {
           void loadOps()
         }}
