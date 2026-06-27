@@ -136,7 +136,9 @@ export async function GET(request: NextRequest) {
     if (status) query = query.where("status", "==", status)
     const snap = await query.limit(limit).get()
 
-    const records = snap.docs.map((d) => serializeFirestoreDocument(d.id, d.data()))
+    const records = snap.docs
+      .map((d) => serializeFirestoreDocument(d.id, d.data()))
+      .filter((record) => status === "archived" || readString(record.status) !== "archived")
     let data = includePeople ? records : records.filter(isRelationshipRecord)
 
     if (includePeople) {

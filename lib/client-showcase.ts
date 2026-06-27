@@ -36,7 +36,9 @@ export interface PublicShowcaseClient {
   name: string
   tagline: string | null
   siteUrl: string
+  previewImageUrl: string | null
   products: ModuleKey[]
+  tags: string[]
   storyId: string | null
 }
 
@@ -45,8 +47,10 @@ export interface WorkspaceShowcaseSeed {
   name: string
   clientId: string | null
   publicUrl: string | null
+  previewImageUrl: string | null
   showOnFrontend: boolean
   frontEndProducts: ModuleKey[]
+  frontEndTags: string[]
 }
 
 /**
@@ -84,6 +88,13 @@ export function toShowcaseClients(
   entries: ClientDirectoryEntry[],
   workspaces: WorkspaceShowcaseSeed[] = []
 ): PublicShowcaseClient[] {
+  const workspaceByClientId = new Map<string, WorkspaceShowcaseSeed>()
+  for (const workspace of workspaces) {
+    if (workspace.clientId && !workspaceByClientId.has(workspace.clientId)) {
+      workspaceByClientId.set(workspace.clientId, workspace)
+    }
+  }
+
   const showcase: PublicShowcaseClient[] = entries
     .filter((entry) => {
       if (entry.showOnFrontend === false) return false
@@ -98,7 +109,12 @@ export function toShowcaseClients(
         entry.publicProfile?.taxonomy?.industry ||
         null,
       siteUrl: resolvePublicSiteUrl(entry) as string,
+      previewImageUrl: workspaceByClientId.get(entry.id)?.previewImageUrl ?? null,
       products: getProductsInUse(entry),
+      tags:
+        (workspaceByClientId.get(entry.id)?.frontEndTags.length
+          ? workspaceByClientId.get(entry.id)?.frontEndTags
+          : entry.brands) ?? [],
       storyId: entry.storyId ?? null,
     }))
 
@@ -120,7 +136,9 @@ export function toShowcaseClients(
             client.publicProfile?.taxonomy?.industry ||
             null,
           siteUrl: workspacePublicUrl,
+          previewImageUrl: workspace.previewImageUrl,
           products: getProductsInUse(client),
+          tags: workspace.frontEndTags.length > 0 ? workspace.frontEndTags : client.brands ?? [],
           storyId: client.storyId ?? null,
         })
       }
@@ -132,7 +150,9 @@ export function toShowcaseClients(
       name: workspace.name,
       tagline: null,
       siteUrl: workspacePublicUrl,
+      previewImageUrl: workspace.previewImageUrl,
       products: workspace.frontEndProducts.length > 0 ? workspace.frontEndProducts : ["web"],
+      tags: workspace.frontEndTags,
       storyId: null,
     })
   }

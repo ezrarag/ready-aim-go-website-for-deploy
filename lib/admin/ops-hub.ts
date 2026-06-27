@@ -48,8 +48,11 @@ export type AdminHubWorkspace = {
   ownerUid: string | null
   showOnFrontend: boolean
   publicUrl: string | null
+  previewImageUrl: string | null
   suggestedPublicUrl: string | null
   frontEndProducts: ModuleKey[]
+  frontEndTags: string[]
+  repoSlugs: string[]
   memberCount: number
   repoCount: number
   vercelCount: number
@@ -284,6 +287,9 @@ export function normalizeAdminHubWorkspace(id: string, input: unknown): AdminHub
   const record = asRecord(input)
   const repos = Array.isArray(record.repos) ? record.repos : []
   const vercelProjects = Array.isArray(record.vercelProjects) ? record.vercelProjects : []
+  const repoSlugs = repos
+    .map((repo) => readString(asRecord(repo).repoSlug) || readString(asRecord(repo).fullName))
+    .filter((value): value is string => Boolean(value))
   return {
     id,
     name: readString(record.name) || id,
@@ -291,12 +297,15 @@ export function normalizeAdminHubWorkspace(id: string, input: unknown): AdminHub
     ownerUid: readString(record.ownerUid),
     showOnFrontend: readBoolean(record.showOnFrontend, false),
     publicUrl: readString(record.publicUrl),
+    previewImageUrl: readString(record.previewImageUrl),
     suggestedPublicUrl: getSuggestedWorkspacePublicUrl(record),
     frontEndProducts: readStringArray(record.frontEndProducts).filter((value): value is ModuleKey =>
       MODULE_KEYS.includes(value as ModuleKey)
     ),
+    frontEndTags: readStringArray(record.frontEndTags),
+    repoSlugs,
     memberCount: readNumber(record.memberCount),
-    repoCount: repos.length,
+    repoCount: repoSlugs.length,
     vercelCount: vercelProjects.length,
     updatedAt: toIsoString(record.updatedAt),
   }

@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get("clientId")
     const projectId = searchParams.get("projectId")
+    const workspaceId = searchParams.get("workspaceId")
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200)
 
     let query: FirebaseFirestore.Query = db.collection("repos")
     if (clientId) query = query.where("clientId", "==", clientId)
     if (projectId) query = query.where("projectId", "==", projectId)
+    if (workspaceId) query = query.where("workspaceId", "==", workspaceId)
     const snap = await query.limit(limit).get()
 
     return NextResponse.json({
@@ -54,18 +56,35 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    const payload = { ...body, repoSlug, createdAt: now, updatedAt: now }
-    const ref = await db.collection("repos").add(payload)
+    const existingSnap = await db.collection("repos").where("repoSlug", "==", repoSlug).limit(1).get()
+    const payload = { ...body, repoSlug, updatedAt: now }
+
+    if (!existingSnap.empty) {
+      const ref = existingSnap.docs[0].ref
+      await ref.set(payload, { merge: true })
+      await writeAuditLog({
+        collection: "repos",
+        docId: ref.id,
+        action: "update",
+        actorKey: extractActorKey(request.headers.get("authorization")),
+        payload: { repoSlug, clientId: body.clientId, workspaceId: body.workspaceId, projectId: body.projectId },
+      })
+      const updated = await ref.get()
+      return NextResponse.json({ success: true, data: { id: updated.id, ...updated.data() } })
+    }
+
+    const createdPayload = { ...payload, createdAt: now }
+    const ref = await db.collection("repos").add(createdPayload)
 
     await writeAuditLog({
       collection: "repos",
       docId: ref.id,
       action: "create",
       actorKey: extractActorKey(request.headers.get("authorization")),
-      payload: { repoSlug, clientId: body.clientId, projectId: body.projectId },
+      payload: { repoSlug, clientId: body.clientId, workspaceId: body.workspaceId, projectId: body.projectId },
     })
 
-    return NextResponse.json({ success: true, data: { id: ref.id, ...payload } })
+    return NextResponse.json({ success: true, data: { id: ref.id, ...createdPayload } })
   } catch (err) {
     console.error("POST /api/admin/repos:", err)
     return NextResponse.json(

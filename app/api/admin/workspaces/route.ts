@@ -57,9 +57,13 @@ export async function GET(request: NextRequest) {
           ownerUid: typeof data.ownerUid === "string" ? data.ownerUid : "",
           showOnFrontend: data.showOnFrontend === true,
           publicUrl: typeof data.publicUrl === "string" ? data.publicUrl : null,
+          previewImageUrl: typeof data.previewImageUrl === "string" ? data.previewImageUrl : null,
           suggestedPublicUrl: getSuggestedWorkspacePublicUrl(data),
           frontEndProducts: Array.isArray(data.frontEndProducts)
             ? data.frontEndProducts.filter((item): item is ModuleKey => typeof item === "string")
+            : [],
+          frontEndTags: Array.isArray(data.frontEndTags)
+            ? data.frontEndTags.filter((item): item is string => typeof item === "string")
             : [],
           repoCount: repos.length,
           vercelCount: vercelProjects.length,

@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Octokit } from "octokit"
 
+import { getFirestoreDb } from "@/lib/firestore"
 import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import { parseRepoSlug } from "@/lib/pulse-selectors"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +15,9 @@ type AdminGitHubRepo = {
   language: string | null
   private: boolean
   updatedAt: string | null
+  alreadyConnected?: boolean
+  connectedClientId?: string | null
+  connectedClientName?: string | null
 }
 
 function mapRepo(repo: {
@@ -67,6 +72,7 @@ export async function GET(request: NextRequest) {
   const owner = (searchParams.get("owner") || process.env.GITHUB_ORG || "").trim()
   const search = (searchParams.get("search") || "").trim().toLowerCase()
   const page = Math.max(parseInt(searchParams.get("page") ?? "1", 10) || 1, 1)
+  const includeConnected = searchParams.get("includeConnected") === "true"
 
   const octokit = new Octokit({ auth: token })
 
@@ -128,11 +134,60 @@ export async function GET(request: NextRequest) {
       )
     : repos
 
+  const db = getFirestoreDb()
+  if (!db) {
+    return NextResponse.json({ success: false, error: "DB unavailable" }, { status: 503 })
+  }
+
+  const [clientsSnap, repoLinksSnap] = await Promise.all([
+    db.collection("clients").limit(500).get(),
+    db.collection("repos").limit(1000).get(),
+  ])
+
+  const connectedRepoMap = new Map<string, { clientId: string | null; clientName: string | null }>()
+
+  for (const doc of clientsSnap.docs) {
+    const data = doc.data() as Record<string, unknown>
+    if (data.status === "archived") continue
+    const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : null
+    const repoValues = [
+      typeof data.sourceRepo === "string" ? data.sourceRepo : "",
+      typeof data.githubRepo === "string" ? data.githubRepo : "",
+      ...(Array.isArray(data.githubRepos) ? data.githubRepos.filter((item): item is string => typeof item === "string") : []),
+    ]
+
+    for (const repoValue of repoValues) {
+      const slug = parseRepoSlug(repoValue)
+      if (!slug || connectedRepoMap.has(slug)) continue
+      connectedRepoMap.set(slug, { clientId: doc.id, clientName: name })
+    }
+  }
+
+  for (const doc of repoLinksSnap.docs) {
+    const data = doc.data() as Record<string, unknown>
+    const slug = parseRepoSlug(typeof data.repoSlug === "string" ? data.repoSlug : "")
+    if (!slug || connectedRepoMap.has(slug)) continue
+    connectedRepoMap.set(slug, {
+      clientId: typeof data.clientId === "string" && data.clientId.trim() ? data.clientId.trim() : null,
+      clientName: null,
+    })
+  }
+
+  const enriched = filtered.map((repo) => {
+    const connection = connectedRepoMap.get(parseRepoSlug(repo.fullName) || "")
+    return {
+      ...repo,
+      alreadyConnected: Boolean(connection),
+      connectedClientId: connection?.clientId ?? null,
+      connectedClientName: connection?.clientName ?? null,
+    }
+  })
+
   return NextResponse.json({
     success: true,
     owner: owner || null,
     source,
     page,
-    repos: filtered,
+    repos: includeConnected ? enriched : enriched.filter((repo) => !repo.alreadyConnected),
   })
 }

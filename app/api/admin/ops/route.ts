@@ -46,22 +46,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "200", 10) || 200, 500)
 
-    const [clientsSnap, usersSnap, workspacesSnap, projectsSnap, tasksSnap] = await Promise.all([
+    const [clientsSnap, usersSnap, workspacesSnap, projectsSnap, tasksSnap, reposSnap] = await Promise.all([
       db.collection("clients").limit(limit).get(),
       db.collection("users").limit(limit).get(),
       db.collection("workspaces").limit(limit).get(),
       db.collection("projects").limit(limit).get(),
       db.collection("projectTasks").limit(limit).get(),
+      db.collection("repos").limit(Math.max(limit * 2, 500)).get(),
     ])
 
     const rawClientDocs = clientsSnap.docs.map((doc) => serializeFirestoreDocument(doc.id, doc.data()))
     const clients = sortAdminHubByUpdated(
       rawClientDocs
+        .filter((doc) => doc.status !== "archived")
         .map((doc) => normalizeAdminHubClient(String(doc.id), doc))
         .filter((client): client is NonNullable<typeof client> => Boolean(client))
     )
 
     const pendingPeople = rawClientDocs
+      .filter((doc) => doc.status !== "archived")
       .map((doc) => normalizePendingClientPerson(String(doc.id), doc))
       .filter((person): person is NonNullable<typeof person> => Boolean(person))
     const userPeople = usersSnap.docs
@@ -69,8 +72,23 @@ export async function GET(request: NextRequest) {
       .filter((person): person is NonNullable<typeof person> => Boolean(person))
     const people = sortAdminHubByUpdated(dedupePeople([...userPeople, ...pendingPeople]))
 
+    const repoRows = reposSnap.docs.map((doc) => serializeFirestoreDocument(doc.id, doc.data()))
+    const repoRowsByWorkspaceId = new Map<string, Array<Record<string, unknown>>>()
+    for (const repo of repoRows) {
+      const workspaceId = typeof repo.workspaceId === "string" ? repo.workspaceId.trim() : ""
+      if (!workspaceId) continue
+      const current = repoRowsByWorkspaceId.get(workspaceId) ?? []
+      current.push(repo)
+      repoRowsByWorkspaceId.set(workspaceId, current)
+    }
+
     const workspaces = sortAdminHubByUpdated(
-      workspacesSnap.docs.map((doc) => normalizeAdminHubWorkspace(doc.id, serializeFirestoreDocument(doc.id, doc.data())))
+      workspacesSnap.docs.map((doc) =>
+        normalizeAdminHubWorkspace(doc.id, {
+          ...serializeFirestoreDocument(doc.id, doc.data()),
+          repos: repoRowsByWorkspaceId.get(doc.id) ?? [],
+        })
+      )
     )
     const projects = sortAdminHubByUpdated(
       projectsSnap.docs.map((doc) => normalizeAdminHubProject(doc.id, serializeFirestoreDocument(doc.id, doc.data())))

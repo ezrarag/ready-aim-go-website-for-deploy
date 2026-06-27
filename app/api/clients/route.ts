@@ -28,9 +28,13 @@ export async function GET(request: NextRequest) {
             name: typeof data.name === "string" && data.name.trim() ? data.name.trim() : doc.id,
             clientId: typeof data.clientId === "string" && data.clientId.trim() ? data.clientId.trim() : null,
             publicUrl: typeof data.publicUrl === "string" && data.publicUrl.trim() ? data.publicUrl.trim() : null,
+            previewImageUrl: typeof data.previewImageUrl === "string" && data.previewImageUrl.trim() ? data.previewImageUrl.trim() : null,
             showOnFrontend: data.showOnFrontend === true,
             frontEndProducts: Array.isArray(data.frontEndProducts)
               ? data.frontEndProducts.filter((item): item is ModuleKey => typeof item === "string")
+              : [],
+            frontEndTags: Array.isArray(data.frontEndTags)
+              ? data.frontEndTags.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
               : [],
           }
         })

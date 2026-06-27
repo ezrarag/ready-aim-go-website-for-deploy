@@ -167,7 +167,38 @@ export async function DELETE(request: NextRequest, context: Params) {
       return NextResponse.json({ success: false, error: "Client not found" }, { status: 404 })
     }
 
-    await ref.update({ status: "archived", updatedAt: new Date().toISOString() })
+    const now = new Date().toISOString()
+    const data = existing.data() as Record<string, unknown>
+    const workspaceId = readString(data.workspaceId)
+
+    await ref.update({ status: "archived", updatedAt: now })
+
+    if (workspaceId) {
+      await db.collection("workspaces").doc(workspaceId).set(
+        {
+          clientId: FieldValue.delete(),
+          updatedAt: now,
+        },
+        { merge: true }
+      )
+    }
+
+    const reposSnap = await db.collection("repos").where("clientId", "==", clientId).limit(200).get()
+    if (!reposSnap.empty) {
+      const batch = db.batch()
+      for (const doc of reposSnap.docs) {
+        batch.set(
+          doc.ref,
+          {
+            archivedClientId: clientId,
+            clientId: FieldValue.delete(),
+            updatedAt: now,
+          },
+          { merge: true }
+        )
+      }
+      await batch.commit()
+    }
 
     await writeAuditLog({
       collection: "clients",
@@ -176,7 +207,7 @@ export async function DELETE(request: NextRequest, context: Params) {
       actorKey: extractActorKey(request.headers.get("authorization")),
     })
 
-    return NextResponse.json({ success: true, data: { id: clientId, status: "archived" } })
+    return NextResponse.json({ success: true, data: { id: clientId, status: "archived", workspaceUnlinked: Boolean(workspaceId) } })
   } catch (err) {
     console.error("DELETE /api/admin/clients/[clientId]:", err)
     return NextResponse.json(

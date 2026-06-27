@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore"
+import { FieldValue, type Firestore } from "firebase-admin/firestore"
 import { getDefaultModules, type ClientModule, type ModuleKey } from "@/lib/client-directory"
 
 function readString(value: unknown): string | null {
@@ -20,6 +20,20 @@ function readModuleKeys(value: unknown): ModuleKey[] {
   return Array.isArray(value)
     ? value.filter((item): item is ModuleKey => typeof item === "string" && MODULE_KEYS.includes(item as ModuleKey))
     : []
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+    : []
+}
+
+function normalizePreviewUrl(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
 function asClientModule(value: unknown, fallback: ClientModule): ClientModule {
@@ -56,7 +70,13 @@ function buildClientModules(current: Record<string, unknown>, enabledKeys: Modul
 export async function updateWorkspaceFrontEndSettings(
   db: Firestore,
   workspaceId: string,
-  updates: { showOnFrontend?: boolean; publicUrl?: string | null; frontEndProducts?: ModuleKey[] }
+  updates: {
+    showOnFrontend?: boolean
+    publicUrl?: string | null
+    previewImageUrl?: string | null
+    frontEndProducts?: ModuleKey[]
+    frontEndTags?: string[]
+  }
 ) {
   const ref = db.collection("workspaces").doc(workspaceId)
   const snap = await ref.get()
@@ -70,7 +90,9 @@ export async function updateWorkspaceFrontEndSettings(
 
   if (updates.showOnFrontend !== undefined) workspaceUpdates.showOnFrontend = updates.showOnFrontend
   if (updates.publicUrl !== undefined) workspaceUpdates.publicUrl = updates.publicUrl
+  if (updates.previewImageUrl !== undefined) workspaceUpdates.previewImageUrl = normalizePreviewUrl(updates.previewImageUrl)
   if (updates.frontEndProducts !== undefined) workspaceUpdates.frontEndProducts = updates.frontEndProducts
+  if (updates.frontEndTags !== undefined) workspaceUpdates.frontEndTags = updates.frontEndTags
 
   await ref.update(workspaceUpdates)
 
@@ -85,9 +107,11 @@ export async function updateWorkspaceFrontEndSettings(
       const clientUpdates: Record<string, unknown> = { updatedAt: now }
       if (updates.showOnFrontend !== undefined) clientUpdates.showOnFrontend = updates.showOnFrontend
       if (updates.publicUrl !== undefined) clientUpdates.websiteUrl = updates.publicUrl
+      if (updates.previewImageUrl !== undefined) clientUpdates.appUrl = normalizePreviewUrl(updates.previewImageUrl)
       if (updates.frontEndProducts !== undefined) {
         clientUpdates.modules = buildClientModules(clientCurrent, updates.frontEndProducts)
       }
+      if (updates.frontEndTags !== undefined) clientUpdates.brands = updates.frontEndTags
       await clientRef.update(clientUpdates)
       clientMirrored = true
     }
@@ -104,11 +128,80 @@ export async function updateWorkspaceFrontEndSettings(
       updates.publicUrl !== undefined
         ? updates.publicUrl
         : readString(current.publicUrl),
+    previewImageUrl:
+      updates.previewImageUrl !== undefined
+        ? normalizePreviewUrl(updates.previewImageUrl) ?? null
+        : readString(current.previewImageUrl),
     frontEndProducts:
       updates.frontEndProducts !== undefined
         ? updates.frontEndProducts
         : readModuleKeys(current.frontEndProducts),
+    frontEndTags:
+      updates.frontEndTags !== undefined
+        ? updates.frontEndTags
+        : readStringArray(current.frontEndTags),
     updatedAt: now,
     clientMirrored,
+  }
+}
+
+export async function relinkWorkspaceClient(
+  db: Firestore,
+  workspaceId: string,
+  nextClientId: string | null,
+  setCanonicalForClient = false
+) {
+  const workspaceRef = db.collection("workspaces").doc(workspaceId)
+  const workspaceSnap = await workspaceRef.get()
+  if (!workspaceSnap.exists) throw new Error("Workspace not found")
+
+  const workspaceData = workspaceSnap.data() as Record<string, unknown>
+  const previousClientId = readString(workspaceData.clientId)
+  const normalizedClientId = nextClientId?.trim() || null
+  const now = new Date().toISOString()
+
+  if (normalizedClientId) {
+    const clientSnap = await db.collection("clients").doc(normalizedClientId).get()
+    if (!clientSnap.exists) throw new Error(`Client "${normalizedClientId}" not found.`)
+  }
+
+  const updates: Record<string, unknown> = { updatedAt: now }
+  if (normalizedClientId) updates.clientId = normalizedClientId
+  else updates.clientId = FieldValue.delete()
+  await workspaceRef.set(updates, { merge: true })
+
+  if (previousClientId && previousClientId !== normalizedClientId) {
+    const previousClientRef = db.collection("clients").doc(previousClientId)
+    const previousClientSnap = await previousClientRef.get()
+    if (previousClientSnap.exists) {
+      const previousClientData = previousClientSnap.data() as Record<string, unknown>
+      if (readString(previousClientData.workspaceId) === workspaceId) {
+        await previousClientRef.set(
+          {
+            workspaceId: FieldValue.delete(),
+            updatedAt: now,
+          },
+          { merge: true }
+        )
+      }
+    }
+  }
+
+  if (normalizedClientId && setCanonicalForClient) {
+    await db.collection("clients").doc(normalizedClientId).set(
+      {
+        workspaceId,
+        updatedAt: now,
+      },
+      { merge: true }
+    )
+  }
+
+  return {
+    workspaceId,
+    previousClientId,
+    clientId: normalizedClientId,
+    canonicalUpdated: Boolean(normalizedClientId && setCanonicalForClient),
+    updatedAt: now,
   }
 }

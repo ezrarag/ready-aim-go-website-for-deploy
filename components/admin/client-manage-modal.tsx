@@ -24,6 +24,7 @@ export function ClientManageModal({
   people,
   workspaces,
   onSaved,
+  onEditWorkspace,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -32,6 +33,7 @@ export function ClientManageModal({
   workspaces: AdminHubWorkspace[]
   /** Called after any persisted change so the dashboard can refresh. */
   onSaved: () => void
+  onEditWorkspace?: (workspaceId: string) => void
 }) {
   const [name, setName] = useState("")
   const [workspaceId, setWorkspaceId] = useState("")
@@ -157,9 +159,21 @@ export function ClientManageModal({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Canonical workspace
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                  Canonical workspace
+                </label>
+                {workspaceId && onEditWorkspace ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEditWorkspace(workspaceId)}
+                  >
+                    Edit workspace
+                  </Button>
+                ) : null}
+              </div>
               <select
                 value={workspaceId}
                 onChange={(event) => setWorkspaceId(event.target.value)}

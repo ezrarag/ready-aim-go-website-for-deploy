@@ -144,11 +144,37 @@ type BuildVideoVerifyResult = {
 
 type WorkspaceEditorState = {
   workspace: AdminHubWorkspace | null
+  clientId: string
+  setCanonicalForClient: boolean
   publicUrl: string
+  previewImageUrl: string
   showOnFrontend: boolean
   frontEndProducts: ModuleKey[]
+  frontEndTags: string[]
+  tagDraft: string
   saving: boolean
   error: string | null
+}
+
+type WorkspaceRepoOption = {
+  id: number
+  fullName: string
+  htmlUrl: string
+  description: string | null
+  language: string | null
+  private: boolean
+  updatedAt: string | null
+  alreadyConnected?: boolean
+  connectedClientId?: string | null
+  connectedClientName?: string | null
+}
+
+type WorkspaceRepoLink = {
+  id: string
+  repoSlug: string
+  htmlUrl: string | null
+  clientId: string | null
+  workspaceId: string | null
 }
 
 type WorkspaceBulkAction = "show" | "hide" | "autofill" | "clearUrl"
@@ -166,9 +192,14 @@ const emptyState: AdminHubState = {
 
 const emptyWorkspaceEditor: WorkspaceEditorState = {
   workspace: null,
+  clientId: "",
+  setCanonicalForClient: false,
   publicUrl: "",
+  previewImageUrl: "",
   showOnFrontend: false,
   frontEndProducts: [],
+  frontEndTags: [],
+  tagDraft: "",
   saving: false,
   error: null,
 }
@@ -281,7 +312,17 @@ export default function DashboardPage() {
   const [workspaceDiagnosticsOpen, setWorkspaceDiagnosticsOpen] = useState(false)
   const [repoConnectOpen, setRepoConnectOpen] = useState(false)
   const [manageClient, setManageClient] = useState<AdminHubClient | null>(null)
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditorState>(emptyWorkspaceEditor)
+  const [workspaceRepoEditorOpen, setWorkspaceRepoEditorOpen] = useState(false)
+  const [workspaceRepoEditorWorkspace, setWorkspaceRepoEditorWorkspace] = useState<AdminHubWorkspace | null>(null)
+  const [workspaceRepoOptions, setWorkspaceRepoOptions] = useState<WorkspaceRepoOption[]>([])
+  const [workspaceRepoLinks, setWorkspaceRepoLinks] = useState<WorkspaceRepoLink[]>([])
+  const [workspaceRepoSelected, setWorkspaceRepoSelected] = useState<string[]>([])
+  const [workspaceRepoLoading, setWorkspaceRepoLoading] = useState(false)
+  const [workspaceRepoSaving, setWorkspaceRepoSaving] = useState(false)
+  const [workspaceRepoRemovingId, setWorkspaceRepoRemovingId] = useState<string | null>(null)
+  const [workspaceRepoError, setWorkspaceRepoError] = useState<string | null>(null)
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([])
   const [workspaceBulkSaving, setWorkspaceBulkSaving] = useState(false)
   const [search, setSearch] = useState("")
@@ -411,7 +452,18 @@ export default function DashboardPage() {
   const visibleWorkspaces = useMemo(
     () =>
       state.workspaces.filter((workspace) =>
-        searchText([workspace.name, workspace.id, workspace.clientId, workspace.ownerUid, workspace.publicUrl], search)
+        searchText(
+          [
+            workspace.name,
+            workspace.id,
+            workspace.clientId,
+            workspace.ownerUid,
+            workspace.publicUrl,
+            workspace.frontEndProducts,
+            workspace.frontEndTags,
+          ],
+          search
+        )
       ),
     [state.workspaces, search]
   )
@@ -461,12 +513,17 @@ export default function DashboardPage() {
     const linkedClient = workspace.clientId ? clientById.get(workspace.clientId) : null
     setWorkspaceEditor({
       workspace,
+      clientId: workspace.clientId || "",
+      setCanonicalForClient: linkedClient?.workspaceId === workspace.id,
       publicUrl: workspace.publicUrl || "",
+      previewImageUrl: workspace.previewImageUrl || "",
       showOnFrontend: workspace.showOnFrontend,
       frontEndProducts:
         workspace.frontEndProducts.length > 0
           ? workspace.frontEndProducts
           : linkedClient?.storyModules ?? [],
+      frontEndTags: workspace.frontEndTags,
+      tagDraft: "",
       saving: false,
       error: null,
     })
@@ -628,9 +685,13 @@ export default function DashboardPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            clientId: workspaceEditor.clientId.trim() || null,
+            setCanonicalForClient: workspaceEditor.setCanonicalForClient,
             showOnFrontend: workspaceEditor.showOnFrontend,
             publicUrl: workspaceEditor.publicUrl.trim(),
+            previewImageUrl: workspaceEditor.previewImageUrl.trim(),
             frontEndProducts: workspaceEditor.frontEndProducts,
+            frontEndTags: workspaceEditor.frontEndTags,
           }),
         }
       )
@@ -646,6 +707,143 @@ export default function DashboardPage() {
         saving: false,
         error: error instanceof Error ? error.message : "Unable to save workspace settings.",
       }))
+    }
+  }
+
+  const openWorkspaceRepoEditor = async (workspace: AdminHubWorkspace) => {
+    setWorkspaceRepoEditorOpen(true)
+    setWorkspaceRepoEditorWorkspace(workspace)
+    setWorkspaceRepoSelected([])
+    setWorkspaceRepoError(null)
+    setWorkspaceRepoLoading(true)
+    try {
+      const [repoLinksResponse, githubReposResponse] = await Promise.all([
+        fetch(`/api/admin/repos?workspaceId=${encodeURIComponent(workspace.id)}&limit=200`, {
+          cache: "no-store",
+        }),
+        fetch("/api/admin/github-repos?includeConnected=true", { cache: "no-store" }),
+      ])
+      const repoLinksPayload = await repoLinksResponse.json().catch(() => ({}))
+      const githubReposPayload = await githubReposResponse.json().catch(() => ({}))
+      if (!repoLinksResponse.ok || repoLinksPayload?.success !== true) {
+        throw new Error(repoLinksPayload?.error || `Workspace repos returned ${repoLinksResponse.status}`)
+      }
+      if (!githubReposResponse.ok || githubReposPayload?.success !== true) {
+        throw new Error(githubReposPayload?.error || `GitHub repos returned ${githubReposResponse.status}`)
+      }
+      setWorkspaceRepoLinks(Array.isArray(repoLinksPayload.data) ? repoLinksPayload.data : [])
+      setWorkspaceRepoOptions(Array.isArray(githubReposPayload.repos) ? githubReposPayload.repos : [])
+    } catch (error) {
+      setWorkspaceRepoLinks([])
+      setWorkspaceRepoOptions([])
+      setWorkspaceRepoError(error instanceof Error ? error.message : "Unable to load workspace repos.")
+    } finally {
+      setWorkspaceRepoLoading(false)
+    }
+  }
+
+  const closeWorkspaceRepoEditor = () => {
+    setWorkspaceRepoEditorOpen(false)
+    setWorkspaceRepoEditorWorkspace(null)
+    setWorkspaceRepoOptions([])
+    setWorkspaceRepoLinks([])
+    setWorkspaceRepoSelected([])
+    setWorkspaceRepoError(null)
+    setWorkspaceRepoLoading(false)
+    setWorkspaceRepoSaving(false)
+    setWorkspaceRepoRemovingId(null)
+  }
+
+  const saveWorkspaceRepos = async () => {
+    if (!workspaceRepoEditorWorkspace) return
+    const workspace = workspaceRepoEditorWorkspace
+    const clientId = workspace.clientId?.trim() || ""
+    if (!clientId) {
+      setWorkspaceRepoError("Link the workspace to a client before assigning repos.")
+      return
+    }
+    if (workspaceRepoSelected.length === 0) return
+
+    setWorkspaceRepoSaving(true)
+    setWorkspaceRepoError(null)
+    try {
+      for (const repoSlug of workspaceRepoSelected) {
+        const option = workspaceRepoOptions.find((repo) => repo.fullName.toLowerCase() === repoSlug.toLowerCase())
+        const response = await fetch("/api/admin/repos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repoSlug,
+            htmlUrl: option?.htmlUrl ?? `https://github.com/${repoSlug}`,
+            clientId,
+            workspaceId: workspace.id,
+          }),
+        })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok || payload?.success !== true) {
+          throw new Error(payload?.error || `Repo save returned ${response.status}`)
+        }
+      }
+      await openWorkspaceRepoEditor(workspace)
+      await loadOps()
+    } catch (error) {
+      setWorkspaceRepoError(error instanceof Error ? error.message : "Unable to save repo links.")
+    } finally {
+      setWorkspaceRepoSaving(false)
+    }
+  }
+
+  const removeWorkspaceRepo = async (repoLink: WorkspaceRepoLink) => {
+    setWorkspaceRepoRemovingId(repoLink.id)
+    setWorkspaceRepoError(null)
+    try {
+      const response = await fetch(`/api/admin/repos/${encodeURIComponent(repoLink.id)}`, {
+        method: "DELETE",
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Repo delete returned ${response.status}`)
+      }
+      if (workspaceRepoEditorWorkspace) {
+        await openWorkspaceRepoEditor(workspaceRepoEditorWorkspace)
+      }
+      await loadOps()
+    } catch (error) {
+      setWorkspaceRepoError(error instanceof Error ? error.message : "Unable to remove repo link.")
+    } finally {
+      setWorkspaceRepoRemovingId(null)
+    }
+  }
+
+  const deleteClient = async (client: AdminHubClient) => {
+    const confirmed = window.confirm(
+      [
+        `Archive client "${client.name}"?`,
+        "",
+        "This removes it from the active admin lists, unlinks its canonical workspace, and detaches repo-client links.",
+        "The underlying workspace and repo records stay in Firestore for reassignment.",
+      ].join("\n")
+    )
+    if (!confirmed) return
+
+    setDeletingClientId(client.id)
+    try {
+      const response = await fetch(`/api/admin/clients/${encodeURIComponent(client.id)}`, {
+        method: "DELETE",
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Client archive returned ${response.status}`)
+      }
+      if (manageClient?.id === client.id) setManageClient(null)
+      await loadOps()
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to archive client.",
+      }))
+    } finally {
+      setDeletingClientId(null)
     }
   }
 
@@ -846,7 +1044,7 @@ export default function DashboardPage() {
                         <th className="px-4 py-3 font-medium">Workspace</th>
                         <th className="px-4 py-3 font-medium">Portal</th>
                         <th className="px-4 py-3 font-medium">Updated</th>
-                        <th className="px-4 py-3 text-right font-medium">Manage</th>
+                        <th className="px-4 py-3 text-right font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -865,10 +1063,22 @@ export default function DashboardPage() {
                             <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{client.workspaceId || "Missing"}</td>
                             <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{client.portalEmail || client.contactEmail || "No contact"}</td>
                             <td className="px-4 py-3 text-muted-foreground">{formatDate(client.updatedAt)}</td>
-                            <td className="px-4 py-3 text-right">
-                              <Button variant="outline" size="sm" onClick={() => setManageClient(client)}>
-                                Manage
-                              </Button>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setManageClient(client)}>
+                                  Manage
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void deleteClient(client)}
+                                  disabled={deletingClientId === client.id}
+                                  className="border-red-500/30 text-red-700 hover:bg-red-500/10 dark:text-red-300"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {deletingClientId === client.id ? "Deleting..." : "Delete"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1479,12 +1689,13 @@ export default function DashboardPage() {
                         <th className="px-4 py-3 font-medium">Front End</th>
                         <th className="px-4 py-3 font-medium">Public URL</th>
                         <th className="px-4 py-3 font-medium">Members</th>
+                        <th className="px-4 py-3 font-medium">Tags</th>
                         <th className="px-4 py-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleWorkspaces.length === 0 ? (
-                        <EmptyRow colSpan={8} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
+                        <EmptyRow colSpan={9} label={loading ? "Loading workspaces..." : "No workspaces match this view."} />
                       ) : (
                         visibleWorkspaces.map((workspace) => (
                           <tr key={workspace.id} className="border-b border-border transition hover:bg-muted/30">
@@ -1515,7 +1726,15 @@ export default function DashboardPage() {
                               <p className="font-mono text-xs text-muted-foreground">{workspace.id}</p>
                             </td>
                             <td className="px-4 py-3">{workspace.clientId ? clientById.get(workspace.clientId)?.name || workspace.clientId : "Unlinked"}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{workspace.repoCount} repos / {workspace.vercelCount} deploys</td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              <button
+                                type="button"
+                                onClick={() => void openWorkspaceRepoEditor(workspace)}
+                                className="text-left hover:text-foreground hover:underline"
+                              >
+                                {workspace.repoCount} repos / {workspace.vercelCount} deploys
+                              </button>
+                            </td>
                             <td className="px-4 py-3">
                               <Badge className={workspace.showOnFrontend ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300"}>
                                 {workspace.showOnFrontend ? "Shown" : "Hidden"}
@@ -1534,6 +1753,19 @@ export default function DashboardPage() {
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">{workspace.memberCount}</td>
                             <td className="px-4 py-3">
+                              {workspace.frontEndTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {workspace.frontEndTags.map((tag) => (
+                                    <Badge key={tag} variant="outline" className="rounded-md">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">None</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   variant="outline"
@@ -1541,7 +1773,14 @@ export default function DashboardPage() {
                                   onClick={() => openWorkspaceEditor(workspace)}
                                 >
                                   <Pencil className="mr-2 h-4 w-4" />
-                                  Edit visibility
+                                  Edit workspace
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void openWorkspaceRepoEditor(workspace)}
+                                >
+                                  Repos
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1714,7 +1953,7 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Workspace Front-End Settings</DialogTitle>
             <DialogDescription>
-              Control whether this workspace should surface on <code>/work</code> and which public URL should represent it. Saving also mirrors these values onto the linked client record when one exists.
+              Control the client association, front-end visibility, preview asset, products, and tags for this workspace. Saving mirrors the front-end fields onto the linked client when one exists.
             </DialogDescription>
           </DialogHeader>
 
@@ -1749,6 +1988,45 @@ export default function DashboardPage() {
                 </p>
               </div>
             </label>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Linked client
+              </label>
+              <select
+                value={workspaceEditor.clientId}
+                onChange={(event) =>
+                  setWorkspaceEditor((current) => ({ ...current, clientId: event.target.value }))
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">No linked client</option>
+                {state.clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name} ({client.id})
+                    {client.workspaceId === workspaceEditor.workspace?.id ? " - canonical" : ""}
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-start gap-3 rounded-lg border border-border p-3">
+                <Checkbox
+                  checked={workspaceEditor.setCanonicalForClient}
+                  onCheckedChange={(checked) =>
+                    setWorkspaceEditor((current) => ({
+                      ...current,
+                      setCanonicalForClient: checked === true,
+                    }))
+                  }
+                  disabled={!workspaceEditor.clientId}
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Set as canonical workspace</p>
+                  <p className="text-xs text-muted-foreground">
+                    Use this when the selected client should point to this workspace from the clients tab. Multiple workspaces can link to one client, but only one is canonical.
+                  </p>
+                </div>
+              </label>
+            </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -1787,6 +2065,22 @@ export default function DashboardPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Preview image URL
+              </label>
+              <Input
+                value={workspaceEditor.previewImageUrl}
+                onChange={(event) =>
+                  setWorkspaceEditor((current) => ({ ...current, previewImageUrl: event.target.value }))
+                }
+                placeholder="https://.../app-preview.png"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Use this for app or Xcode projects when a live site screenshot is not the right preview for <code>/work</code>.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 Products in use
               </label>
               <div className="flex flex-wrap gap-2">
@@ -1820,6 +2114,56 @@ export default function DashboardPage() {
                 These tags feed the <code>/work</code> “Products in use” badges for the linked client.
               </p>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Showcase tags
+              </label>
+              <Input
+                value={workspaceEditor.tagDraft}
+                onChange={(event) =>
+                  setWorkspaceEditor((current) => ({ ...current, tagDraft: event.target.value }))
+                }
+                onKeyDown={(event) => {
+                  const raw = workspaceEditor.tagDraft.trim()
+                  if (event.key !== "Enter" && event.key !== ",") return
+                  event.preventDefault()
+                  if (!raw) return
+                  setWorkspaceEditor((current) => ({
+                    ...current,
+                    frontEndTags: current.frontEndTags.includes(raw)
+                      ? current.frontEndTags
+                      : [...current.frontEndTags, raw],
+                    tagDraft: "",
+                  }))
+                }}
+                placeholder="Type a tag and press Enter"
+              />
+              <div className="flex flex-wrap gap-2">
+                {workspaceEditor.frontEndTags.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">No showcase tags yet.</span>
+                ) : (
+                  workspaceEditor.frontEndTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() =>
+                        setWorkspaceEditor((current) => ({
+                          ...current,
+                          frontEndTags: current.frontEndTags.filter((item) => item !== tag),
+                        }))
+                      }
+                      className="rounded-full border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
+                    >
+                      {tag} ×
+                    </button>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These power the filter chips on <code>/work</code> and mirror onto the linked client brands.
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1829,6 +2173,126 @@ export default function DashboardPage() {
             <Button onClick={() => void saveWorkspaceVisibility()} disabled={workspaceEditor.saving}>
               {workspaceEditor.saving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={workspaceRepoEditorOpen} onOpenChange={(next) => { if (!next) closeWorkspaceRepoEditor() }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Workspace Repos</DialogTitle>
+            <DialogDescription>
+              Associate GitHub repos to the selected workspace and linked client. Saving an already-connected repo moves that repo link here.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {workspaceRepoEditorWorkspace ? (
+              <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                <p className="font-medium text-foreground">{workspaceRepoEditorWorkspace.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{workspaceRepoEditorWorkspace.id}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Client: {workspaceRepoEditorWorkspace.clientId ? clientById.get(workspaceRepoEditorWorkspace.clientId)?.name || workspaceRepoEditorWorkspace.clientId : "Link a client first"}
+                </p>
+              </div>
+            ) : null}
+
+            {workspaceRepoError ? (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                {workspaceRepoError}
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Current repo links
+              </label>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                {workspaceRepoLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading repo links...</p>
+                ) : workspaceRepoLinks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No repo links for this workspace yet.</p>
+                ) : (
+                  workspaceRepoLinks.map((repoLink) => (
+                    <div key={repoLink.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{repoLink.repoSlug}</p>
+                        <p className="truncate text-xs text-muted-foreground">{repoLink.htmlUrl || repoLink.id}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void removeWorkspaceRepo(repoLink)}
+                        disabled={workspaceRepoRemovingId === repoLink.id}
+                      >
+                        {workspaceRepoRemovingId === repoLink.id ? "Removing..." : "Remove"}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Available GitHub repos
+              </label>
+              <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border p-1">
+                {workspaceRepoLoading ? (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">Loading GitHub repos...</p>
+                ) : (
+                  workspaceRepoOptions.map((repo) => {
+                    const selected = workspaceRepoSelected.includes(repo.fullName.toLowerCase())
+                    const currentLink = workspaceRepoLinks.find((link) => link.repoSlug.toLowerCase() === repo.fullName.toLowerCase())
+                    const linkedElsewhere =
+                      repo.alreadyConnected &&
+                      !currentLink &&
+                      repo.connectedClientId !== workspaceRepoEditorWorkspace?.clientId
+
+                    return (
+                      <button
+                        key={repo.id}
+                        type="button"
+                        onClick={() =>
+                          setWorkspaceRepoSelected((current) =>
+                            current.includes(repo.fullName.toLowerCase())
+                              ? current.filter((item) => item !== repo.fullName.toLowerCase())
+                              : [...current, repo.fullName.toLowerCase()]
+                          )
+                        }
+                        className={selected ? "flex w-full items-start justify-between gap-3 rounded-lg bg-primary/10 px-3 py-2 text-left" : "flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted/40"}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">{repo.fullName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {currentLink
+                              ? "Currently linked here"
+                              : linkedElsewhere
+                                ? `Currently connected to ${repo.connectedClientName || repo.connectedClientId || "another client"}`
+                                : repo.description || "Available"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentLink ? <Badge variant="outline">Current</Badge> : null}
+                          {linkedElsewhere ? <Badge variant="outline">Move on save</Badge> : null}
+                          {repo.language ? <Badge variant="outline">{repo.language}</Badge> : null}
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeWorkspaceRepoEditor} disabled={workspaceRepoSaving}>
+              Close
+            </Button>
+            <Button onClick={() => void saveWorkspaceRepos()} disabled={workspaceRepoSaving || workspaceRepoSelected.length === 0}>
+              {workspaceRepoSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save repo links
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1852,6 +2316,12 @@ export default function DashboardPage() {
         workspaces={state.workspaces}
         onSaved={() => {
           void loadOps()
+        }}
+        onEditWorkspace={(workspaceId) => {
+          const workspace = workspaceById.get(workspaceId)
+          if (!workspace) return
+          setManageClient(null)
+          openWorkspaceEditor(workspace)
         }}
       />
     </DashboardLayout>

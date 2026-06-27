@@ -23,6 +23,9 @@ type AdminGitHubRepo = {
   language: string | null
   private: boolean
   updatedAt: string | null
+  alreadyConnected?: boolean
+  connectedClientId?: string | null
+  connectedClientName?: string | null
 }
 
 export function RepoConnectModal({
@@ -32,15 +35,14 @@ export function RepoConnectModal({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Called with the new client id after a client is created. */
-  onCreated: (clientId: string) => void
+  /** Called after one or more clients are created. */
+  onCreated: () => void
 }) {
   const [repos, setRepos] = useState<AdminGitHubRepo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [selected, setSelected] = useState<AdminGitHubRepo | null>(null)
-  const [nameOverride, setNameOverride] = useState("")
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
@@ -65,8 +67,7 @@ export function RepoConnectModal({
   useEffect(() => {
     if (!open) return
     setSearch("")
-    setSelected(null)
-    setNameOverride("")
+    setSelectedIds([])
     void load()
   }, [open, load])
 
@@ -80,8 +81,21 @@ export function RepoConnectModal({
     )
   }, [repos, search])
 
+  const selectedRepos = useMemo(
+    () => repos.filter((repo) => selectedIds.includes(repo.id)),
+    [repos, selectedIds]
+  )
+
+  function toggleRepo(repoId: number) {
+    setSelectedIds((current) =>
+      current.includes(repoId)
+        ? current.filter((id) => id !== repoId)
+        : [...current, repoId]
+    )
+  }
+
   async function createClient() {
-    if (!selected) return
+    if (selectedRepos.length === 0) return
     setCreating(true)
     setError(null)
     try {
@@ -89,17 +103,18 @@ export function RepoConnectModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          repoFullName: selected.fullName,
-          repoId: selected.id,
-          htmlUrl: selected.htmlUrl,
-          name: nameOverride.trim() || undefined,
+          repos: selectedRepos.map((repo) => ({
+            repoFullName: repo.fullName,
+            repoId: repo.id,
+            htmlUrl: repo.htmlUrl,
+          })),
         }),
       })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok || payload?.success !== true) {
         throw new Error(payload?.error || `Create client returned ${res.status}`)
       }
-      onCreated(payload.clientId as string)
+      onCreated()
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create client.")
@@ -144,12 +159,12 @@ export function RepoConnectModal({
             ) : (
               <ul className="divide-y divide-border">
                 {filtered.map((repo) => {
-                  const isSelected = selected?.id === repo.id
+                  const isSelected = selectedIds.includes(repo.id)
                   return (
                     <li key={repo.id}>
                       <button
                         type="button"
-                        onClick={() => setSelected(repo)}
+                        onClick={() => toggleRepo(repo.id)}
                         className={cn(
                           "flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition hover:bg-muted/40",
                           isSelected && "bg-primary/10"
@@ -189,16 +204,9 @@ export function RepoConnectModal({
             )}
           </div>
 
-          {selected ? (
-            <div className="space-y-1">
-              <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Client name
-              </label>
-              <Input
-                value={nameOverride}
-                onChange={(event) => setNameOverride(event.target.value)}
-                placeholder={selected.fullName.split("/")[1] ?? selected.fullName}
-              />
+          {selectedRepos.length > 0 ? (
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+              {selectedRepos.length} {selectedRepos.length === 1 ? "repo" : "repos"} selected. Each selected repo will create a new client and linked workspace.
             </div>
           ) : null}
         </div>
@@ -207,9 +215,9 @@ export function RepoConnectModal({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={creating}>
             Cancel
           </Button>
-          <Button onClick={() => void createClient()} disabled={!selected || creating}>
+          <Button onClick={() => void createClient()} disabled={selectedRepos.length === 0 || creating}>
             {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Create client
+            Create {selectedRepos.length > 1 ? "clients" : "client"}
           </Button>
         </DialogFooter>
       </DialogContent>
