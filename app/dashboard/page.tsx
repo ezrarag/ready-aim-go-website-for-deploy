@@ -1949,7 +1949,7 @@ export default function DashboardPage() {
       </div>
 
       <Dialog open={workspaceEditor.workspace !== null} onOpenChange={(next) => { if (!next) closeWorkspaceEditor() }}>
-        <DialogContent>
+        <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Workspace Front-End Settings</DialogTitle>
             <DialogDescription>
@@ -1957,7 +1957,7 @@ export default function DashboardPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto pr-2">
             {workspaceEditor.workspace ? (
               <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
                 <p className="font-medium text-foreground">{workspaceEditor.workspace.name}</p>
@@ -2166,7 +2166,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-border pt-4">
             <Button variant="outline" onClick={closeWorkspaceEditor} disabled={workspaceEditor.saving}>
               Cancel
             </Button>

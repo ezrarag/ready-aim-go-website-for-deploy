@@ -2,19 +2,19 @@
 
 import { useEffect, useRef, useState, type SyntheticEvent } from "react"
 import { motion } from "framer-motion"
-import { ArrowRight, ExternalLink, Volume2, VolumeX } from "lucide-react"
+import { ArrowRight, ExternalLink } from "lucide-react"
 import type { LandingScene } from "@/lib/landing-scenes"
 
 type SceneVideoPlayerProps = {
   scene: LandingScene
   onLoadScene: (sceneId: string) => void
   pause?: boolean
+  isMuted: boolean
 }
 
-export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVideoPlayerProps) {
+export function SceneVideoPlayer({ scene, onLoadScene, pause = false, isMuted }: SceneVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isOverlayRevealed, setIsOverlayRevealed] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
   const [videoFailed, setVideoFailed] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(scene.autoAdvanceSeconds ?? 0)
   const [isAutoAdvancePaused, setIsAutoAdvancePaused] = useState(false)
@@ -108,19 +108,6 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
     return () => window.clearInterval(intervalId)
   }, [hasAutoAdvance, isAutoAdvancePaused, onLoadScene, pause, scene.id, scene.nextSceneId])
 
-  const toggleSound = () => {
-    const shouldMute = !isMuted
-    setIsMuted(shouldMute)
-
-    const video = videoRef.current
-    if (!video) return
-
-    video.muted = shouldMute
-    if (!shouldMute && !pause) {
-      video.play().catch(() => {})
-    }
-  }
-
   const cancelAutoAdvance = () => {
     setIsAutoAdvancePaused(true)
   }
@@ -164,16 +151,6 @@ export function SceneVideoPlayer({ scene, onLoadScene, pause = false }: SceneVid
           Add video asset at {scene.videoSrc}
         </div>
       ) : null}
-
-      <button
-        type="button"
-        onClick={toggleSound}
-        className="absolute bottom-6 left-5 z-40 flex h-11 w-11 items-center justify-center border border-white/15 bg-black/55 text-white transition hover:bg-white hover:text-black focus:outline-none focus:ring-2 focus:ring-orange-400 sm:bottom-8 md:bottom-12"
-        aria-label={isMuted ? "Enable video sound" : "Mute video sound"}
-        title={isMuted ? "Enable sound" : "Mute sound"}
-      >
-        {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-      </button>
 
       <motion.div
         initial={false}

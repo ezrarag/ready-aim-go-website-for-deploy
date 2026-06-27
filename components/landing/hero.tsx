@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Volume2, VolumeX } from "lucide-react"
 import { ActSelectorOverlay } from "./act-selector-overlay"
 import { RoleSelectorOverlay } from "./role-selector-overlay"
 import { SceneVideoPlayer } from "./scene-video-player"
@@ -26,6 +26,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   const [activeSceneId, setActiveSceneId] = useState(defaultLandingSceneId)
   const [showActOverlay, setShowActOverlay] = useState(false)
   const [showRoleOverlay, setShowRoleOverlay] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
 
   const activeScene = getLandingScene(activeSceneId)
   const activeArea = getLandingArea(activeScene.area)
@@ -63,7 +64,12 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
 
   return (
     <section className="fixed inset-0 z-0 flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
-      <SceneVideoPlayer scene={activeScene} onLoadScene={loadScene} pause={menuOverlayOpen} />
+      <SceneVideoPlayer
+        scene={activeScene}
+        onLoadScene={loadScene}
+        pause={menuOverlayOpen}
+        isMuted={isMuted}
+      />
 
       <div className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.34)_36%,rgba(0,0,0,0.08)_70%)]" />
 
@@ -74,21 +80,35 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           transition={{ duration: 0.6 }}
           className="flex flex-col gap-2"
         >
-          <button
-            type="button"
-            onClick={() => {
-              onWatchDemo?.()
-              setShowActOverlay(true)
-            }}
-            className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
-          >
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.34em] text-orange-400">
-              {activeScene.roleLabel} · {activeScene.actLabel}
+          <div className="flex flex-col items-start gap-2">
+            <span className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.34em] text-orange-400">
+              <span>
+                {activeScene.roleLabel} · {activeScene.actLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsMuted((current) => !current)}
+                className="inline-flex items-center gap-1 border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-orange-300 transition hover:bg-orange-400 hover:text-black focus:outline-none focus:ring-2 focus:ring-orange-400"
+                aria-label={isMuted ? "Enable sound for this act" : "Mute sound for this act"}
+                title={isMuted ? "Enable sound" : "Mute sound"}
+              >
+                {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                {isMuted ? "Sound off" : "Sound on"}
+              </button>
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                onWatchDemo?.()
+                setShowActOverlay(true)
+              }}
+              className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            >
             <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
               Story
             </h2>
-          </button>
+            </button>
+          </div>
 
           <button
             type="button"
@@ -138,24 +158,6 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex items-center overflow-hidden"
-        >
-          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 text-xs font-black uppercase text-white">
-            F4
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push("/business")}
-            className="bg-transparent px-4 py-2 text-sm font-black uppercase text-white transition hover:text-white/80"
-          >
-            Business
-          </button>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
           className="flex items-center overflow-hidden"
         >
           <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 text-xs font-black uppercase text-white">
