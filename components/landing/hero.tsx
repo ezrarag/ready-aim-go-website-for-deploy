@@ -80,11 +80,24 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           transition={{ duration: 0.6 }}
           className="flex flex-col gap-2"
         >
-          <div className="flex flex-col items-start gap-2">
-            <span className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.34em] text-orange-400">
-              <span>
-                {activeScene.roleLabel} · {activeScene.actLabel}
-              </span>
+          <div className="flex flex-col items-start">
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.34em] text-orange-400">
+              {activeScene.roleLabel} · {activeScene.actLabel}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onWatchDemo?.()
+                  setShowActOverlay(true)
+                }}
+                className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              >
+                <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
+                  Story
+                </h2>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsMuted((current) => !current)}
@@ -95,19 +108,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
                 {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
                 {isMuted ? "Sound off" : "Sound on"}
               </button>
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                onWatchDemo?.()
-                setShowActOverlay(true)
-              }}
-              className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            >
-            <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
-              Story
-            </h2>
-            </button>
+            </div>
           </div>
 
           <button
