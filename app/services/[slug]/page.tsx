@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, ArrowRight, BadgeDollarSign, CheckCircle2, Play } from "lucide-react"
+import { ArrowLeft, ArrowRight, BadgeDollarSign, CheckCircle2 } from "lucide-react"
 import { getFirestoreDb } from "@/lib/firestore"
 import { serializeFirestoreDocument } from "@/lib/firestore-json"
 
@@ -120,17 +120,19 @@ export async function ServiceSlugPage({ slug }: { slug: string }) {
   if (!service) notFound()
 
   const embedUrl = toYouTubeEmbedUrl(service.videoUrl)
+  const intakeHref = `/intake?service=${encodeURIComponent(service.slug)}`
+  const hasVideo = Boolean(embedUrl)
 
   return (
     <main className="min-h-screen bg-[#111827] text-white">
       <div className="absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),transparent_34%),linear-gradient(135deg,rgba(49,68,109,0.9),rgba(17,24,39,1))]" />
-      <div className="relative mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
+      <div id="top" className="relative mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
         <Link href="/services" className="inline-flex items-center gap-2 rounded-md border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-bold uppercase tracking-[0.24em] text-white/72 transition hover:border-orange-200/40 hover:text-white">
           <ArrowLeft className="h-4 w-4" />
           Services
         </Link>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.92fr] lg:items-stretch">
+        <section className={`mt-6 grid gap-6 lg:items-stretch ${hasVideo ? "lg:grid-cols-[1fr_0.92fr]" : "lg:grid-cols-1"}`}>
           <div className="relative overflow-hidden rounded-[0.75rem] border border-white/12 bg-[#31446d]/70 p-6 shadow-[0_32px_90px_-55px_rgba(15,23,42,0.9)] backdrop-blur-sm sm:p-8 lg:p-10">
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(18,28,54,0.32)_62%,rgba(14,20,36,0.78)_100%)]" />
             <div className="relative">
@@ -139,12 +141,12 @@ export async function ServiceSlugPage({ slug }: { slug: string }) {
                 {service.name}
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/76">{service.tagline}</p>
-              <div className="mt-8 inline-flex items-center gap-3 rounded-[0.5rem] border border-orange-300/30 bg-orange-300/10 px-4 py-3">
-                <BadgeDollarSign className="h-5 w-5 text-orange-100" />
-                <span className="text-sm font-bold uppercase tracking-[0.2em] text-orange-100">{service.price}</span>
+              <div className="mt-8 inline-flex items-center gap-3">
+                <BadgeDollarSign className="h-5 w-5 text-white/45" />
+                <span className="text-sm font-black uppercase tracking-[0.2em] text-white/60">{service.price}</span>
               </div>
               <div className="mt-10">
-                <Link href={`/intake?service=${encodeURIComponent(service.slug)}`} className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-[#223255] transition hover:bg-orange-100">
+                <Link href={intakeHref} className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-[#223255] transition hover:bg-orange-100">
                   Start Intake
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -152,8 +154,8 @@ export async function ServiceSlugPage({ slug }: { slug: string }) {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[0.75rem] border border-white/12 bg-black/20 shadow-[0_32px_90px_-55px_rgba(15,23,42,0.9)]">
-            {embedUrl ? (
+          {hasVideo ? (
+            <div className="relative overflow-hidden rounded-[0.75rem] border border-white/12 bg-black/20 shadow-[0_32px_90px_-55px_rgba(15,23,42,0.9)]">
               <iframe
                 src={embedUrl}
                 title={`${service.name} video`}
@@ -161,15 +163,8 @@ export async function ServiceSlugPage({ slug }: { slug: string }) {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
-            ) : (
-              <div className="flex aspect-video min-h-[20rem] items-center justify-center bg-[#24345a]/80">
-                <div className="text-center text-white/60">
-                  <Play className="mx-auto h-10 w-10" />
-                  <p className="mt-3 text-xs font-bold uppercase tracking-[0.24em]">Video pending</p>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
@@ -209,6 +204,33 @@ export async function ServiceSlugPage({ slug }: { slug: string }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+
+        <section className="mt-8 border-t border-white/10 py-8">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.34em]">
+            Ready To Start?
+          </p>
+          <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-4xl font-black uppercase italic leading-[0.92] tracking-[0.05em] text-white sm:text-5xl lg:text-6xl">
+                {service.name} - {service.price}
+              </h2>
+            </div>
+            <div className="w-full max-w-sm lg:w-auto lg:max-w-none">
+              <Link
+                href={intakeHref}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-orange-400 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-[#223255] transition hover:bg-orange-300 lg:inline-flex lg:w-auto"
+              >
+                Start Intake
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Link href="#top" className="text-sm text-white/56 transition hover:text-white/80">
+              Read the service brief from the top ↑
+            </Link>
           </div>
         </section>
       </div>
