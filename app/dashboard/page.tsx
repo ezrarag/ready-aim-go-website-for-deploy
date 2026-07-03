@@ -23,6 +23,7 @@ import {
 
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelInset, AdminPanelTitle } from "@/components/admin/admin-panel"
+import { DailyBriefingCard } from "@/components/admin/daily-briefing-card"
 import { RepoConnectModal } from "@/components/admin/repo-connect-modal"
 import { ClientManageModal } from "@/components/admin/client-manage-modal"
 import { GuidesView } from "@/components/admin/guides-view"
@@ -966,6 +967,8 @@ export default function DashboardPage() {
             </CardContent>
           </AdminPanel>
         ) : null}
+
+        <DailyBriefingCard />
 
         <AdminPanel>
           <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
