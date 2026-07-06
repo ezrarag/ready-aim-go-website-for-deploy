@@ -122,6 +122,29 @@ function toBriefingEvent(value: Record<string, unknown>) {
   } satisfies BriefingEvent
 }
 
+function isMissingIndexError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes("FAILED_PRECONDITION") &&
+    (message.includes("index") || message.includes("COLLECTION_GROUP_ASC"))
+  )
+}
+
+async function safeCollectionGroupQuery(
+  label: string,
+  run: () => Promise<FirebaseFirestore.QuerySnapshot>
+) {
+  try {
+    return await run()
+  } catch (error) {
+    if (isMissingIndexError(error)) {
+      console.warn(`[briefing] skipping ${label} query because a Firestore index is missing`, error)
+      return null
+    }
+    throw error
+  }
+}
+
 async function buildGreeting({
   window,
   events,
@@ -212,18 +235,24 @@ export async function GET() {
           .orderBy("start", "asc")
           .limit(100)
           .get(),
-        db.collectionGroup("tasks")
-          .where("status", "==", "blocked")
-          .limit(100)
-          .get(),
-        db.collectionGroup("ideas")
-          .where("status", "==", "unprocessed")
-          .limit(100)
-          .get(),
-        db.collectionGroup("features")
-          .where("status", "==", "blocked")
-          .limit(100)
-          .get(),
+        safeCollectionGroupQuery("build tasks", () =>
+          db.collectionGroup("tasks")
+            .where("status", "==", "blocked")
+            .limit(100)
+            .get()
+        ),
+        safeCollectionGroupQuery("client ideas", () =>
+          db.collectionGroup("ideas")
+            .where("status", "==", "unprocessed")
+            .limit(100)
+            .get()
+        ),
+        safeCollectionGroupQuery("client features", () =>
+          db.collectionGroup("features")
+            .where("status", "==", "blocked")
+            .limit(100)
+            .get()
+        ),
       ])
 
     const events = eventsSnap.docs
@@ -231,7 +260,7 @@ export async function GET() {
       .filter((event): event is BriefingEvent => Boolean(event))
       .filter((event) => getChicagoDateForValue(event.start) === dateKey)
 
-    const buildTaskLoops: OpenLoopItem[] = blockedBuildTasksSnap.docs
+    const buildTaskLoops: OpenLoopItem[] = (blockedBuildTasksSnap?.docs ?? [])
       .filter((doc) => doc.ref.path.startsWith("buildProjects/"))
       .map((doc) => {
         const data = doc.data()
@@ -245,7 +274,7 @@ export async function GET() {
         }
       })
 
-    const ideaLoops: OpenLoopItem[] = unprocessedIdeasSnap.docs
+    const ideaLoops: OpenLoopItem[] = (unprocessedIdeasSnap?.docs ?? [])
       .filter((doc) => doc.ref.path.startsWith("clients/"))
       .map((doc) => {
         const data = doc.data()
@@ -265,7 +294,7 @@ export async function GET() {
         }
       })
 
-    const featureLoops: OpenLoopItem[] = blockedFeaturesSnap.docs
+    const featureLoops: OpenLoopItem[] = (blockedFeaturesSnap?.docs ?? [])
       .filter((doc) => doc.ref.path.startsWith("clientProjects/"))
       .map((doc) => {
         const data = doc.data()

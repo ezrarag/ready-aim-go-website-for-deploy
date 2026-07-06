@@ -56,6 +56,24 @@ type RepoRecord = {
   clientId?: string | null
 }
 
+type ProjectSuggestionRecord = {
+  id: string
+  projectId?: string
+  projectTitle?: string
+  projectType?: string | null
+  workspaceId?: string
+  clientId?: string | null
+  clientName?: string
+  clientEmail?: string | null
+  rawText?: string | null
+  summary?: string
+  urgency?: string
+  status?: string
+  source?: string
+  agentContextStatus?: string
+  createdAt?: string | null
+}
+
 type ClientSignalRecord = {
   id: string
   name?: string
@@ -176,6 +194,7 @@ export function WorkspaceProjectControlCenter({
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [deliverables, setDeliverables] = useState<DeliverableRecord[]>([])
   const [repos, setRepos] = useState<RepoRecord[]>([])
+  const [suggestions, setSuggestions] = useState<ProjectSuggestionRecord[]>([])
   const [clientSignal, setClientSignal] = useState<ClientSignalRecord | null>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -197,10 +216,15 @@ export function WorkspaceProjectControlCenter({
       readData<ProjectRecord>(projectQuery),
       readData<TaskRecord>(taskQuery),
       readData<RepoRecord>(`/api/admin/repos?clientId=${encodeURIComponent(clientId)}&limit=200`),
+      readData<ProjectSuggestionRecord>(
+        workspaceId
+          ? `/api/admin/project-suggestions?workspaceId=${encodeURIComponent(workspaceId)}&clientId=${encodeURIComponent(clientId)}&limit=100`
+          : `/api/admin/project-suggestions?clientId=${encodeURIComponent(clientId)}&limit=100`
+      ),
       readData<DeliverableRecord>(`/api/clients/${encodeURIComponent(clientId)}/deliverables`, "data"),
       readClientSignal(clientId),
     ])
-      .then(([nextProjects, nextTasks, nextRepos, nextDeliverables, nextClientSignal]) => {
+      .then(([nextProjects, nextTasks, nextRepos, nextSuggestions, nextDeliverables, nextClientSignal]) => {
         if (cancelled) return
         const signalProject = buildClientSignalProject(nextClientSignal)
         const mergedProjects =
@@ -211,6 +235,7 @@ export function WorkspaceProjectControlCenter({
         setProjects(mergedProjects)
         setTasks(nextTasks)
         setRepos(nextRepos)
+        setSuggestions(nextSuggestions)
         setDeliverables(nextDeliverables)
         setClientSignal(nextClientSignal)
         setSelectedProjectId((current) => current || mergedProjects[0]?.id || null)
@@ -231,6 +256,10 @@ export function WorkspaceProjectControlCenter({
   const selectedTasks = useMemo(
     () => tasks.filter((task) => !selectedProject || task.projectId === selectedProject.id),
     [selectedProject, tasks]
+  )
+  const selectedSuggestions = useMemo(
+    () => suggestions.filter((suggestion) => !selectedProject || suggestion.projectId === selectedProject.id),
+    [selectedProject, suggestions]
   )
   const linkedRepoCount = useMemo(() => {
     const values = [
@@ -366,6 +395,50 @@ export function WorkspaceProjectControlCenter({
                         </div>
                       )
                     })}
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">Client project suggestions</p>
+                          <p className="text-sm text-muted-foreground">
+                            Captured from the client portal Projects tab and available to raCommand/Codex context through clientFeedback.
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{selectedSuggestions.length}</Badge>
+                      </div>
+
+                      {selectedSuggestions.length === 0 ? (
+                        <p className="mt-3 rounded bg-muted px-3 py-2 text-xs text-muted-foreground">
+                          No client suggestions recorded for this project.
+                        </p>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          {selectedSuggestions.slice(0, 6).map((suggestion) => (
+                            <div key={suggestion.id} className="rounded bg-muted px-3 py-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTone(suggestion.status)}`}>
+                                    {suggestion.status || "open"}
+                                  </span>
+                                  <Badge variant="outline">{suggestion.urgency || "medium"}</Badge>
+                                  {suggestion.projectType ? <Badge variant="secondary">{suggestion.projectType}</Badge> : null}
+                                </div>
+                                {suggestion.createdAt ? (
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(suggestion.createdAt).toLocaleString()}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 whitespace-pre-wrap text-sm">
+                                {suggestion.rawText || suggestion.summary || "No suggestion text captured."}
+                              </p>
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                Agent context: {suggestion.agentContextStatus || "ready"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </>
                 ) : null}
               </div>
@@ -413,7 +486,7 @@ export function WorkspaceProjectControlCenter({
           </TabsContent>
 
           <TabsContent value="audit">
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-6">
               <div className="rounded-lg border p-4">
                 <p className="text-2xl font-bold">{projects.length}</p>
                 <p className="text-xs text-muted-foreground">Child projects</p>
@@ -429,6 +502,10 @@ export function WorkspaceProjectControlCenter({
               <div className="rounded-lg border p-4">
                 <p className="text-2xl font-bold">{linkedHostCount}</p>
                 <p className="text-xs text-muted-foreground">Linked hosts</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-2xl font-bold">{suggestions.filter((item) => item.status !== "resolved").length}</p>
+                <p className="text-xs text-muted-foreground">Open suggestions</p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
