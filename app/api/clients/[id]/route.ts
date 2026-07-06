@@ -86,6 +86,7 @@ export async function PATCH(
       "appStoreConnectSku", "appStoreConnectVersionString", "appStoreConnectBuildNumber",
       "appStoreConnectBuildState", "appStoreConnectBetaGroups", "appStoreConnectUpdatedAt",
       "rdUrl", "housingUrl", "transportationUrl", "insuranceUrl",
+      "retainer",
       // ── Public profile ─────────────────────────────────────────────────────
       // Full object replace. Callers should fetch → merge locally → send back.
       "publicProfile",

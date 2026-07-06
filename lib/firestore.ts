@@ -19,6 +19,7 @@ import { pulseReportSchema } from './pulse-report'
 import { clientRoleSuggestionSnapshotSchema } from './client-role-suggestions'
 import { clientWorkspaceSchema, type ClientWorkspace } from './client-workspace'
 import type { ClientPublicProfile } from './types/client-public-profile'
+import { normalizeClientRetainer } from './wallet-pools'
 
 let app: App | null = null
 let db: Firestore | null = null
@@ -217,6 +218,7 @@ type FirestoreClientDoc = {
   transportationUrl?: unknown
   insuranceUrl?: unknown
   modules?: unknown
+  retainer?: unknown
   publicProfile?: unknown
 }
 
@@ -396,6 +398,7 @@ const mapClientDoc = (id: string, doc: FirestoreClientDoc): ClientDirectoryEntry
     transportationUrl: asString(doc.transportationUrl) || undefined,
     insuranceUrl: asString(doc.insuranceUrl) || undefined,
     modules: asModules(doc.modules),
+    retainer: normalizeClientRetainer(doc.retainer),
     pulseReport: parsedPulseReport.success ? parsedPulseReport.data : undefined,
     roleSuggestionSnapshot: parsedRoleSuggestionSnapshot.success ? parsedRoleSuggestionSnapshot.data : undefined,
     publicProfile: asPublicProfile(doc.publicProfile),

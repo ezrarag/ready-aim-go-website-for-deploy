@@ -58,6 +58,7 @@ export async function PATCH(request: NextRequest, context: Params) {
     // Strip protected fields from caller payload
     delete patch.id
     delete patch.createdAt
+    delete patch.subscriptions
 
     const ref = db.collection("clients").doc(clientId)
     const existing = await ref.get()

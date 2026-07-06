@@ -1,6 +1,7 @@
 import type { PulseReport } from "./pulse-report"
 import type { ClientRoleSuggestionSnapshot } from "./client-role-suggestions"
 import type { ClientPublicProfile } from "./types/client-public-profile"
+import type { ClientRetainer } from "./wallet-pools"
 
 export type ClientStatus = "active" | "inactive" | "onboarding"
 export type DeployStatus = "live" | "building" | "error"
@@ -80,6 +81,8 @@ export interface ClientDirectoryEntry {
   pulseReport?: PulseReport
   /** Unified AI-generated work contexts and draft role suggestions for admin/client review. */
   roleSuggestionSnapshot?: ClientRoleSuggestionSnapshot
+  /** Optional retainer linkage into a pooled wallet ledger. */
+  retainer?: ClientRetainer
   /**
    * Public-facing profile: visibility toggles, identity, taxonomy, services,
    * products, pricing, people, and growth indicators.
