@@ -6,6 +6,7 @@ interface ClientPortalRecord {
   id: string
   name?: string
   storyId?: string
+  workspaceId?: string
   websiteUrl?: string
   deployUrl?: string
   deployStatus?: string

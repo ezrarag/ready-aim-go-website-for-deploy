@@ -27,6 +27,7 @@ import { DailyBriefingCard } from "@/components/admin/daily-briefing-card"
 import { RepoConnectModal } from "@/components/admin/repo-connect-modal"
 import { ClientManageModal } from "@/components/admin/client-manage-modal"
 import { GuidesView } from "@/components/admin/guides-view"
+import { WorkspaceQuestionnairesPanel } from "@/components/admin/workspace-questionnaires-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardHeader } from "@/components/ui/card"
@@ -2167,6 +2168,13 @@ export default function DashboardPage() {
                 These power the filter chips on <code>/work</code> and mirror onto the linked client brands.
               </p>
             </div>
+
+            {workspaceEditor.workspace ? (
+              <WorkspaceQuestionnairesPanel
+                workspaceId={workspaceEditor.workspace.id}
+                workspaceName={workspaceEditor.workspace.name}
+              />
+            ) : null}
           </div>
 
           <DialogFooter className="border-t border-border pt-4">

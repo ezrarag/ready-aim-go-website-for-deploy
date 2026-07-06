@@ -77,6 +77,7 @@ import { CommissionRateModal } from "@/components/commission-rate-modal";
 import { WebsiteCardModal } from "@/components/website-card-modal";
 import { toast } from "sonner";
 import { FirstTimeUserPopup } from "@/components/first-time-user-popup"
+import { ClientQuestionnairesCard } from "@/components/client-questionnaires-card"
 
 function ClientDashboardContent() {
   const { session, loading, error } = useUserWithRole();
@@ -87,7 +88,7 @@ function ClientDashboardContent() {
   const { stats: clientStats, loading: statsLoading, error: statsError } = useClientStats(clientId);
   const { operators, loading: operatorsLoading, error: operatorsError } = useOperators();
   const { projects: clientProjects, loading: projectsLoading, error: projectsError } = useClientProjects(clientId);
-  const { website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(clientId);
+  const { client: clientProfile, website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(clientId);
   const { commissionRate, loading: commissionLoading, error: commissionError, updateCommissionRate } = useCommissionRate(clientId);
   const { revenueData, loading: revenueLoading, error: revenueError } = useRevenueData(clientId);
   const { activities: activityLog, loading: activityLoading, error: activityError } = useActivityLog(clientId);
@@ -451,6 +452,11 @@ function ClientDashboardContent() {
 
   const renderOverview = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
+      <ClientQuestionnairesCard
+        workspaceId={clientProfile?.workspaceId || null}
+        clientName={clientProfile?.name || clientWebsite?.name || null}
+      />
+
       {/* Agent Allocation */}
       <Card className={`bg-neutral-800 border-gray-200 ${!financesEnabled ? 'opacity-50 blur-sm' : ''}`}>
         <CardHeader>
