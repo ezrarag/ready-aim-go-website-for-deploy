@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import type { ModuleKey } from "@/lib/client-directory"
 import { getFirestoreDb } from "@/lib/firestore"
 import { relinkWorkspaceClient, updateWorkspaceFrontEndSettings } from "@/lib/admin/workspace-frontend"
+import { healWorkspaceChildClientIds } from "@/lib/admin/workspace-assets"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 
 export const dynamic = "force-dynamic"
@@ -108,8 +109,12 @@ export async function PATCH(request: NextRequest, context: Params) {
   }
 
   let relinkResult: Awaited<ReturnType<typeof relinkWorkspaceClient>> | null = null
+  let healedChildMappings: Awaited<ReturnType<typeof healWorkspaceChildClientIds>> | null = null
   if ("clientId" in body) {
     relinkResult = await relinkWorkspaceClient(db, id, clientId, setCanonicalForClient)
+    if (clientId) {
+      healedChildMappings = await healWorkspaceChildClientIds(db, id, clientId)
+    }
   }
 
   const result = await updateWorkspaceFrontEndSettings(db, id, {
@@ -125,5 +130,6 @@ export async function PATCH(request: NextRequest, context: Params) {
     workspace: result,
     clientMirrored: result.clientMirrored,
     relink: relinkResult,
+    healedChildMappings,
   })
 }
