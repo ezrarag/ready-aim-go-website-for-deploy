@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       actorKey: extractActorKey(request.headers.get("authorization")),
       payload: {
         operation: "link-client",
+        workspaceSlug: workspaceId,
         previousClientId: relink.previousClientId,
         clientId,
         setCanonicalForClient,
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       workspaceId,
+      workspaceSlug: workspaceId,
       clientId,
       relink,
       healedChildMappings,

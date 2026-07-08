@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: doc.id,
+          slug: doc.id,
           name: typeof data.name === "string" ? data.name : "",
           clientId: typeof data.clientId === "string" ? data.clientId : null,
           ownerUid: typeof data.ownerUid === "string" ? data.ownerUid : "",

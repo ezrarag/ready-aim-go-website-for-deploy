@@ -43,6 +43,7 @@ export type AdminHubPerson = {
 
 export type AdminHubWorkspace = {
   id: string
+  slug: string
   name: string
   clientId: string | null
   ownerUid: string | null
@@ -65,6 +66,7 @@ export type AdminHubProject = {
   clientId: string | null
   clientName: string | null
   workspaceId: string | null
+  workspaceSlug: string | null
   status: string
   product: AdminProductKey | null
   githubRepos: string[]
@@ -292,6 +294,7 @@ export function normalizeAdminHubWorkspace(id: string, input: unknown): AdminHub
     .filter((value): value is string => Boolean(value))
   return {
     id,
+    slug: id,
     name: readString(record.name) || id,
     clientId: readString(record.clientId),
     ownerUid: readString(record.ownerUid),
@@ -325,6 +328,7 @@ export function normalizeAdminHubProject(id: string, input: unknown): AdminHubPr
     clientId: readString(record.clientId),
     clientName: readString(record.clientName),
     workspaceId: readString(record.workspaceId),
+    workspaceSlug: readString(record.workspaceSlug) || readString(record.workspaceId),
     status: readString(record.status) || "active",
     product: normalizeProduct(record.product || record.productKey || record.service || record.serviceKey),
     githubRepos: Array.from(new Set(githubRepos)),
@@ -382,6 +386,16 @@ export function buildAdminHubWarnings(input: {
         view: "clients",
         clientId: client.id,
       })
+    } else if (!workspaceIds.has(client.workspaceId)) {
+      warnings.push({
+        id: `client:${client.id}:workspace-missing`,
+        severity: "danger",
+        label: "Client workspace missing",
+        detail: `${client.name} points to missing workspace ${client.workspaceId}.`,
+        view: "clients",
+        clientId: client.id,
+        workspaceId: client.workspaceId,
+      })
     }
     if (client.legacyProductData) {
       warnings.push({
@@ -409,6 +423,27 @@ export function buildAdminHubWarnings(input: {
   }
 
   for (const project of input.projects) {
+    if (!project.workspaceId) {
+      warnings.push({
+        id: `project:${project.id}:workspace-empty`,
+        severity: "warning",
+        label: "Project missing workspace",
+        detail: `${project.name} is not attached to a canonical workspace.`,
+        view: "workspaces",
+        projectId: project.id,
+      })
+    }
+    if (project.workspaceId && project.workspaceSlug !== project.workspaceId) {
+      warnings.push({
+        id: `project:${project.id}:workspace-slug`,
+        severity: "warning",
+        label: "Project missing workspace slug",
+        detail: `${project.name} should carry workspaceSlug ${project.workspaceId}.`,
+        view: "workspaces",
+        workspaceId: project.workspaceId,
+        projectId: project.id,
+      })
+    }
     if (project.clientId && !clientIds.has(project.clientId)) {
       warnings.push({
         id: `project:${project.id}:client`,

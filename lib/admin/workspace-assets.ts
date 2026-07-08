@@ -40,16 +40,24 @@ export async function healWorkspaceChildClientIds(
 
     for (const docSnap of snapshot.docs) {
       const data = docSnap.data() as Record<string, unknown>
-      if (readAdminString(data.clientId)) continue
+      const existingClientId = readAdminString(data.clientId)
+      const existingWorkspaceSlug = readAdminString(data.workspaceSlug)
+      if (existingClientId && existingWorkspaceSlug === workspaceId) continue
+
+      const update: Record<string, unknown> = {
+        workspaceSlug: workspaceId,
+        workspaceSlugHealedAt: now,
+        updatedAt: now,
+      }
+      if (!existingClientId) {
+        update.clientId = clientId
+        update.clientIdHealedFromWorkspaceId = workspaceId
+        update.clientIdHealedAt = now
+      }
 
       batch.set(
         docSnap.ref,
-        {
-          clientId,
-          clientIdHealedFromWorkspaceId: workspaceId,
-          clientIdHealedAt: now,
-          updatedAt: now,
-        },
+        update,
         { merge: true }
       )
       healed[collectionName].push(docSnap.id)
@@ -80,6 +88,7 @@ export async function attachProjectToWorkspace(
 ) {
   await db.collection("workspaces").doc(workspaceId).set(
     {
+      slug: workspaceId,
       projectIds: FieldValue.arrayUnion(projectId),
       updatedAt: new Date().toISOString(),
     },

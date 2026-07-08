@@ -147,6 +147,7 @@ export async function POST(request: NextRequest, context: Params) {
       ...normalized,
       id: projectId,
       workspaceId: id,
+      workspaceSlug: id,
       clientId,
       source: "admin-workspace-injection",
       sourceSystem: "readyaimgo-admin",
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest, context: Params) {
       payload: {
         operation: "inject-workspace-project",
         workspaceId: id,
+        workspaceSlug: id,
         clientId,
         title: normalized.title,
         repoSlug: normalized.repoSlug,

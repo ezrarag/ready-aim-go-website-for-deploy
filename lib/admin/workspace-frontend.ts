@@ -165,7 +165,7 @@ export async function relinkWorkspaceClient(
     if (!clientSnap.exists) throw new Error(`Client "${normalizedClientId}" not found.`)
   }
 
-  const updates: Record<string, unknown> = { updatedAt: now }
+  const updates: Record<string, unknown> = { slug: workspaceId, updatedAt: now }
   if (normalizedClientId) updates.clientId = normalizedClientId
   else updates.clientId = FieldValue.delete()
   await workspaceRef.set(updates, { merge: true })

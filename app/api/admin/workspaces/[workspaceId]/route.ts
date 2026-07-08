@@ -50,6 +50,7 @@ export async function GET(request: NextRequest, context: Params) {
       success: true,
       workspace: {
         id: doc.id,
+        slug: doc.id,
         clientId: readString(data.clientId),
         showOnFrontend: data.showOnFrontend === true,
         publicUrl: readString(data.publicUrl),
