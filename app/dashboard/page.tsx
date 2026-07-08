@@ -301,6 +301,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = normalizeAdminHubView(searchParams.get("view"))
+  const requestedWorkspaceId = searchParams.get("workspace")?.trim() || ""
+  const requestedWorkspacePanel = searchParams.get("panel")?.trim() || ""
   const [state, setState] = useState<AdminHubState>(emptyState)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -510,6 +512,22 @@ export default function DashboardPage() {
       return matchesClient && matchesWorkspace && matchesStatus
     })
   }, [buildVideoClientFilter, buildVideoStatusFilter, buildVideoVisibility?.rows, buildVideoWorkspaceFilter])
+
+  useEffect(() => {
+    if (view !== "workspaces" || !requestedWorkspaceId) return
+    const workspace = workspaceById.get(requestedWorkspaceId)
+    if (!workspace) return
+
+    if (requestedWorkspacePanel === "repos") {
+      void openWorkspaceRepoEditor(workspace).finally(() => {
+        router.replace(getAdminHubHref("workspaces"), { scroll: false })
+      })
+      return
+    }
+
+    openWorkspaceEditor(workspace)
+    router.replace(getAdminHubHref("workspaces"), { scroll: false })
+  }, [requestedWorkspaceId, requestedWorkspacePanel, router, view, workspaceById])
 
   const openWorkspaceEditor = (workspace: AdminHubWorkspace) => {
     const linkedClient = workspace.clientId ? clientById.get(workspace.clientId) : null
@@ -1771,6 +1789,11 @@ export default function DashboardPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap gap-2">
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={`/dashboard/workspaces/${encodeURIComponent(workspace.id)}`}>
+                                    Open workspace
+                                  </Link>
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
