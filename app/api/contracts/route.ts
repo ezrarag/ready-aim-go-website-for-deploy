@@ -21,11 +21,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get("workspaceId")?.trim()
     const clientId = searchParams.get("clientId")?.trim()
+    const status = searchParams.get("status")?.trim()
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200)
 
     let query: FirebaseFirestore.Query = db.collection("contracts")
     if (workspaceId) query = query.where("workspaceId", "==", workspaceId)
     if (clientId) query = query.where("clientId", "==", clientId)
+    if (status) query = query.where("status", "==", status)
 
     const snap = await query.limit(limit).get()
     return NextResponse.json({

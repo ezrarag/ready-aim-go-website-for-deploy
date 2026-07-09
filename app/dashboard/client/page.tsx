@@ -77,6 +77,7 @@ import { CommissionRateModal } from "@/components/commission-rate-modal";
 import { WebsiteCardModal } from "@/components/website-card-modal";
 import { toast } from "sonner";
 import { FirstTimeUserPopup } from "@/components/first-time-user-popup"
+import { ClientInvoicesCard } from "@/components/client-invoices-card"
 import { ClientQuestionnairesCard } from "@/components/client-questionnaires-card"
 import { ClientWorkspaceSettingsCard } from "@/components/client-workspace-settings-card"
 
@@ -3173,6 +3174,8 @@ function ClientDashboardContent() {
 
   const renderFinancialDashboard = () => (
     <div className="p-6 space-y-6">
+      <ClientInvoicesCard />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

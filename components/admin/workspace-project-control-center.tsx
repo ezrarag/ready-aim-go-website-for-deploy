@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { WorkspaceInvoicesPanel } from "@/components/admin/workspace-invoices-panel"
 import { WorkspaceQuestionnairesPanel } from "@/components/admin/workspace-questionnaires-panel"
 
 type ProjectRecord = {
@@ -328,6 +329,7 @@ export function WorkspaceProjectControlCenter({
   })
   const [contractSaving, setContractSaving] = useState(false)
   const [contractError, setContractError] = useState<string | null>(null)
+  const [extractingContractId, setExtractingContractId] = useState<string | null>(null)
   const [updateDraft, setUpdateDraft] = useState<UpdateDraft>({
     type: "web",
     title: "",
@@ -602,6 +604,44 @@ export function WorkspaceProjectControlCenter({
     }
   }
 
+  const handleExtractContract = async (contractId: string, storagePath: string) => {
+    setExtractingContractId(contractId)
+    setContractError(null)
+    try {
+      const contract = contracts.find((entry) => entry.id === contractId)
+      const response = await fetch("/api/contracts/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contractId,
+          storagePath,
+          workspaceId,
+          clientId: clientId || null,
+          title: contract?.title || workspaceName || contractId,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to extract contract details.")
+      }
+      setContracts((current) =>
+        current.map((entry) =>
+          entry.id === contractId
+            ? {
+                ...entry,
+                status: (payload.data?.status as string) || "extracted",
+                storagePath,
+              }
+            : entry
+        )
+      )
+    } catch (error) {
+      setContractError(error instanceof Error ? error.message : "Unable to extract contract details.")
+    } finally {
+      setExtractingContractId(null)
+    }
+  }
+
   const handleCreateUpdate = async () => {
     if (!clientId || !updateDraft.title.trim()) {
       setUpdateError("A linked client and update title are required.")
@@ -834,6 +874,7 @@ export function WorkspaceProjectControlCenter({
             <TabsList className="flex h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
               <TabsTrigger value="suggestions"><MessageSquare className="mr-2 h-4 w-4" />Suggestions</TabsTrigger>
               <TabsTrigger value="contracts"><FileText className="mr-2 h-4 w-4" />Contracts</TabsTrigger>
+              <TabsTrigger value="invoices"><Wallet className="mr-2 h-4 w-4" />Invoices</TabsTrigger>
               <TabsTrigger value="deliverables"><CheckCircle className="mr-2 h-4 w-4" />Deliverables</TabsTrigger>
               <TabsTrigger value="retainer"><Wallet className="mr-2 h-4 w-4" />Retainer</TabsTrigger>
               <TabsTrigger value="updates"><Video className="mr-2 h-4 w-4" />Updates</TabsTrigger>
@@ -986,10 +1027,41 @@ export function WorkspaceProjectControlCenter({
                           </a>
                         ))
                       )}
+                      {contract.storagePath ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleExtractContract(contract.id, contract.storagePath as string)}
+                          disabled={extractingContractId === contract.id}
+                        >
+                          {extractingContractId === contract.id ? "Extracting..." : contract.status === "extracted" ? "Re-extract" : "Extract details"}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 ))
               )}
+            </TabsContent>
+
+            <TabsContent value="invoices" className="space-y-3">
+              <WorkspaceInvoicesPanel
+                clientId={detail.client?.id || detail.workspace.clientId}
+                workspaceId={workspaceId}
+                contracts={contracts.map((contract) => ({
+                  id: contract.id,
+                  title: contract.title,
+                }))}
+                defaultBillTo={{
+                  name: detail.client?.name || detail.workspace.name || "",
+                  company: detail.client?.name || detail.workspace.name || "",
+                  address: "",
+                  email:
+                    detail.client?.contactEmail ||
+                    detail.client?.portalEmail ||
+                    detail.workspace.clientEmail ||
+                    "",
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="deliverables" className="space-y-3">

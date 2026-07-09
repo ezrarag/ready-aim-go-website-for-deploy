@@ -2,12 +2,59 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { extractActorKey, writeAuditLog } from "@/lib/audit-log"
 import { getFirestoreDb, getStorageBucket } from "@/lib/firestore"
+import { buildDefaultInvoiceFromContract } from "@/lib/invoice-service"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import type { ExtractedContractMilestone } from "@/lib/types/contracts"
 
 type Params = { params: Promise<{ contractId: string }> }
 
 function readString(value: unknown, maxLength = 4000) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : ""
+}
+
+function readNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""))
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function readNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null
+  return readNumber(value)
+}
+
+function readMilestones(value: unknown): ExtractedContractMilestone[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return []
+    const record = item as Record<string, unknown>
+    const label = readString(record.label, 280)
+    if (!label) return []
+    const triggerType = readString(record.triggerType, 40)
+    return [{
+      label,
+      amount: readNumber(record.amount),
+      triggerType:
+        triggerType === "signing" || triggerType === "delivery" || triggerType === "manual"
+          ? triggerType
+          : "manual",
+    }]
+  })
+}
+
+function addDaysIso(days: number | null) {
+  const date = new Date()
+  if (typeof days === "number" && Number.isFinite(days) && days > 0) {
+    date.setDate(date.getDate() + days)
+  }
+  return date.toISOString()
+}
+
+function toCents(amount: number) {
+  return Math.max(0, Math.round(amount * 100))
 }
 
 export async function GET(request: NextRequest, context: Params) {
@@ -83,6 +130,97 @@ export async function PATCH(request: NextRequest, context: Params) {
       if ("notes" in body) patch.notes = readString(body.notes, 12000) || null
       if ("attachmentUrl" in body) patch.attachmentUrl = readString(body.attachmentUrl, 2000) || null
       if ("fileUrl" in body) patch.fileUrl = readString(body.fileUrl, 2000) || null
+      if ("clientId" in body) patch.clientId = readString(body.clientId, 240) || null
+      if ("workspaceId" in body) patch.workspaceId = readString(body.workspaceId, 240) || null
+      if ("payerEntity" in body) patch.payerEntity = readString(body.payerEntity, 280)
+      if ("payerContact" in body) patch.payerContact = readString(body.payerContact, 800)
+      if ("contractorName" in body) patch.contractorName = readString(body.contractorName, 280)
+      if ("totalFee" in body) patch.totalFee = readNumber(body.totalFee)
+      if ("currency" in body) patch.currency = readString(body.currency, 24).toLowerCase() || "usd"
+      if ("paymentTermsDays" in body) patch.paymentTermsDays = readNullableNumber(body.paymentTermsDays)
+      if ("deadlineDate" in body) patch.deadlineDate = readString(body.deadlineDate, 80) || null
+      if ("milestones" in body) patch.milestones = readMilestones(body.milestones)
+
+      if (body.confirm === true) {
+        const current = (snap.data() ?? {}) as Record<string, unknown>
+        if ((current.status === "confirmed") || Array.isArray(current.createdInvoiceIds)) {
+          return NextResponse.json({ success: false, error: "Contract already confirmed." }, { status: 409 })
+        }
+
+        const clientId = readString(("clientId" in patch ? patch.clientId : current.clientId), 240)
+        const workspaceId = readString(("workspaceId" in patch ? patch.workspaceId : current.workspaceId), 240)
+        const title = readString(("title" in patch ? patch.title : current.title), 280) || "Contract invoice"
+        const payerEntity = readString(("payerEntity" in patch ? patch.payerEntity : current.payerEntity), 280)
+        const payerContact = readString(("payerContact" in patch ? patch.payerContact : current.payerContact), 800)
+        const contractorName = readString(("contractorName" in patch ? patch.contractorName : current.contractorName), 280) || "ReadyAimGo"
+        const currency = readString(("currency" in patch ? patch.currency : current.currency), 24).toLowerCase() || "usd"
+        const paymentTermsDays = readNullableNumber("paymentTermsDays" in patch ? patch.paymentTermsDays : current.paymentTermsDays)
+        const deadlineDate = readString(("deadlineDate" in patch ? patch.deadlineDate : current.deadlineDate), 80) || null
+        const totalFee = readNumber("totalFee" in patch ? patch.totalFee : current.totalFee)
+        let milestones = "milestones" in patch ? readMilestones(patch.milestones) : readMilestones(current.milestones)
+
+        if (!clientId) {
+          return NextResponse.json({ success: false, error: "Pick a client before confirming." }, { status: 400 })
+        }
+
+        if (milestones.length === 0 && totalFee > 0) {
+          milestones = [{ label: "Contract milestone", amount: totalFee, triggerType: "manual" }]
+          patch.milestones = milestones
+        }
+
+        if (milestones.length === 0) {
+          return NextResponse.json({ success: false, error: "Add at least one milestone before confirming." }, { status: 400 })
+        }
+
+        const invoiceCollection = db.collection("clients").doc(clientId).collection("invoices")
+        const invoiceIds: string[] = []
+        const now = new Date().toISOString()
+        const issueDate = now
+        const dueDate = deadlineDate || addDaysIso(paymentTermsDays)
+
+        for (const [index, milestone] of milestones.entries()) {
+          const invoiceRef = invoiceCollection.doc()
+          const invoice = buildDefaultInvoiceFromContract({
+            clientId,
+            workspaceId,
+            contractId,
+            templateId: "contract_milestone",
+            title: `${title} — ${milestone.label}`,
+            amountCents: toCents(milestone.amount),
+            billingPeriod: milestone.triggerType,
+            issueDate,
+            dueDate,
+            from: {
+              name: contractorName,
+              company: contractorName,
+              address: "Milwaukee, WI",
+              email: "support@readyaimgo.biz",
+            },
+            billTo: {
+              name: payerEntity || "",
+              company: payerEntity || "",
+              address: "",
+              email: payerContact || "",
+            },
+            description: milestone.label,
+          })
+
+          await invoiceRef.set({
+            ...invoice,
+            status: "draft",
+            milestoneIndex: index,
+            milestoneLabel: milestone.label,
+            createdAt: now,
+            updatedAt: now,
+            currency,
+          })
+          invoiceIds.push(invoiceRef.id)
+        }
+
+        patch.status = "confirmed"
+        patch.confirmedAt = now
+        patch.createdInvoiceIds = invoiceIds
+      }
     }
 
     await ref.set(patch, { merge: true })
@@ -95,7 +233,8 @@ export async function PATCH(request: NextRequest, context: Params) {
       payload: patch,
     })
 
-    return NextResponse.json({ success: true })
+    const refreshed = await ref.get()
+    return NextResponse.json({ success: true, data: { id: refreshed.id, ...(refreshed.data() ?? {}) } })
   } catch (error) {
     console.error("PATCH /api/contracts/[contractId]:", error)
     return NextResponse.json(

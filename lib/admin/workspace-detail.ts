@@ -60,6 +60,7 @@ export type WorkspaceContractSummary = {
   type: string | null
   updatedAt: string | null
   fileUrls: string[]
+  storagePath: string | null
 }
 
 export type WorkspaceMemberSummary = {
@@ -220,6 +221,7 @@ function normalizeContract(id: string, input: Record<string, unknown>): Workspac
       readString(serialized.kind),
     updatedAt: toIsoString(serialized.updatedAt) || toIsoString(serialized.createdAt),
     fileUrls,
+    storagePath: readString(serialized.storagePath),
   }
 }
 

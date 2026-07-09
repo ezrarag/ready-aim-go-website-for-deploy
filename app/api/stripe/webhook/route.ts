@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' })
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-08-27.basil' })
   
   const sig = req.headers.get('stripe-signature')
   const body = await req.text()
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
     if (session.metadata?.purpose === 'deliverable_payment') {
       const clientId = session.metadata.clientId
       const deliverableId = session.metadata.deliverableId
+      const invoiceId = session.metadata.invoiceId
       const stripeSessionId = session.id
       const amountTotal = session.amount_total || 0
 
@@ -132,6 +133,16 @@ export async function POST(req: NextRequest) {
           paidAt: now,
           createdAt: now,
         })
+
+        if (invoiceId) {
+          await db.collection('clients').doc(clientId).collection('invoices').doc(invoiceId).set({
+            status: 'paid',
+            paidAt: now,
+            stripeSessionId,
+            paymentLink: session.url ?? null,
+            updatedAt: now,
+          }, { merge: true })
+        }
 
         console.log('Deliverable payment recorded:', deliverableId)
       } catch (error) {

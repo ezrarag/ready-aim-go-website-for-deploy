@@ -1638,6 +1638,7 @@ export default function DashboardPage() {
           if (!next) setManageClient(null)
         }}
         client={manageClient}
+        clients={state.clients}
         people={state.people}
         workspaces={state.workspaces}
         onSaved={() => {

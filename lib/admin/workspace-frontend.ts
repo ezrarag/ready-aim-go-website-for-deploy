@@ -42,6 +42,22 @@ function normalizePreviewUrl(value: string | null | undefined): string | null | 
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
+function compactUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => compactUndefined(item))
+      .filter((item) => item !== undefined) as T
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, compactUndefined(entry)])
+    ) as T
+  }
+  return value
+}
+
 function asClientModule(value: unknown, fallback: ClientModule): ClientModule {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>
@@ -68,7 +84,7 @@ export function buildClientModules(current: Record<string, unknown>, enabledKeys
   const enabled = new Set(enabledKeys)
   return MODULE_KEYS.reduce((modules, key) => {
     const base = asClientModule(currentModules[key], defaults[key])
-    modules[key] = { ...base, enabled: enabled.has(key) }
+    modules[key] = compactUndefined({ ...base, enabled: enabled.has(key) })
     return modules
   }, {} as Record<ModuleKey, ClientModule>)
 }
