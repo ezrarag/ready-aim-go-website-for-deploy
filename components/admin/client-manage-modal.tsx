@@ -286,7 +286,7 @@ export function ClientManageModal({
                   {client.portalEmail ? (
                     <Button type="button" variant="outline" size="sm" asChild>
                       <a
-                        href={`https://clients.readyaimgo.biz/portal/${encodeURIComponent(client.id)}`}
+                        href="https://clients.readyaimgo.biz/dashboard/client"
                         target="_blank"
                         rel="noreferrer"
                       >

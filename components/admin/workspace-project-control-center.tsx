@@ -277,6 +277,32 @@ function formatCurrency(amount: number, currency = "usd") {
   }).format(amount)
 }
 
+function normalizeContractRecord(record: Record<string, unknown>) {
+  const fileUrls = [
+    typeof record.fileUrl === "string" ? record.fileUrl : null,
+    typeof record.attachmentUrl === "string" ? record.attachmentUrl : null,
+    ...(Array.isArray(record.fileUrls)
+      ? record.fileUrls.filter((item): item is string => typeof item === "string")
+      : []),
+  ].filter((value): value is string => Boolean(value))
+
+  return {
+    id: typeof record.id === "string" ? record.id : "",
+    title:
+      (typeof record.title === "string" && record.title.trim()) ||
+      (typeof record.name === "string" && record.name.trim()) ||
+      "Contract",
+    status: typeof record.status === "string" && record.status.trim() ? record.status : "draft",
+    type: typeof record.type === "string" && record.type.trim() ? record.type : null,
+    updatedAt:
+      (typeof record.updatedAt === "string" && record.updatedAt) ||
+      (typeof record.createdAt === "string" && record.createdAt) ||
+      null,
+    fileUrls: Array.from(new Set(fileUrls)),
+    storagePath: typeof record.storagePath === "string" && record.storagePath.trim() ? record.storagePath : null,
+  }
+}
+
 export function WorkspaceProjectControlCenter({
   clientId,
   workspaceId,
@@ -595,8 +621,12 @@ export function WorkspaceProjectControlCenter({
       if (!response.ok || payload.success === false) {
         throw new Error(payload.error || "Unable to create contract.")
       }
-      setContracts((current) => [payload.data, ...current])
+      const created = normalizeContractRecord((payload.data ?? {}) as Record<string, unknown>)
+      setContracts((current) => [created, ...current])
       setContractDraft({ title: "", type: "scope_of_work", status: "draft", notes: "", file: null })
+      if (created.storagePath) {
+        void handleExtractContract(created.id, created.storagePath)
+      }
     } catch (error) {
       setContractError(error instanceof Error ? error.message : "Unable to create contract.")
     } finally {
@@ -989,6 +1019,11 @@ export function WorkspaceProjectControlCenter({
                     onChange={(event) => setContractDraft((current) => ({ ...current, file: event.target.files?.[0] || null }))}
                   />
                 </div>
+                {contractDraft.file ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Selected file: {contractDraft.file.name}
+                  </p>
+                ) : null}
                 <Textarea
                   className="mt-3 min-h-[96px]"
                   value={contractDraft.notes}

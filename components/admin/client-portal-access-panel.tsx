@@ -192,7 +192,7 @@ export function ClientPortalAccessPanel({ clientId }: Props) {
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                   <a
-                    href={`https://clients.readyaimgo.biz/portal/${encodeURIComponent(clientId)}`}
+                    href="https://clients.readyaimgo.biz/dashboard/client"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

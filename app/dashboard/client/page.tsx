@@ -110,6 +110,7 @@ function ClientDashboardContent() {
     recordInteraction
   } = useMarketplace(clientId);
   const [activeSection, setActiveSection] = useState("overview");
+  const [portalWorkspaceId, setPortalWorkspaceId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showNewMissionModal, setShowNewMissionModal] = useState(false);
@@ -289,6 +290,26 @@ function ClientDashboardContent() {
   }, [loading, session?.user, clientId, router])
 
   useEffect(() => {
+    if (!clientId) {
+      setPortalWorkspaceId(null)
+      return
+    }
+    import("@/lib/portal-client").then(async ({ portalFetch }) => {
+      try {
+        const response = await portalFetch("/api/portal/workspace", { cache: "no-store" })
+        const payload = await response.json().catch(() => ({}))
+        if (response.ok && payload?.success === true && payload?.data?.id) {
+          setPortalWorkspaceId(payload.data.id as string)
+          return
+        }
+      } catch {
+        // Fall back to the client profile field below.
+      }
+      setPortalWorkspaceId(null)
+    })
+  }, [clientId])
+
+  useEffect(() => {
     if (!session?.user) return
     // TODO: client todos from Firestore
     setTodos([])
@@ -455,7 +476,7 @@ function ClientDashboardContent() {
   const renderOverview = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
       <ClientQuestionnairesCard
-        workspaceId={clientProfile?.workspaceId || null}
+        workspaceId={portalWorkspaceId || clientProfile?.workspaceId || null}
         clientName={clientProfile?.name || clientWebsite?.name || null}
       />
 
@@ -3578,7 +3599,18 @@ function ClientDashboardContent() {
             </div>
           </CardContent>
         </Card>
-        <ClientWorkspaceSettingsCard onSaved={() => void refetchClientData()} />
+        <ClientWorkspaceSettingsCard onSaved={() => {
+          void refetchClientData()
+          import("@/lib/portal-client").then(async ({ portalFetch }) => {
+            try {
+              const response = await portalFetch("/api/portal/workspace", { cache: "no-store" })
+              const payload = await response.json().catch(() => ({}))
+              setPortalWorkspaceId(response.ok && payload?.success === true && payload?.data?.id ? payload.data.id as string : null)
+            } catch {
+              setPortalWorkspaceId(null)
+            }
+          })
+        }} />
       </div>
     </div>
   )

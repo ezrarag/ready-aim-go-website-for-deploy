@@ -3,6 +3,10 @@ import { getFirestoreDb } from "@/lib/firestore"
 import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { resolvePortalIdentity } from "@/lib/portal-auth"
 
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
 // GET /api/portal/me — return the authenticated client's own profile
 export async function GET(request: NextRequest) {
   const identity = await resolvePortalIdentity(request)
@@ -22,11 +26,21 @@ export async function GET(request: NextRequest) {
     // Strip sensitive admin-only fields before returning to portal
     const data = doc.data() as Record<string, unknown>
     const { portalUid: _p, ...safeData } = data
+    let workspaceId = readString(safeData.workspaceId)
+    if (!workspaceId) {
+      const workspaceSnap = await db
+        .collection("workspaces")
+        .where("clientId", "==", identity.activeClientId)
+        .limit(1)
+        .get()
+      workspaceId = workspaceSnap.empty ? null : workspaceSnap.docs[0].id
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         ...serializeFirestoreDocument(doc.id, safeData),
+        workspaceId,
         portalIdentity: {
           uid: identity.uid,
           activeClientId: identity.activeClientId,

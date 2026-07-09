@@ -47,10 +47,10 @@ import {
 import {
   ADMIN_PRODUCT_KEYS,
   ADMIN_PRODUCT_LABELS,
+  getModuleKeysForProducts,
+  getProductsForModuleKeys,
   type AdminProductKey,
 } from "@/lib/admin/products"
-import { MODULE_LABELS } from "@/lib/client-showcase"
-import type { ModuleKey } from "@/lib/client-directory"
 import type {
   AdminHubClient,
   AdminHubPayload,
@@ -75,7 +75,7 @@ type WorkspaceEditorState = {
   publicUrl: string
   previewImageUrl: string
   showOnFrontend: boolean
-  frontEndProducts: ModuleKey[]
+  frontEndProducts: AdminProductKey[]
   frontEndTags: string[]
   tagDraft: string
   saving: boolean
@@ -200,6 +200,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = normalizeAdminHubView(searchParams.get("view"))
+  const requestedClientId = searchParams.get("clientId")?.trim() || ""
   const requestedWorkspaceId = searchParams.get("workspace")?.trim() || ""
   const requestedWorkspacePanel = searchParams.get("panel")?.trim() || ""
   const [state, setState] = useState<AdminHubState>(emptyState)
@@ -351,6 +352,14 @@ export default function DashboardPage() {
     router.replace(getAdminHubHref("workspaces"), { scroll: false })
   }, [requestedWorkspaceId, requestedWorkspacePanel, router, view, workspaceById])
 
+  useEffect(() => {
+    if (view !== "clients" || !requestedClientId) return
+    const client = clientById.get(requestedClientId)
+    if (!client) return
+    setManageClient(client)
+    router.replace(getAdminHubHref("clients"), { scroll: false })
+  }, [clientById, requestedClientId, router, view])
+
   const openWorkspaceEditor = (workspace: AdminHubWorkspace) => {
     const linkedClient = workspace.clientId ? clientById.get(workspace.clientId) : null
     setWorkspaceEditor({
@@ -363,8 +372,8 @@ export default function DashboardPage() {
       showOnFrontend: workspace.showOnFrontend,
       frontEndProducts:
         workspace.frontEndProducts.length > 0
-          ? workspace.frontEndProducts
-          : linkedClient?.storyModules ?? [],
+          ? getProductsForModuleKeys(workspace.frontEndProducts)
+          : linkedClient?.activeProducts ?? getProductsForModuleKeys(linkedClient?.storyModules ?? []),
       frontEndTags: workspace.frontEndTags,
       tagDraft: "",
       saving: false,
@@ -400,7 +409,7 @@ export default function DashboardPage() {
             showOnFrontend: workspaceEditor.showOnFrontend,
             publicUrl: workspaceEditor.publicUrl.trim(),
             previewImageUrl: workspaceEditor.previewImageUrl.trim(),
-            frontEndProducts: workspaceEditor.frontEndProducts,
+            frontEndProducts: getModuleKeysForProducts(workspaceEditor.frontEndProducts),
             frontEndTags: workspaceEditor.frontEndTags,
           }),
         }
@@ -1315,7 +1324,17 @@ export default function DashboardPage() {
               <select
                 value={workspaceEditor.clientId}
                 onChange={(event) =>
-                  setWorkspaceEditor((current) => ({ ...current, clientId: event.target.value }))
+                  setWorkspaceEditor((current) => {
+                    const nextClientId = event.target.value
+                    const nextClient = state.clients.find((client) => client.id === nextClientId)
+                    return {
+                      ...current,
+                      clientId: nextClientId,
+                      frontEndProducts: nextClient?.activeProducts.length
+                        ? nextClient.activeProducts
+                        : current.frontEndProducts,
+                    }
+                  })
                 }
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
@@ -1403,19 +1422,18 @@ export default function DashboardPage() {
                 Products in use
               </label>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(MODULE_LABELS).map(([key, label]) => {
-                  const moduleKey = key as ModuleKey
-                  const active = workspaceEditor.frontEndProducts.includes(moduleKey)
+                {ADMIN_PRODUCT_KEYS.map((productKey) => {
+                  const active = workspaceEditor.frontEndProducts.includes(productKey)
                   return (
                     <button
-                      key={moduleKey}
+                      key={productKey}
                       type="button"
                       onClick={() =>
                         setWorkspaceEditor((current) => ({
                           ...current,
-                          frontEndProducts: current.frontEndProducts.includes(moduleKey)
-                            ? current.frontEndProducts.filter((item) => item !== moduleKey)
-                            : [...current.frontEndProducts, moduleKey],
+                          frontEndProducts: current.frontEndProducts.includes(productKey)
+                            ? current.frontEndProducts.filter((item) => item !== productKey)
+                            : [...current.frontEndProducts, productKey],
                         }))
                       }
                       className={
@@ -1424,7 +1442,7 @@ export default function DashboardPage() {
                           : "rounded-full border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-muted/40"
                       }
                     >
-                      {label}
+                      {ADMIN_PRODUCT_LABELS[productKey]}
                     </button>
                   )
                 })}
