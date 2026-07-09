@@ -65,6 +65,15 @@ export async function PATCH(
       updates.type = body.type as ModuleKey
     }
     if (typeof body.title === "string") updates.title = body.title.trim()
+    if (body.workspaceId !== undefined) {
+      updates.workspaceId = typeof body.workspaceId === "string" ? body.workspaceId.trim() : undefined
+    }
+    if (body.authorKind === "admin" || body.authorKind === "system" || body.authorKind === "client") {
+      updates.authorKind = body.authorKind
+    }
+    if (body.authorLabel !== undefined) {
+      updates.authorLabel = typeof body.authorLabel === "string" ? body.authorLabel : undefined
+    }
     if (body.summary !== undefined) updates.summary = typeof body.summary === "string" ? body.summary : undefined
     if (body.details !== undefined) updates.details = typeof body.details === "string" ? body.details : undefined
     if (body.status === "draft" || body.status === "published") {

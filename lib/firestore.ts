@@ -420,6 +420,9 @@ export type FirestoreUpdateDoc = {
   status?: string
   published?: boolean
   createdByUid?: string
+  workspaceId?: string
+  authorKind?: string
+  authorLabel?: string
   links?: Record<string, string>
   video?: ClientUpdateVideo
   versionLabel?: string
@@ -438,6 +441,12 @@ function mapUpdateDoc(id: string, data: FirebaseFirestore.DocumentData): ClientU
     id,
     createdAt: createdAtStr,
     createdByUid: typeof data.createdByUid === "string" ? data.createdByUid : undefined,
+    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
+    authorKind:
+      data.authorKind === "admin" || data.authorKind === "system" || data.authorKind === "client"
+        ? data.authorKind
+        : undefined,
+    authorLabel: typeof data.authorLabel === "string" ? data.authorLabel : undefined,
     type: MODULE_KEYS.includes(data.type as ModuleKey) ? (data.type as ModuleKey) : "web",
     title: typeof data.title === "string" ? data.title : "",
     summary: typeof data.summary === "string" ? data.summary : undefined,
@@ -518,6 +527,9 @@ export async function createClientUpdate(
   await ref.set({
     createdAt,
     createdByUid: data.createdByUid ?? null,
+    workspaceId: data.workspaceId ?? null,
+    authorKind: data.authorKind ?? null,
+    authorLabel: data.authorLabel ?? null,
     type: data.type,
     title: data.title,
     summary: data.summary ?? null,
@@ -546,6 +558,9 @@ export async function updateClientUpdate(
   const payload: Record<string, unknown> = {}
   if (data.type !== undefined) payload.type = data.type
   if (data.title !== undefined) payload.title = data.title
+  if (data.workspaceId !== undefined) payload.workspaceId = data.workspaceId
+  if (data.authorKind !== undefined) payload.authorKind = data.authorKind
+  if (data.authorLabel !== undefined) payload.authorLabel = data.authorLabel
   if (data.summary !== undefined) payload.summary = data.summary
   if (data.details !== undefined) payload.details = data.details
   if (data.body !== undefined) payload.body = data.body

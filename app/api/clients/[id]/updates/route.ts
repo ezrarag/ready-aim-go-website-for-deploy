@@ -13,13 +13,17 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") as ModuleKey | null
     const status = searchParams.get("status") as UpdateStatus | null
+    const workspaceId = searchParams.get("workspaceId")?.trim() || ""
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "10", 10) || 10, 50)
 
-    const updates = await getClientUpdates(clientId, {
+    let updates = await getClientUpdates(clientId, {
       ...(type && MODULE_KEYS.includes(type) && { type }),
       ...(status && (status === "draft" || status === "published") && { status }),
       limit,
     })
+    if (workspaceId) {
+      updates = updates.filter((update) => !update.workspaceId || update.workspaceId === workspaceId)
+    }
 
     return NextResponse.json({
       success: true,
@@ -68,6 +72,12 @@ export async function POST(
       details: typeof body.details === "string" ? body.details : undefined,
       body: typeof body.body === "string" ? body.body : undefined,
       status: body.status === "published" ? "published" : "draft",
+      workspaceId: typeof body.workspaceId === "string" ? body.workspaceId.trim() : undefined,
+      authorKind:
+        body.authorKind === "admin" || body.authorKind === "system" || body.authorKind === "client"
+          ? body.authorKind
+          : undefined,
+      authorLabel: typeof body.authorLabel === "string" ? body.authorLabel : undefined,
       links: body.links && typeof body.links === "object" ? body.links : undefined,
       video: body.video && typeof body.video === "object" ? body.video : undefined,
       versionLabel: typeof body.versionLabel === "string" ? body.versionLabel : undefined,

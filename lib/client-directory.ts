@@ -117,6 +117,9 @@ export interface ClientUpdate {
   id: string
   createdAt: string
   createdByUid?: string
+  workspaceId?: string
+  authorKind?: "admin" | "system" | "client"
+  authorLabel?: string
   type: ModuleKey
   title: string
   summary?: string

@@ -319,6 +319,28 @@ export function WorkspaceQuestionnairesPanel({
     }
   }
 
+  const sendQuestionnaire = async (questionnaire: QuestionnaireDoc) => {
+    setMessage(null)
+    try {
+      const response = await fetch(
+        `/api/workspaces/${encodeURIComponent(workspaceId)}/questionnaires/${encodeURIComponent(questionnaire.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "active" }),
+        }
+      )
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload?.success !== true) {
+        throw new Error(payload?.error || `Questionnaire send returned ${response.status}`)
+      }
+      setMessage("Questionnaire sent to the client Intake tab.")
+      await loadQuestionnaires()
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "Unable to send questionnaire.")
+    }
+  }
+
   const exportResponsesAsText = async () => {
     if (!responseViewer || responseViewer.responses.length === 0) return
 
@@ -411,6 +433,11 @@ export function WorkspaceQuestionnairesPanel({
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </Button>
+                      {questionnaire.status === "draft" ? (
+                        <Button type="button" size="sm" onClick={() => void sendQuestionnaire(questionnaire)}>
+                          Send to client
+                        </Button>
+                      ) : null}
                       {questionnaire.status === "closed" ? (
                         <Button type="button" size="sm" variant="outline" onClick={() => void openResponses(questionnaire)}>
                           View responses

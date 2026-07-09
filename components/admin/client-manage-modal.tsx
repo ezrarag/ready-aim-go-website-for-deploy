@@ -140,7 +140,7 @@ export function ClientManageModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Manage client</DialogTitle>
+          <DialogTitle>Manage person / relationship</DialogTitle>
         </DialogHeader>
 
         {client ? (
@@ -163,16 +163,29 @@ export function ClientManageModal({
                 <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                   Canonical workspace
                 </label>
-                {workspaceId && onEditWorkspace ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEditWorkspace(workspaceId)}
-                  >
-                    Edit workspace
-                  </Button>
-                ) : null}
+                <div className="flex gap-2">
+                  {client.clientPortalEmail ? (
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <a
+                        href={`https://clients.readyaimgo.biz/portal/${encodeURIComponent(client.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View client dashboard
+                      </a>
+                    </Button>
+                  ) : null}
+                  {workspaceId && onEditWorkspace ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEditWorkspace(workspaceId)}
+                    >
+                      Edit workspace
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <select
                 value={workspaceId}

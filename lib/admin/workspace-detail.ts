@@ -90,6 +90,17 @@ export type WorkspaceEmailSummary = {
   threadUrl: string | null
 }
 
+export type WorkspaceMessageSummary = {
+  id: string
+  title: string | null
+  content: string
+  projectId: string | null
+  clientId: string | null
+  authorKind: string | null
+  authorLabel: string | null
+  createdAt: string | null
+}
+
 export type WorkspaceEventSummary = {
   id: string
   title: string
@@ -104,7 +115,9 @@ export type WorkspaceFileReference = {
   id: string
   label: string
   url: string
-  source: "contract" | "update-video"
+  source: "contract" | "update-video" | "workspace-file"
+  projectId?: string | null
+  scope?: string | null
   updatedAt: string | null
 }
 
@@ -157,6 +170,7 @@ export type AdminWorkspaceDetail = {
   members: WorkspaceMemberSummary[]
   pendingInvites: WorkspaceInviteSummary[]
   emails: WorkspaceEmailSummary[]
+  messages: WorkspaceMessageSummary[]
   events: WorkspaceEventSummary[]
   fileReferences: WorkspaceFileReference[]
   retainer: WorkspaceRetainerSummary
@@ -246,6 +260,20 @@ function normalizeEmail(id: string, input: Record<string, unknown>): WorkspaceEm
   }
 }
 
+function normalizeMessage(id: string, input: Record<string, unknown>): WorkspaceMessageSummary {
+  const serialized = serializeFirestoreDocument(id, input)
+  return {
+    id,
+    title: readString(serialized.title),
+    content: readString(serialized.content) || "",
+    projectId: readString(serialized.projectId),
+    clientId: readString(serialized.clientId),
+    authorKind: readString(serialized.authorKind),
+    authorLabel: readString(serialized.authorLabel),
+    createdAt: toIsoString(serialized.createdAt),
+  }
+}
+
 function normalizeEvent(id: string, input: Record<string, unknown>): WorkspaceEventSummary {
   const serialized = serializeFirestoreDocument(id, input)
   return {
@@ -283,7 +311,7 @@ export async function loadAdminWorkspaceDetail(
   const clientId = clientSnap?.id ?? workspaceClientId ?? null
   const clientData = clientSnap?.exists ? (clientSnap.data() as Record<string, unknown>) : {}
 
-  const [contractsByWorkspace, contractsByClient, membersSnap, invitesSnap, emailsSnap, eventsSnap, statusVideoData] =
+  const [contractsByWorkspace, contractsByClient, membersSnap, invitesSnap, emailsSnap, messagesSnap, workspaceFilesSnap, eventsSnap, statusVideoData] =
     await Promise.all([
       db.collection("contracts").where("workspaceId", "==", workspaceId).limit(50).get().catch(() => null),
       clientId
@@ -294,6 +322,8 @@ export async function loadAdminWorkspaceDetail(
       clientId
         ? db.collection("clientComms").doc(clientId).collection("emails").limit(20).get().catch(() => null)
         : Promise.resolve(null),
+      db.collection("workspaces").doc(workspaceId).collection("messages").limit(40).get().catch(() => null),
+      db.collection("workspaces").doc(workspaceId).collection("files").limit(40).get().catch(() => null),
       clientId
         ? db.collection("clientComms").doc(clientId).collection("events").limit(20).get().catch(() => null)
         : Promise.resolve(null),
@@ -311,12 +341,17 @@ export async function loadAdminWorkspaceDetail(
     return rightTime - leftTime
   })
 
-  const updates = clientId ? await getClientUpdates(clientId, { limit: 12 }) : []
+  const updates = clientId
+    ? (await getClientUpdates(clientId, { limit: 24 })).filter((update) => !update.workspaceId || update.workspaceId === workspaceId)
+    : []
   const members = (membersSnap?.docs ?? []).map((doc) => normalizeMember(doc.id, doc.data() as Record<string, unknown>))
   const pendingInvites = (invitesSnap?.docs ?? []).map((doc) => normalizeInvite(doc.id, doc.data() as Record<string, unknown>))
   const emails = (emailsSnap?.docs ?? [])
     .map((doc) => normalizeEmail(doc.id, doc.data() as Record<string, unknown>))
     .sort((left, right) => new Date(right.date ?? 0).getTime() - new Date(left.date ?? 0).getTime())
+  const messages = (messagesSnap?.docs ?? [])
+    .map((doc) => normalizeMessage(doc.id, doc.data() as Record<string, unknown>))
+    .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime())
   const events = (eventsSnap?.docs ?? [])
     .map((doc) => normalizeEvent(doc.id, doc.data() as Record<string, unknown>))
     .sort((left, right) => new Date(right.start ?? 0).getTime() - new Date(left.start ?? 0).getTime())
@@ -328,6 +363,8 @@ export async function loadAdminWorkspaceDetail(
         label: contract.title,
         url,
         source: "contract" as const,
+        projectId: null,
+        scope: "contract",
         updatedAt: contract.updatedAt,
       }))
     ),
@@ -338,8 +375,22 @@ export async function loadAdminWorkspaceDetail(
         label: update.title || "Update video",
         url: update.video?.publicUrl || "",
         source: "update-video" as const,
+        projectId: null,
+        scope: update.workspaceId ? "workspace-update" : "client-update",
         updatedAt: update.createdAt,
       })),
+    ...(workspaceFilesSnap?.docs ?? []).map((doc) => {
+      const serialized = serializeFirestoreDocument(doc.id, doc.data() as Record<string, unknown>)
+      return {
+        id: `workspace-file:${doc.id}`,
+        label: readString(serialized.title) || readString(serialized.filename) || doc.id,
+        url: readString(serialized.url) || "",
+        source: "workspace-file" as const,
+        projectId: readString(serialized.projectId),
+        scope: readString(serialized.scope),
+        updatedAt: toIsoString(serialized.updatedAt) || toIsoString(serialized.createdAt),
+      }
+    }).filter((entry) => Boolean(entry.url)),
   ])
 
   const normalizedRetainer = normalizeClientRetainer(clientData.retainer)
@@ -434,6 +485,7 @@ export async function loadAdminWorkspaceDetail(
     members,
     pendingInvites,
     emails,
+    messages,
     events,
     fileReferences,
     retainer,

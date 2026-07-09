@@ -256,6 +256,9 @@ export function normalizePendingClientPerson(id: string, input: unknown): AdminH
 
 export function normalizeUserPerson(uid: string, input: unknown): AdminHubPerson | null {
   const record = asRecord(input)
+  if (record.archived === true || readString(record.status) === "archived") {
+    return null
+  }
   const email = readString(record.email)?.toLowerCase() || ""
   if (!email) return null
   const contract = contractFromUserDoc(record)

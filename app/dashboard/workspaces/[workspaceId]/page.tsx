@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, Pencil, Settings } from "lucide-react"
+import { ArrowLeft, Eye, FileText, Pencil, ReceiptText, Settings } from "lucide-react"
 
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelTitle } from "@/components/admin/admin-panel"
@@ -19,11 +19,14 @@ export const metadata: Metadata = {
 
 type Props = {
   params: Promise<{ workspaceId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
 export default async function AdminWorkspaceDetailPage(props: Props) {
   const params = await props.params
+  const searchParams = props.searchParams ? await props.searchParams : undefined
   const workspaceId = decodeURIComponent(params.workspaceId)
+  const requestedTab = typeof searchParams?.tab === "string" ? searchParams.tab : undefined
   const detail = await loadAdminWorkspaceDetail(getAdminDb(), workspaceId)
 
   if (!detail) {
@@ -32,6 +35,9 @@ export default async function AdminWorkspaceDetailPage(props: Props) {
 
   const quickEditHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(workspaceId)}&panel=edit`
   const quickReposHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(workspaceId)}&panel=repos`
+  const clientViewHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}/client-view`
+  const uploadContractHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}?tab=contracts`
+  const createInvoiceHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}?tab=deliverables`
 
   return (
     <DashboardLayout>
@@ -55,6 +61,26 @@ export default async function AdminWorkspaceDetailPage(props: Props) {
               <Link href="/dashboard?view=workspaces">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Workspaces
+              </Link>
+            </Button>
+            {detail.client ? (
+              <Button asChild variant="outline">
+                <Link href={clientViewHref}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  See Client View
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild variant="outline">
+              <Link href={uploadContractHref}>
+                <FileText className="mr-2 h-4 w-4" />
+                Upload contract
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={createInvoiceHref}>
+                <ReceiptText className="mr-2 h-4 w-4" />
+                Create invoice
               </Link>
             </Button>
             <Button asChild variant="outline">
@@ -136,6 +162,7 @@ export default async function AdminWorkspaceDetailPage(props: Props) {
           detail={detail}
           quickEditHref={quickEditHref}
           quickReposHref={quickReposHref}
+          initialTab={requestedTab}
         />
       </div>
     </DashboardLayout>

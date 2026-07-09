@@ -78,6 +78,7 @@ import { WebsiteCardModal } from "@/components/website-card-modal";
 import { toast } from "sonner";
 import { FirstTimeUserPopup } from "@/components/first-time-user-popup"
 import { ClientQuestionnairesCard } from "@/components/client-questionnaires-card"
+import { ClientWorkspaceSettingsCard } from "@/components/client-workspace-settings-card"
 
 function ClientDashboardContent() {
   const { session, loading, error } = useUserWithRole();
@@ -88,7 +89,7 @@ function ClientDashboardContent() {
   const { stats: clientStats, loading: statsLoading, error: statsError } = useClientStats(clientId);
   const { operators, loading: operatorsLoading, error: operatorsError } = useOperators();
   const { projects: clientProjects, loading: projectsLoading, error: projectsError } = useClientProjects(clientId);
-  const { client: clientProfile, website: clientWebsite, loading: websiteLoading, error: websiteError } = useClientData(clientId);
+  const { client: clientProfile, website: clientWebsite, loading: websiteLoading, error: websiteError, refetch: refetchClientData } = useClientData(clientId);
   const { commissionRate, loading: commissionLoading, error: commissionError, updateCommissionRate } = useCommissionRate(clientId);
   const { revenueData, loading: revenueLoading, error: revenueError } = useRevenueData(clientId);
   const { activities: activityLog, loading: activityLoading, error: activityError } = useActivityLog(clientId);
@@ -3574,6 +3575,7 @@ function ClientDashboardContent() {
             </div>
           </CardContent>
         </Card>
+        <ClientWorkspaceSettingsCard onSaved={() => void refetchClientData()} />
       </div>
     </div>
   )

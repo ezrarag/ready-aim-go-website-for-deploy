@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   BarChart3,
   CheckCircle,
@@ -9,10 +10,8 @@ import {
   FolderOpen,
   Link2,
   MessageSquare,
-  Plus,
   RefreshCw,
   ShieldCheck,
-  Target,
   Users,
   Video,
   Wallet,
@@ -72,6 +71,7 @@ type DeliverableRecord = {
   summary?: string
   status?: string
   amount?: number
+  workspaceId?: string | null
   projectId?: string | null
   liveUrl?: string | null
 }
@@ -101,6 +101,8 @@ type ProjectSuggestionRecord = {
   source?: string
   agentContextStatus?: string
   createdAt?: string | null
+  adminResponse?: string | null
+  taskId?: string | null
 }
 
 type ClientSignalRecord = {
@@ -129,11 +131,52 @@ type PulseAuditState = {
   matchedEventCount?: number
 }
 
-type InjectProjectDraft = {
+type SuggestionComposerState = {
+  [suggestionId: string]: {
+    status: string
+    adminResponse: string
+    saving: boolean
+    error: string | null
+  }
+}
+
+type ContractDraft = {
+  title: string
+  type: string
+  status: string
+  notes: string
+  file: File | null
+}
+
+type UpdateDraft = {
+  type: string
   title: string
   summary: string
-  repoSlug: string
-  vercelProjectSlug: string
+  details: string
+  status: "draft" | "published"
+}
+
+type MessageDraft = {
+  title: string
+  content: string
+  projectId: string
+}
+
+type InvoiceDraft = {
+  contractId: string
+  title: string
+  amount: string
+  summary: string
+}
+
+type WorkspaceFileRecord = {
+  id: string
+  label: string
+  url: string
+  source: "contract" | "update-video" | "workspace-file"
+  updatedAt: string | null
+  projectId?: string | null
+  scope?: string | null
 }
 
 function recordTitle(record: ProjectRecord) {
@@ -240,6 +283,7 @@ export function WorkspaceProjectControlCenter({
   detail,
   quickEditHref,
   quickReposHref,
+  initialTab,
 }: {
   clientId?: string | null
   workspaceId: string
@@ -247,27 +291,80 @@ export function WorkspaceProjectControlCenter({
   detail: AdminWorkspaceDetail
   quickEditHref?: string
   quickReposHref?: string
+  initialTab?: string
 }) {
+  const router = useRouter()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [deliverables, setDeliverables] = useState<DeliverableRecord[]>([])
   const [repos, setRepos] = useState<RepoRecord[]>([])
   const [suggestions, setSuggestions] = useState<ProjectSuggestionRecord[]>([])
+  const [suggestionForms, setSuggestionForms] = useState<SuggestionComposerState>({})
   const [clientSignal, setClientSignal] = useState<ClientSignalRecord | null>(null)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [contracts, setContracts] = useState(detail.contracts)
+  const [workspaceMessages, setWorkspaceMessages] = useState(detail.messages)
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileRecord[]>(
+    detail.fileReferences.filter((file) => file.source === "workspace-file")
+  )
+  const [members, setMembers] = useState(detail.members)
+  const [updates, setUpdates] = useState(detail.updates)
+  const [retainer, setRetainer] = useState(detail.retainer)
+  const [retainerSaving, setRetainerSaving] = useState(false)
+  const [retainerError, setRetainerError] = useState<string | null>(null)
+  const [retainerDraft, setRetainerDraft] = useState({
+    poolId: detail.retainer.poolId || "",
+    poolName: detail.retainer.poolName || "",
+    amountTotal: detail.retainer.amountTotal ? String(detail.retainer.amountTotal) : "",
+    currency: detail.retainer.currency || "usd",
+    source: detail.retainer.source || "manual",
+    active: detail.retainer.active,
+  })
+  const [contractDraft, setContractDraft] = useState<ContractDraft>({
+    title: "",
+    type: "scope_of_work",
+    status: "draft",
+    notes: "",
+    file: null,
+  })
+  const [contractSaving, setContractSaving] = useState(false)
+  const [contractError, setContractError] = useState<string | null>(null)
+  const [updateDraft, setUpdateDraft] = useState<UpdateDraft>({
+    type: "web",
+    title: "",
+    summary: "",
+    details: "",
+    status: "draft",
+  })
+  const [updateSaving, setUpdateSaving] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [messageDraft, setMessageDraft] = useState<MessageDraft>({
+    title: "",
+    content: "",
+    projectId: "",
+  })
+  const [messageSaving, setMessageSaving] = useState(false)
+  const [messageError, setMessageError] = useState<string | null>(null)
+  const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft>({
+    contractId: detail.contracts[0]?.id || "",
+    title: detail.contracts[0] ? `${detail.contracts[0].title} invoice` : "",
+    amount: "",
+    summary: detail.contracts[0] ? `Invoice derived from ${detail.contracts[0].title}.` : "",
+  })
+  const [invoiceSaving, setInvoiceSaving] = useState(false)
+  const [invoiceError, setInvoiceError] = useState<string | null>(null)
+  const [archivingMemberId, setArchivingMemberId] = useState<string | null>(null)
+  const [teamError, setTeamError] = useState<string | null>(null)
+  const [fileUpload, setFileUpload] = useState<{ title: string; projectId: string; file: File | null }>({
+    title: "",
+    projectId: "",
+    file: null,
+  })
+  const [fileSaving, setFileSaving] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pulseAudit, setPulseAudit] = useState<PulseAuditState | null>(null)
   const [pulseAuditLoading, setPulseAuditLoading] = useState(false)
   const [pulseAuditError, setPulseAuditError] = useState<string | null>(null)
-  const [injectOpen, setInjectOpen] = useState(false)
-  const [injectSaving, setInjectSaving] = useState(false)
-  const [injectError, setInjectError] = useState<string | null>(null)
-  const [injectDraft, setInjectDraft] = useState<InjectProjectDraft>({
-    title: "",
-    summary: "",
-    repoSlug: "",
-    vercelProjectSlug: "",
-  })
 
   const loadWorkspaceMap = async () => {
     let cancelled = false
@@ -298,9 +395,20 @@ export function WorkspaceProjectControlCenter({
     setTasks(nextTasks)
     setRepos(nextRepos)
     setSuggestions(nextSuggestions)
+    setSuggestionForms((current) => {
+      const next = { ...current }
+      for (const suggestion of nextSuggestions) {
+        next[suggestion.id] = next[suggestion.id] || {
+          status: suggestion.status || "open",
+          adminResponse: suggestion.adminResponse || "",
+          saving: false,
+          error: null,
+        }
+      }
+      return next
+    })
     setDeliverables(nextDeliverables)
     setClientSignal(nextClientSignal)
-    setSelectedProjectId((current) => current || mergedProjects[0]?.id || null)
     setLoading(false)
   }
 
@@ -308,17 +416,24 @@ export function WorkspaceProjectControlCenter({
     void loadWorkspaceMap()
   }, [clientId, workspaceId])
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null,
-    [projects, selectedProjectId]
-  )
-  const selectedTasks = useMemo(
-    () => tasks.filter((task) => !selectedProject || task.projectId === selectedProject.id),
-    [selectedProject, tasks]
-  )
-  const selectedSuggestions = useMemo(
-    () => suggestions.filter((suggestion) => !selectedProject || suggestion.projectId === selectedProject.id),
-    [selectedProject, suggestions]
+  useEffect(() => {
+    setContracts(detail.contracts)
+    setWorkspaceMessages(detail.messages)
+    setWorkspaceFiles(detail.fileReferences.filter((file) => file.source === "workspace-file"))
+    setMembers(detail.members)
+    setUpdates(detail.updates)
+    setRetainer(detail.retainer)
+    setInvoiceDraft({
+      contractId: detail.contracts[0]?.id || "",
+      title: detail.contracts[0] ? `${detail.contracts[0].title} invoice` : "",
+      amount: "",
+      summary: detail.contracts[0] ? `Invoice derived from ${detail.contracts[0].title}.` : "",
+    })
+  }, [detail])
+
+  const visibleDeliverables = useMemo(
+    () => deliverables.filter((deliverable) => !deliverable.workspaceId || deliverable.workspaceId === workspaceId),
+    [deliverables, workspaceId]
   )
   const linkedRepoCount = useMemo(() => {
     const values = [
@@ -362,36 +477,346 @@ export function WorkspaceProjectControlCenter({
     }
   }
 
-  const handleInjectProject = async () => {
-    if (!injectDraft.title.trim()) {
-      setInjectError("Project title is required.")
-      return
-    }
+  const handleSuggestionField = (suggestionId: string, key: "status" | "adminResponse", value: string) => {
+    setSuggestionForms((current) => ({
+      ...current,
+      [suggestionId]: {
+        status: current[suggestionId]?.status || "open",
+        adminResponse: current[suggestionId]?.adminResponse || "",
+        saving: false,
+        error: null,
+        [key]: value,
+      },
+    }))
+  }
 
-    setInjectSaving(true)
-    setInjectError(null)
+  const handleSaveSuggestion = async (suggestion: ProjectSuggestionRecord, convertToTask = false) => {
+    const form = suggestionForms[suggestion.id] || {
+      status: suggestion.status || "open",
+      adminResponse: suggestion.adminResponse || "",
+      saving: false,
+      error: null,
+    }
+    setSuggestionForms((current) => ({
+      ...current,
+      [suggestion.id]: { ...form, saving: true, error: null },
+    }))
     try {
-      const response = await fetch(`/api/admin/workspaces/${encodeURIComponent(workspaceId)}/projects`, {
-        method: "POST",
+      const response = await fetch(`/api/admin/project-suggestions/${encodeURIComponent(suggestion.id)}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: injectDraft.title.trim(),
-          summary: injectDraft.summary.trim(),
-          repoSlug: injectDraft.repoSlug.trim(),
-          vercelProjectSlug: injectDraft.vercelProjectSlug.trim(),
+          status: form.status,
+          adminResponse: form.adminResponse,
+          convertToTask,
+          workspaceId,
+          clientId: clientId || suggestion.clientId || "",
+          projectId: suggestion.projectId || "",
+          taskTitle: suggestion.projectTitle || suggestion.summary || suggestion.rawText || "Client suggestion follow-up",
         }),
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok || payload.success === false) {
-        throw new Error(payload.error || "Failed to inject project")
+        throw new Error(payload.error || "Unable to update suggestion.")
       }
-      setInjectOpen(false)
-      setInjectDraft({ title: "", summary: "", repoSlug: "", vercelProjectSlug: "" })
       await loadWorkspaceMap()
     } catch (error) {
-      setInjectError(error instanceof Error ? error.message : "Failed to inject project")
+      setSuggestionForms((current) => ({
+        ...current,
+        [suggestion.id]: { ...form, saving: false, error: error instanceof Error ? error.message : "Unable to update suggestion." },
+      }))
+      return
+    }
+    setSuggestionForms((current) => ({
+      ...current,
+      [suggestion.id]: { ...form, saving: false, error: null },
+    }))
+  }
+
+  const handleSaveRetainer = async () => {
+    setRetainerSaving(true)
+    setRetainerError(null)
+    try {
+      const response = await fetch(`/api/admin/workspaces/${encodeURIComponent(workspaceId)}/retainer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: clientId || detail.client?.id || "",
+          poolId: retainerDraft.poolId,
+          poolName: retainerDraft.poolName,
+          amountTotal: Number(retainerDraft.amountTotal || 0),
+          currency: retainerDraft.currency,
+          source: retainerDraft.source,
+          active: retainerDraft.active,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to save retainer settings.")
+      }
+      setRetainer({
+        ...retainer,
+        exists: true,
+        amountTotal: Number(retainerDraft.amountTotal || 0),
+        currency: retainerDraft.currency,
+        source: retainerDraft.source,
+        poolId: retainerDraft.poolId,
+        poolName: retainerDraft.poolName || retainerDraft.poolId,
+        active: retainerDraft.active,
+      })
+    } catch (error) {
+      setRetainerError(error instanceof Error ? error.message : "Unable to save retainer settings.")
     } finally {
-      setInjectSaving(false)
+      setRetainerSaving(false)
+    }
+  }
+
+  const handleCreateContract = async () => {
+    if (!clientId || !contractDraft.title.trim()) {
+      setContractError("A linked client and contract title are required.")
+      return
+    }
+    setContractSaving(true)
+    setContractError(null)
+    try {
+      const form = new FormData()
+      form.set("workspaceId", workspaceId)
+      form.set("clientId", clientId)
+      form.set("title", contractDraft.title)
+      form.set("type", contractDraft.type)
+      form.set("status", contractDraft.status)
+      form.set("notes", contractDraft.notes)
+      if (contractDraft.file) form.set("file", contractDraft.file)
+
+      const response = await fetch("/api/contracts", { method: "POST", body: form })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to create contract.")
+      }
+      setContracts((current) => [payload.data, ...current])
+      setContractDraft({ title: "", type: "scope_of_work", status: "draft", notes: "", file: null })
+    } catch (error) {
+      setContractError(error instanceof Error ? error.message : "Unable to create contract.")
+    } finally {
+      setContractSaving(false)
+    }
+  }
+
+  const handleCreateUpdate = async () => {
+    if (!clientId || !updateDraft.title.trim()) {
+      setUpdateError("A linked client and update title are required.")
+      return
+    }
+    setUpdateSaving(true)
+    setUpdateError(null)
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: updateDraft.type,
+          title: updateDraft.title,
+          summary: updateDraft.summary,
+          details: updateDraft.details,
+          status: updateDraft.status,
+          workspaceId,
+          authorKind: "admin",
+          authorLabel: "Admin",
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to create update.")
+      }
+      setUpdates((current) => [
+        {
+          id: payload.id,
+          createdAt: new Date().toISOString(),
+          createdByUid: "admin",
+          workspaceId,
+          authorKind: "admin",
+          authorLabel: "Admin",
+          type: updateDraft.type as "web" | "app" | "rd" | "housing" | "transportation" | "insurance",
+          title: updateDraft.title,
+          summary: updateDraft.summary || undefined,
+          details: updateDraft.details || undefined,
+          body: updateDraft.details || undefined,
+          status: updateDraft.status,
+        },
+        ...current,
+      ])
+      setUpdateDraft({ type: "web", title: "", summary: "", details: "", status: "draft" })
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : "Unable to create update.")
+    } finally {
+      setUpdateSaving(false)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!messageDraft.content.trim()) {
+      setMessageError("Message content is required.")
+      return
+    }
+    setMessageSaving(true)
+    setMessageError(null)
+    try {
+      const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: clientId || "",
+          projectId: messageDraft.projectId || null,
+          title: messageDraft.title,
+          content: messageDraft.content,
+          authorLabel: "Admin",
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to send message.")
+      }
+      setWorkspaceMessages((current) => [
+        {
+          id: payload.id,
+          title: messageDraft.title || null,
+          content: messageDraft.content,
+          projectId: messageDraft.projectId || null,
+          clientId: clientId || null,
+          authorKind: "admin",
+          authorLabel: "Admin",
+          createdAt: new Date().toISOString(),
+        },
+        ...current,
+      ])
+      setMessageDraft({ title: "", content: "", projectId: "" })
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : "Unable to send message.")
+    } finally {
+      setMessageSaving(false)
+    }
+  }
+
+  const handleUploadFile = async () => {
+    if (!fileUpload.file) {
+      setFileError("Select a file to upload.")
+      return
+    }
+    setFileSaving(true)
+    setFileError(null)
+    try {
+      const form = new FormData()
+      form.set("file", fileUpload.file)
+      form.set("title", fileUpload.title)
+      form.set("projectId", fileUpload.projectId)
+      form.set("scope", fileUpload.projectId ? "project" : "workspace")
+
+      const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/files`, {
+        method: "POST",
+        body: form,
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to upload file.")
+      }
+      setWorkspaceFiles((current) => [
+        {
+          id: payload.id,
+          label: fileUpload.title || fileUpload.file?.name || payload.id,
+          url: payload.url,
+          source: "workspace-file",
+          projectId: fileUpload.projectId || null,
+          scope: fileUpload.projectId ? "project" : "workspace",
+          updatedAt: new Date().toISOString(),
+        },
+        ...current,
+      ])
+      setFileUpload({ title: "", projectId: "", file: null })
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Unable to upload file.")
+    } finally {
+      setFileSaving(false)
+    }
+  }
+
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/files/${encodeURIComponent(fileId.replace(/^workspace-file:/, ""))}`, {
+        method: "DELETE",
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to delete file.")
+      }
+      setWorkspaceFiles((current) => current.filter((file) => file.id !== fileId))
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Unable to delete file.")
+    }
+  }
+
+  const handleCreateInvoiceFromContract = async () => {
+    if (!clientId || !invoiceDraft.title.trim()) {
+      setInvoiceError("A linked client and invoice title are required.")
+      return
+    }
+
+    setInvoiceSaving(true)
+    setInvoiceError(null)
+    try {
+      const selectedContract = contracts.find((contract) => contract.id === invoiceDraft.contractId)
+      const amount = Number(invoiceDraft.amount || 0)
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}/deliverables`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          title: invoiceDraft.title,
+          amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
+          summary:
+            invoiceDraft.summary.trim() ||
+            (selectedContract ? `Invoice starter created from ${selectedContract.title}.` : "Invoice starter created from workspace contract."),
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to create invoice starter.")
+      }
+      setDeliverables((current) => [payload.data as DeliverableRecord, ...current])
+      setInvoiceDraft({
+        contractId: selectedContract?.id || contracts[0]?.id || "",
+        title: selectedContract ? `${selectedContract.title} invoice` : "",
+        amount: "",
+        summary: selectedContract ? `Invoice derived from ${selectedContract.title}.` : "",
+      })
+    } catch (error) {
+      setInvoiceError(error instanceof Error ? error.message : "Unable to create invoice starter.")
+    } finally {
+      setInvoiceSaving(false)
+    }
+  }
+
+  const handleArchiveWorkspaceMember = async (memberId: string) => {
+    if (!window.confirm("Archive this workspace person if they are no longer linked elsewhere?")) {
+      return
+    }
+
+    setArchivingMemberId(memberId)
+    setTeamError(null)
+    try {
+      const response = await fetch(
+        `/api/admin/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberId)}`,
+        { method: "DELETE" }
+      )
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || "Unable to archive workspace person.")
+      }
+      setMembers((current) => current.filter((member) => member.id !== memberId))
+      router.refresh()
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : "Unable to archive workspace person.")
+    } finally {
+      setArchivingMemberId(null)
     }
   }
 
@@ -405,9 +830,8 @@ export function WorkspaceProjectControlCenter({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="projects" className="space-y-4">
+          <Tabs defaultValue={initialTab || "suggestions"} className="space-y-4">
             <TabsList className="flex h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="projects"><Target className="mr-2 h-4 w-4" />Projects</TabsTrigger>
               <TabsTrigger value="suggestions"><MessageSquare className="mr-2 h-4 w-4" />Suggestions</TabsTrigger>
               <TabsTrigger value="contracts"><FileText className="mr-2 h-4 w-4" />Contracts</TabsTrigger>
               <TabsTrigger value="deliverables"><CheckCircle className="mr-2 h-4 w-4" />Deliverables</TabsTrigger>
@@ -420,107 +844,10 @@ export function WorkspaceProjectControlCenter({
               <TabsTrigger value="audit"><BarChart3 className="mr-2 h-4 w-4" />Audit</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="projects" className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Workspace-linked projects, current deployment linkage, and objective-to-task alignment.
-                </p>
-                <Button onClick={() => setInjectOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Inject Project
-                </Button>
-              </div>
-
-              {loading ? <p className="text-sm text-muted-foreground">Loading workspace project map...</p> : null}
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div className="space-y-3">
-                  {projects.length === 0 ? (
-                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">No child projects are linked yet.</p>
-                  ) : (
-                    projects.map((project) => (
-                      <button
-                        key={project.id}
-                        type="button"
-                        onClick={() => setSelectedProjectId(project.id)}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          selectedProject?.id === project.id ? "border-primary bg-primary/5" : "hover:border-primary/40"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-medium">{recordTitle(project)}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTone(project.status)}`}>
-                            {project.status || "active"}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{project.projectType || project.id}</p>
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                <div className="space-y-3 lg:col-span-2">
-                  {selectedProject ? (
-                    <>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold">{recordTitle(selectedProject)}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {selectedProject.summary || selectedProject.description || "No project summary captured."}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {firstRepo(selectedProject) ? <Badge variant="secondary">{firstRepo(selectedProject)}</Badge> : null}
-                            {firstHost(selectedProject) ? <Badge variant="secondary">{firstHost(selectedProject)}</Badge> : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      {projectObjectives(selectedProject).map((objective) => {
-                        const aligned = selectedTasks.filter((task) => taskMatches(task, objective))
-                        const done = aligned.filter((task) => task.status === "done" || task.status === "complete").length
-                        const progress = aligned.length ? Math.round((done / aligned.length) * 100) : 0
-                        return (
-                          <div key={objective.id} className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_1.3fr]">
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium">{objective.title}</p>
-                                <span className="text-xs text-muted-foreground">{progress}%</span>
-                              </div>
-                              <div className="mt-2 h-2 rounded-full bg-muted">
-                                <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
-                              </div>
-                              <p className="mt-2 text-xs text-muted-foreground">{objective.description}</p>
-                            </div>
-                            <div className="space-y-2">
-                              {aligned.length === 0 ? (
-                                <p className="rounded bg-muted px-3 py-2 text-xs text-muted-foreground">No tasks aligned yet.</p>
-                              ) : (
-                                aligned.map((task) => (
-                                  <div key={task.id} className="flex justify-between gap-3 rounded bg-muted px-3 py-2">
-                                    <span className="text-sm">{task.title || "Untitled task"}</span>
-                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTone(task.status)}`}>
-                                      {task.status || "proposed"}
-                                    </span>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </>
-                  ) : (
-                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">Select a project to inspect scope alignment.</p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
             <TabsContent value="suggestions" className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
-                  Workspace and project suggestions sourced through `clientFeedback`. If this view is empty for a known active workspace, verify the client submission path is writing `workspaceId`/`projectId`.
+                  Workspace suggestions sourced through `clientFeedback`, with project context preserved here instead of in a separate redundant Projects tab.
                 </p>
                 <Badge variant="secondary">{suggestions.length}</Badge>
               </div>
@@ -529,7 +856,14 @@ export function WorkspaceProjectControlCenter({
                   No project suggestions are visible for this workspace yet.
                 </p>
               ) : (
-                suggestions.map((suggestion) => (
+                suggestions.map((suggestion) => {
+                  const form = suggestionForms[suggestion.id] || {
+                    status: suggestion.status || "open",
+                    adminResponse: suggestion.adminResponse || "",
+                    saving: false,
+                    error: null,
+                  }
+                  return (
                   <div key={suggestion.id} className="rounded-lg border p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap gap-2">
@@ -538,6 +872,7 @@ export function WorkspaceProjectControlCenter({
                         </span>
                         {suggestion.urgency ? <Badge variant="outline">{suggestion.urgency}</Badge> : null}
                         {suggestion.projectTitle ? <Badge variant="secondary">{suggestion.projectTitle}</Badge> : null}
+                        {suggestion.projectId ? <Badge variant="outline">{suggestion.projectId}</Badge> : null}
                       </div>
                       {suggestion.createdAt ? (
                         <span className="text-xs text-muted-foreground">{formatDateTime(suggestion.createdAt)}</span>
@@ -549,18 +884,87 @@ export function WorkspaceProjectControlCenter({
                     <p className="mt-2 text-xs text-muted-foreground">
                       Source: {suggestion.source || "workspace-project-suggestion"} · Agent context: {suggestion.agentContextStatus || "ready"}
                     </p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-[180px_1fr]">
+                      <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        Status
+                        <select
+                          className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                          value={form.status}
+                          onChange={(event) => handleSuggestionField(suggestion.id, "status", event.target.value)}
+                        >
+                          {["open", "acknowledged", "accepted", "in_progress", "declined", "done"].map((status) => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        Admin response
+                        <Textarea
+                          className="mt-2 min-h-[96px]"
+                          value={form.adminResponse}
+                          onChange={(event) => handleSuggestionField(suggestion.id, "adminResponse", event.target.value)}
+                          placeholder="Add admin context or the next action visible to this workspace."
+                        />
+                      </label>
+                    </div>
+                    {suggestion.taskId ? (
+                      <p className="mt-3 text-xs text-muted-foreground">Linked task: {suggestion.taskId}</p>
+                    ) : null}
+                    {form.error ? <p className="mt-3 text-sm text-rose-600">{form.error}</p> : null}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => void handleSaveSuggestion(suggestion)} disabled={form.saving}>
+                        {form.saving ? "Saving..." : "Save suggestion"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void handleSaveSuggestion(suggestion, true)} disabled={form.saving}>
+                        Convert to task
+                      </Button>
+                    </div>
                   </div>
-                ))
+                )})
               )}
             </TabsContent>
 
             <TabsContent value="contracts" className="space-y-3">
-              {detail.contracts.length === 0 ? (
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Create contract or scope record</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Input
+                    value={contractDraft.title}
+                    onChange={(event) => setContractDraft((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Statement of work"
+                  />
+                  <Input
+                    value={contractDraft.type}
+                    onChange={(event) => setContractDraft((current) => ({ ...current, type: event.target.value }))}
+                    placeholder="scope_of_work"
+                  />
+                  <Input
+                    value={contractDraft.status}
+                    onChange={(event) => setContractDraft((current) => ({ ...current, status: event.target.value }))}
+                    placeholder="draft"
+                  />
+                  <Input
+                    type="file"
+                    onChange={(event) => setContractDraft((current) => ({ ...current, file: event.target.files?.[0] || null }))}
+                  />
+                </div>
+                <Textarea
+                  className="mt-3 min-h-[96px]"
+                  value={contractDraft.notes}
+                  onChange={(event) => setContractDraft((current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Scope notes or agreement context."
+                />
+                {contractError ? <p className="mt-3 text-sm text-rose-600">{contractError}</p> : null}
+                <Button className="mt-3" onClick={() => void handleCreateContract()} disabled={contractSaving}>
+                  {contractSaving ? "Saving..." : "Create contract"}
+                </Button>
+              </div>
+              {contracts.length === 0 ? (
                 <p className="rounded-lg border p-4 text-sm text-muted-foreground">
                   No contract records are linked to this workspace yet.
                 </p>
               ) : (
-                detail.contracts.map((contract) => (
+                contracts.map((contract) => (
                   <div key={contract.id} className="rounded-lg border p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -589,15 +993,66 @@ export function WorkspaceProjectControlCenter({
             </TabsContent>
 
             <TabsContent value="deliverables" className="space-y-3">
-              {deliverables.length === 0 ? (
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Create invoice from contract</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Starter flow only. This creates a pending client deliverable invoice from the selected contract without changing contract records.
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <select
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                    value={invoiceDraft.contractId}
+                    onChange={(event) => {
+                      const contract = contracts.find((entry) => entry.id === event.target.value)
+                      setInvoiceDraft((current) => ({
+                        ...current,
+                        contractId: event.target.value,
+                        title: current.title || (contract ? `${contract.title} invoice` : ""),
+                        summary: current.summary || (contract ? `Invoice derived from ${contract.title}.` : ""),
+                      }))
+                    }}
+                  >
+                    <option value="">No contract selected</option>
+                    {contracts.map((contract) => (
+                      <option key={contract.id} value={contract.id}>
+                        {contract.title}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    value={invoiceDraft.amount}
+                    onChange={(event) => setInvoiceDraft((current) => ({ ...current, amount: event.target.value }))}
+                    inputMode="decimal"
+                    placeholder="Amount"
+                  />
+                  <Input
+                    value={invoiceDraft.title}
+                    onChange={(event) => setInvoiceDraft((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Invoice title"
+                  />
+                  <Input
+                    value={invoiceDraft.summary}
+                    onChange={(event) => setInvoiceDraft((current) => ({ ...current, summary: event.target.value }))}
+                    placeholder="Invoice summary"
+                  />
+                </div>
+                {invoiceError ? <p className="mt-3 text-sm text-rose-600">{invoiceError}</p> : null}
+                <Button className="mt-3" onClick={() => void handleCreateInvoiceFromContract()} disabled={invoiceSaving}>
+                  {invoiceSaving ? "Creating..." : "Create invoice starter"}
+                </Button>
+              </div>
+              {visibleDeliverables.length === 0 ? (
                 <p className="rounded-lg border p-4 text-sm text-muted-foreground">No deliverables found.</p>
               ) : (
-                deliverables.map((deliverable) => (
+                visibleDeliverables.map((deliverable) => (
                   <div key={deliverable.id} className="flex items-start justify-between gap-4 rounded-lg border p-4">
                     <div>
                       <p className="font-medium">{deliverable.title || deliverable.id}</p>
                       <p className="text-sm text-muted-foreground">
                         {deliverable.summary || deliverable.projectId || "Workspace deliverable"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {deliverable.workspaceId ? "Workspace-linked" : "Client-level record"}
                       </p>
                       {deliverable.liveUrl ? (
                         <a href={deliverable.liveUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm hover:underline">
@@ -622,61 +1077,102 @@ export function WorkspaceProjectControlCenter({
                 <p className="rounded-lg border p-4 text-sm text-muted-foreground">
                   This workspace is not linked to a canonical client yet, so retainer visibility is blocked.
                 </p>
-              ) : !detail.retainer.exists ? (
-                <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-                  Linked client has no retainer record yet. Add `clients/{'{id}'}.retainer` and pool contributions to unlock this surface.
-                </p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <>
+                <div className="rounded-lg border p-4">
+                  <p className="font-medium">Retainer configuration</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <Input value={retainerDraft.poolId} onChange={(event) => setRetainerDraft((current) => ({ ...current, poolId: event.target.value }))} placeholder="pool id" />
+                    <Input value={retainerDraft.poolName} onChange={(event) => setRetainerDraft((current) => ({ ...current, poolName: event.target.value }))} placeholder="pool name" />
+                    <Input value={retainerDraft.amountTotal} onChange={(event) => setRetainerDraft((current) => ({ ...current, amountTotal: event.target.value }))} placeholder="3000" />
+                    <Input value={retainerDraft.currency} onChange={(event) => setRetainerDraft((current) => ({ ...current, currency: event.target.value }))} placeholder="usd" />
+                    <Input value={retainerDraft.source} onChange={(event) => setRetainerDraft((current) => ({ ...current, source: event.target.value }))} placeholder="manual" />
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={retainerDraft.active}
+                      onChange={(event) => setRetainerDraft((current) => ({ ...current, active: event.target.checked }))}
+                    />
+                    Active retainer
+                  </label>
+                  {retainerError ? <p className="mt-3 text-sm text-rose-600">{retainerError}</p> : null}
+                  <Button className="mt-3" onClick={() => void handleSaveRetainer()} disabled={retainerSaving}>
+                    {retainerSaving ? "Saving..." : retainer.exists ? "Update retainer" : "Link retainer"}
+                  </Button>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Ledger editing remains on the finance layer. This tab updates the canonical client retainer linkage and pooled wallet reference only.
+                  </p>
+                </div>
+                {retainer.exists ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-lg border p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Committed</p>
                     <p className="mt-2 text-2xl font-semibold">
-                      {formatCurrency(detail.retainer.amountTotal ?? 0, detail.retainer.currency ?? "usd")}
+                      {formatCurrency(retainer.amountTotal ?? 0, retainer.currency ?? "usd")}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{detail.retainer.active ? "Active" : "Inactive"} · {detail.retainer.source || "manual"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{retainer.active ? "Active" : "Inactive"} · {retainer.source || "manual"}</p>
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Received</p>
                     <p className="mt-2 text-2xl font-semibold">
-                      {formatCurrency(detail.retainer.totalReceived, detail.retainer.currency ?? "usd")}
+                      {formatCurrency(retainer.totalReceived, retainer.currency ?? "usd")}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{detail.retainer.contributionCount} contribution{detail.retainer.contributionCount === 1 ? "" : "s"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{retainer.contributionCount} contribution{retainer.contributionCount === 1 ? "" : "s"} · client-level pool record</p>
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Pool allocated</p>
                     <p className="mt-2 text-2xl font-semibold">
-                      {formatCurrency(detail.retainer.totalAllocated, detail.retainer.currency ?? "usd")}
+                      {formatCurrency(retainer.totalAllocated, retainer.currency ?? "usd")}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{detail.retainer.allocationCount} pool allocation{detail.retainer.allocationCount === 1 ? "" : "s"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{retainer.allocationCount} pool allocation{retainer.allocationCount === 1 ? "" : "s"}</p>
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Pool linkage</p>
-                    <p className="mt-2 text-lg font-semibold">{detail.retainer.poolName || detail.retainer.poolId}</p>
+                    <p className="mt-2 text-lg font-semibold">{retainer.poolName || retainer.poolId}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Latest contribution: {detail.retainer.latestContributionAt ? formatDateTime(detail.retainer.latestContributionAt) : "None"}
+                      Latest contribution: {retainer.latestContributionAt ? formatDateTime(retainer.latestContributionAt) : "None"}
                     </p>
                   </div>
-                </div>
+                </div> : null}
+                </>
               )}
             </TabsContent>
 
             <TabsContent value="updates" className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Post admin update</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Input value={updateDraft.type} onChange={(event) => setUpdateDraft((current) => ({ ...current, type: event.target.value }))} placeholder="web" />
+                  <Input value={updateDraft.title} onChange={(event) => setUpdateDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Update title" />
+                </div>
+                <Input className="mt-3" value={updateDraft.summary} onChange={(event) => setUpdateDraft((current) => ({ ...current, summary: event.target.value }))} placeholder="Short summary" />
+                <Textarea className="mt-3 min-h-[110px]" value={updateDraft.details} onChange={(event) => setUpdateDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Workspace-scoped update details" />
+                {updateError ? <p className="mt-3 text-sm text-rose-600">{updateError}</p> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button onClick={() => void handleCreateUpdate()} disabled={updateSaving}>{updateSaving ? "Posting..." : "Create draft update"}</Button>
+                  <Button variant="outline" onClick={() => setUpdateDraft((current) => ({ ...current, status: current.status === "draft" ? "published" : "draft" }))}>
+                    Status: {updateDraft.status}
+                  </Button>
+                </div>
+              </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-3 rounded-lg border p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium">Client updates feed</p>
-                    <Badge variant="secondary">{detail.updates.length}</Badge>
+                    <Badge variant="secondary">{updates.length}</Badge>
                   </div>
-                  {detail.updates.length === 0 ? (
+                  {updates.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No client updates recorded yet.</p>
                   ) : (
-                    detail.updates.map((update) => (
+                    updates.map((update) => (
                       <div key={update.id} className="rounded bg-muted p-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">{update.title}</p>
                           <Badge className={statusTone(update.status)}>{update.status}</Badge>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(update.createdAt)} · {update.type}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatDateTime(update.createdAt)} · {update.type} · {update.workspaceId ? "workspace-scoped" : "client-level"}{update.authorKind ? ` · ${update.authorKind}` : ""}
+                        </p>
                         <p className="mt-2 text-sm text-muted-foreground">{update.summary || update.details || update.body || "No summary provided."}</p>
                         {update.video?.publicUrl ? (
                           <a href={update.video.publicUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm hover:underline">
@@ -721,6 +1217,12 @@ export function WorkspaceProjectControlCenter({
             </TabsContent>
 
             <TabsContent value="intake">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Intake sender</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Use an active questionnaire to push intake into the client workspace. Draft questionnaires stay internal; switching one to active sends it to the client-side Intake tab.
+                </p>
+              </div>
               <WorkspaceQuestionnairesPanel workspaceId={workspaceId} workspaceName={workspaceName || workspaceId} />
             </TabsContent>
 
@@ -729,18 +1231,31 @@ export function WorkspaceProjectControlCenter({
                 <div className="rounded-lg border p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium">Active members</p>
-                    <Badge variant="secondary">{detail.members.length}</Badge>
+                    <Badge variant="secondary">{members.length}</Badge>
                   </div>
+                  {teamError ? <p className="mt-3 text-sm text-rose-600">{teamError}</p> : null}
                   <div className="mt-3 space-y-2">
-                    {detail.members.length === 0 ? (
+                    {members.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No workspace members found.</p>
                     ) : (
-                      detail.members.map((member) => (
+                      members.map((member) => (
                         <div key={member.id} className="rounded bg-muted px-3 py-2">
-                          <p className="font-medium">{member.displayName || member.email || member.id}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {member.role || "No role"} · {member.status || "unknown"} · {member.source || "manual"}
-                          </p>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{member.displayName || member.email || member.id}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {member.role || "No role"} · {member.status || "unknown"} · {member.source || "manual"}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleArchiveWorkspaceMember(member.id)}
+                              disabled={archivingMemberId === member.id}
+                            >
+                              {archivingMemberId === member.id ? "Archiving..." : "Archive"}
+                            </Button>
+                          </div>
                         </div>
                       ))
                     )}
@@ -771,7 +1286,52 @@ export function WorkspaceProjectControlCenter({
             </TabsContent>
 
             <TabsContent value="messages" className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Admin composer</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Input value={messageDraft.title} onChange={(event) => setMessageDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Message title" />
+                  <Input value={messageDraft.projectId} onChange={(event) => setMessageDraft((current) => ({ ...current, projectId: event.target.value }))} placeholder="Optional project id" />
+                </div>
+                <Textarea className="mt-3 min-h-[110px]" value={messageDraft.content} onChange={(event) => setMessageDraft((current) => ({ ...current, content: event.target.value }))} placeholder="Post a workspace message from admin." />
+                {messageError ? <p className="mt-3 text-sm text-rose-600">{messageError}</p> : null}
+                <Button className="mt-3" onClick={() => void handleSendMessage()} disabled={messageSaving}>
+                  {messageSaving ? "Sending..." : "Post message"}
+                </Button>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Upload workspace file</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <Input value={fileUpload.title} onChange={(event) => setFileUpload((current) => ({ ...current, title: event.target.value }))} placeholder="File label" />
+                  <Input value={fileUpload.projectId} onChange={(event) => setFileUpload((current) => ({ ...current, projectId: event.target.value }))} placeholder="Optional project id" />
+                  <Input type="file" onChange={(event) => setFileUpload((current) => ({ ...current, file: event.target.files?.[0] || null }))} />
+                </div>
+                {fileError ? <p className="mt-3 text-sm text-rose-600">{fileError}</p> : null}
+                <Button className="mt-3" onClick={() => void handleUploadFile()} disabled={fileSaving}>
+                  {fileSaving ? "Uploading..." : "Upload file"}
+                </Button>
+              </div>
               <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">Workspace message thread</p>
+                    <Badge variant="secondary">{workspaceMessages.length}</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {workspaceMessages.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No workspace-authored messages yet.</p>
+                    ) : (
+                      workspaceMessages.map((message) => (
+                        <div key={message.id} className="rounded bg-muted px-3 py-2">
+                          <p className="font-medium">{message.title || "Untitled message"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {message.authorLabel || message.authorKind || "admin"} · {formatDateTime(message.createdAt)}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{message.content}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
                 <div className="rounded-lg border p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium">Recent email threads</p>
@@ -819,18 +1379,29 @@ export function WorkspaceProjectControlCenter({
               <div className="rounded-lg border p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium">Shared file references</p>
-                  <Badge variant="secondary">{detail.fileReferences.length}</Badge>
+                  <Badge variant="secondary">{detail.fileReferences.length + workspaceFiles.length}</Badge>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {detail.fileReferences.length === 0 ? (
+                  {detail.fileReferences.length === 0 && workspaceFiles.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No canonical file references are exposed for this workspace yet.</p>
                   ) : (
-                    detail.fileReferences.map((file) => (
-                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded bg-muted px-3 py-2 text-sm hover:underline">
-                        <span>{file.label}</span>
-                        <span className="text-xs text-muted-foreground">{file.source}</span>
-                      </a>
-                    ))
+                    <>
+                      {workspaceFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between rounded bg-muted px-3 py-2 text-sm">
+                          <a href={file.url} target="_blank" rel="noreferrer" className="hover:underline">{file.label}</a>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{file.scope || file.source}</span>
+                            <Button size="sm" variant="ghost" onClick={() => void handleDeleteFile(file.id)}>Remove</Button>
+                          </div>
+                        </div>
+                      ))}
+                      {detail.fileReferences.filter((file) => file.source !== "workspace-file").map((file) => (
+                        <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded bg-muted px-3 py-2 text-sm hover:underline">
+                          <span>{file.label}</span>
+                          <span className="text-xs text-muted-foreground">{file.scope || file.source}</span>
+                        </a>
+                      ))}
+                    </>
                   )}
                 </div>
               </div>
@@ -894,11 +1465,7 @@ export function WorkspaceProjectControlCenter({
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-6">
-                <div className="rounded-lg border p-4">
-                  <p className="text-2xl font-bold">{projects.length}</p>
-                  <p className="text-xs text-muted-foreground">Child projects</p>
-                </div>
+              <div className="grid gap-4 md:grid-cols-5">
                 <div className="rounded-lg border p-4">
                   <p className="text-2xl font-bold">{tasks.length}</p>
                   <p className="text-xs text-muted-foreground">Tracked tasks</p>
@@ -971,42 +1538,6 @@ export function WorkspaceProjectControlCenter({
         </CardContent>
       </Card>
 
-      <Dialog open={injectOpen} onOpenChange={setInjectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Inject Workspace Project</DialogTitle>
-            <DialogDescription>
-              Create a workspace-linked project record using the existing admin injection path.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title</label>
-              <Input value={injectDraft.title} onChange={(event) => setInjectDraft((current) => ({ ...current, title: event.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Summary</label>
-              <Textarea value={injectDraft.summary} onChange={(event) => setInjectDraft((current) => ({ ...current, summary: event.target.value }))} rows={4} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Repo slug</label>
-              <Input value={injectDraft.repoSlug} onChange={(event) => setInjectDraft((current) => ({ ...current, repoSlug: event.target.value }))} placeholder="owner/repo" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Vercel project slug</label>
-              <Input value={injectDraft.vercelProjectSlug} onChange={(event) => setInjectDraft((current) => ({ ...current, vercelProjectSlug: event.target.value }))} placeholder="project-name" />
-            </div>
-            {injectError ? <p className="text-sm text-red-600">{injectError}</p> : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInjectOpen(false)} disabled={injectSaving}>Cancel</Button>
-            <Button onClick={() => void handleInjectProject()} disabled={injectSaving}>
-              {injectSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create project
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

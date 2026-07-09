@@ -7,8 +7,7 @@ export type AdminNavItem = {
 }
 
 export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
-  { id: "clients", label: "Clients", href: "/dashboard?view=clients" },
-  { id: "people", label: "People", href: "/dashboard?view=people" },
+  { id: "clients", label: "People", href: "/dashboard?view=clients" },
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
   { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
@@ -19,8 +18,7 @@ export const ADMIN_NAV_ITEMS = ADMIN_HUB_VIEWS
 
 /** @deprecated The admin dashboard now uses ADMIN_HUB_VIEWS. */
 export const CLIENT_SECTION_ITEMS: AdminNavItem[] = [
-  { id: "clients", label: "Clients", href: "/dashboard?view=clients" },
-  { id: "people", label: "People", href: "/dashboard?view=people" },
+  { id: "clients", label: "People", href: "/dashboard?view=clients" },
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
   { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
@@ -31,11 +29,11 @@ export const ADVANCED_ADMIN_TOOLS: AdminNavItem[] = ADMIN_HUB_VIEWS
 
 export const ADMIN_ROUTE_REDIRECTS: Record<string, string> = {
   "/dashboard/clients": "/dashboard?view=clients",
-  "/dashboard/clients/access": "/dashboard?view=people",
+  "/dashboard/clients/access": "/dashboard?view=clients",
   "/dashboard/clients/activity": "/dashboard?view=workspaces",
   "/dashboard/clients/assets": "/dashboard?view=workspaces",
   "/dashboard/clients/contracts": "/dashboard?view=billing",
-  "/dashboard/clients/onboarding": "/dashboard?view=people",
+  "/dashboard/clients/onboarding": "/dashboard?view=clients",
   "/dashboard/clients/vercel-sync": "/dashboard?view=workspaces",
   "/dashboard/command": "/dashboard?view=tasks",
   "/dashboard/web-development": "/dashboard?view=workspaces",
@@ -45,8 +43,9 @@ export const ADMIN_ROUTE_REDIRECTS: Record<string, string> = {
 }
 
 export function normalizeAdminHubView(value: string | null | undefined): AdminHubView {
-  return value === "clients" ||
-    value === "people" ||
+  return value === "people"
+    ? "clients"
+    : value === "clients" ||
     value === "workspaces" ||
     value === "tasks" ||
     value === "billing" ||

@@ -63,6 +63,14 @@ export const ADMIN_PRODUCT_LABELS: Record<AdminProductKey, string> = ADMIN_PRODU
   {} as Record<AdminProductKey, string>
 )
 
+export function readAdminProductKeys(value: unknown): AdminProductKey[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter(
+    (item): item is AdminProductKey =>
+      typeof item === "string" && ADMIN_PRODUCT_KEYS.includes(item as AdminProductKey)
+  )
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -131,4 +139,61 @@ export function getActiveProductKeys(
     const status = subscriptions[key]?.status
     return status === "active" || status === "trialing"
   })
+}
+
+export function getModuleKeysForProducts(products: AdminProductKey[]): import("@/lib/client-directory").ModuleKey[] {
+  const moduleKeys = new Set<import("@/lib/client-directory").ModuleKey>()
+  for (const product of ADMIN_PRODUCTS) {
+    if (!products.includes(product.id)) continue
+    for (const moduleKey of product.legacyModuleKeys) {
+      if (
+        moduleKey === "web" ||
+        moduleKey === "app" ||
+        moduleKey === "rd" ||
+        moduleKey === "housing" ||
+        moduleKey === "transportation" ||
+        moduleKey === "insurance"
+      ) {
+        moduleKeys.add(moduleKey)
+      }
+    }
+  }
+  return Array.from(moduleKeys)
+}
+
+export function getProductsForModuleKeys(
+  moduleKeys: import("@/lib/client-directory").ModuleKey[]
+): AdminProductKey[] {
+  const enabled = new Set(moduleKeys)
+  return ADMIN_PRODUCTS.filter((product) =>
+    product.legacyModuleKeys.some((key) => enabled.has(key as import("@/lib/client-directory").ModuleKey))
+  ).map((product) => product.id)
+}
+
+export function buildSubscriptionsFromActiveProducts(
+  client: Record<string, unknown>,
+  activeProducts: AdminProductKey[]
+): Record<AdminProductKey, AdminProductSubscription> {
+  const current = normalizeClientSubscriptions(client)
+  const active = new Set(activeProducts)
+  const now = new Date().toISOString()
+
+  return ADMIN_PRODUCT_KEYS.reduce((subscriptions, key) => {
+    const existing = current[key]
+    const nextStatus = active.has(key)
+      ? existing.status === "trialing"
+        ? "trialing"
+        : "active"
+      : "inactive"
+
+    subscriptions[key] = {
+      ...existing,
+      product: key,
+      status: nextStatus,
+      startedAt: active.has(key) ? existing.startedAt ?? now : existing.startedAt,
+      updatedAt: now,
+      legacy: false,
+    }
+    return subscriptions
+  }, {} as Record<AdminProductKey, AdminProductSubscription>)
 }

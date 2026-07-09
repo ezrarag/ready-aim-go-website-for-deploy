@@ -5,6 +5,8 @@ import { serializeFirestoreDocument } from "@/lib/firestore-json"
 import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
 import { normalizePhoneToE164 } from "@/lib/telnyx"
+import { readAdminProductKeys } from "@/lib/admin/products"
+import { syncClientProductSelections } from "@/lib/admin/client-product-sync"
 
 type Params = { params: Promise<{ clientId: string }> }
 
@@ -52,6 +54,7 @@ export async function PATCH(request: NextRequest, context: Params) {
 
     const body = (await request.json()) as Record<string, unknown>
     const patch = { ...body, updatedAt: new Date().toISOString() }
+    const activeProducts = readAdminProductKeys(body.activeProducts)
     if (typeof patch.phone === "string") {
       patch.phone = normalizePhoneToE164(patch.phone) || ""
     }
@@ -59,6 +62,7 @@ export async function PATCH(request: NextRequest, context: Params) {
     delete patch.id
     delete patch.createdAt
     delete patch.subscriptions
+    delete patch.activeProducts
 
     const ref = db.collection("clients").doc(clientId)
     const existing = await ref.get()
@@ -98,6 +102,14 @@ export async function PATCH(request: NextRequest, context: Params) {
 
     await ref.update(patch)
 
+    if (activeProducts !== undefined) {
+      await syncClientProductSelections(db, {
+        clientId,
+        activeProducts,
+        workspaceId: requestedWorkspaceId ?? currentWorkspaceId,
+      })
+    }
+
     if ("workspaceId" in body) {
       if (currentWorkspaceId && currentWorkspaceId !== requestedWorkspaceId) {
         await db.collection("workspaces").doc(currentWorkspaceId).set(
@@ -113,6 +125,7 @@ export async function PATCH(request: NextRequest, context: Params) {
         await db.collection("workspaces").doc(requestedWorkspaceId).set(
           {
             clientId,
+            ...(typeof body.name === "string" && body.name.trim() ? { name: body.name.trim() } : {}),
             updatedAt: patch.updatedAt,
           },
           { merge: true }

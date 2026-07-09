@@ -1,5 +1,11 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore"
 import { getDefaultModules, type ClientModule, type ModuleKey } from "@/lib/client-directory"
+import {
+  buildSubscriptionsFromActiveProducts,
+  getActiveProductKeys,
+  getProductsForModuleKeys,
+  normalizeClientSubscriptions,
+} from "@/lib/admin/products"
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null
@@ -53,7 +59,7 @@ function asClientModule(value: unknown, fallback: ClientModule): ClientModule {
   return fallback
 }
 
-function buildClientModules(current: Record<string, unknown>, enabledKeys: ModuleKey[]): Record<ModuleKey, ClientModule> {
+export function buildClientModules(current: Record<string, unknown>, enabledKeys: ModuleKey[]): Record<ModuleKey, ClientModule> {
   const defaults = getDefaultModules()
   const currentModules = current.modules && typeof current.modules === "object" && !Array.isArray(current.modules)
     ? (current.modules as Record<string, unknown>)
@@ -71,6 +77,7 @@ export async function updateWorkspaceFrontEndSettings(
   db: Firestore,
   workspaceId: string,
   updates: {
+    name?: string
     showOnFrontend?: boolean
     publicUrl?: string | null
     previewImageUrl?: string | null
@@ -88,6 +95,7 @@ export async function updateWorkspaceFrontEndSettings(
   const now = new Date().toISOString()
   const workspaceUpdates: Record<string, unknown> = { updatedAt: now }
 
+  if (updates.name !== undefined) workspaceUpdates.name = updates.name.trim() || workspaceId
   if (updates.showOnFrontend !== undefined) workspaceUpdates.showOnFrontend = updates.showOnFrontend
   if (updates.publicUrl !== undefined) workspaceUpdates.publicUrl = updates.publicUrl
   if (updates.previewImageUrl !== undefined) workspaceUpdates.previewImageUrl = normalizePreviewUrl(updates.previewImageUrl)
@@ -110,6 +118,13 @@ export async function updateWorkspaceFrontEndSettings(
       if (updates.previewImageUrl !== undefined) clientUpdates.appUrl = normalizePreviewUrl(updates.previewImageUrl)
       if (updates.frontEndProducts !== undefined) {
         clientUpdates.modules = buildClientModules(clientCurrent, updates.frontEndProducts)
+        const inferredProducts = getProductsForModuleKeys(updates.frontEndProducts)
+        const currentActiveProducts = getActiveProductKeys(normalizeClientSubscriptions(clientCurrent))
+        const preservedUnmappedProducts = currentActiveProducts.filter((product) => product === "cohort")
+        clientUpdates.subscriptions = buildSubscriptionsFromActiveProducts(
+          clientCurrent,
+          Array.from(new Set([...inferredProducts, ...preservedUnmappedProducts]))
+        )
       }
       if (updates.frontEndTags !== undefined) clientUpdates.brands = updates.frontEndTags
       await clientRef.update(clientUpdates)
@@ -120,6 +135,7 @@ export async function updateWorkspaceFrontEndSettings(
   return {
     id: workspaceId,
     clientId,
+    name: updates.name !== undefined ? updates.name.trim() || workspaceId : readString(current.name) || workspaceId,
     showOnFrontend:
       updates.showOnFrontend !== undefined
         ? updates.showOnFrontend
