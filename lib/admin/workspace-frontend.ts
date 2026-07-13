@@ -1,4 +1,5 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore"
+import { assignUserToWorkspace } from "../workspace-access"
 import { getDefaultModules, type ClientModule, type ModuleKey } from "@/lib/client-directory"
 import {
   buildSubscriptionsFromActiveProducts,
@@ -227,6 +228,77 @@ export async function relinkWorkspaceClient(
       },
       { merge: true }
     )
+  }
+
+  if (normalizedClientId) {
+    try {
+      const [membersSnap, usersSnap] = await Promise.all([
+        db.collection("clients").doc(normalizedClientId).collection("members").get(),
+        db.collection("users").where("clientIds", "array-contains", normalizedClientId).get(),
+      ])
+
+      const people = new Map<string, { email: string; displayName: string; role: any }>()
+
+      for (const doc of membersSnap.docs) {
+        const d = doc.data() || {}
+        const email = readString(d.email)
+        if (email) {
+          people.set(doc.id, {
+            email,
+            displayName: readString(d.displayName) || email,
+            role: d.role,
+          })
+        }
+      }
+
+      for (const doc of usersSnap.docs) {
+        const d = doc.data() || {}
+        const email = readString(d.email)
+        if (email && !people.has(doc.id)) {
+          let role = "collaborator"
+          const memberships = d.memberships && typeof d.memberships === "object" && !Array.isArray(d.memberships)
+            ? (d.memberships as Record<string, any>)
+            : {}
+          const m = memberships[normalizedClientId]
+          if (m && typeof m === "object" && typeof m.role === "string") {
+            role = m.role
+          } else {
+            const parsed = readString(d.role) || readString(d.userRole)
+            if (parsed) role = parsed
+          }
+          people.set(doc.id, {
+            email,
+            displayName: readString(d.displayName) || readString(d.full_name) || email,
+            role,
+          })
+        }
+      }
+
+      await Promise.all(
+        Array.from(people.entries()).map(async ([uid, info]) => {
+          const role =
+            info.role === "owner" ||
+            info.role === "developer" ||
+            info.role === "collaborator" ||
+            info.role === "employee-of-client" ||
+            info.role === "beam-participant"
+              ? info.role
+              : "collaborator"
+
+          await assignUserToWorkspace({
+            db,
+            workspaceId,
+            uid,
+            email: info.email,
+            displayName: info.displayName,
+            role,
+            source: "relink-workspace-client",
+          })
+        })
+      )
+    } catch (err) {
+      console.error(`Failed to assign client members to workspace ${workspaceId}:`, err)
+    }
   }
 
   return {

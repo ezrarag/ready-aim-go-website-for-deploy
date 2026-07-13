@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore"
 import { getFirestoreDb } from "@/lib/firestore"
 import { isInternalMutationAuthorized } from "@/lib/internal-api-auth"
 import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
+import { assignUserToWorkspace } from "@/lib/workspace-access"
 
 export const dynamic = "force-dynamic"
 
@@ -50,18 +51,52 @@ export async function POST(request: NextRequest, context: Params) {
     const workspaceId = readString((clientSnap.data() as Record<string, unknown>).workspaceId)
     const now = new Date().toISOString()
 
+    const userData = (userSnap.data() as Record<string, unknown>) || {}
     const update: Record<string, unknown> = {
       clientIds: FieldValue.arrayUnion(clientId),
       updatedAt: now,
     }
-    if (!readString((userSnap.data() as Record<string, unknown>).client_id)) {
+    if (!readString(userData.client_id)) {
       update.client_id = clientId
-    }
-    if (workspaceId) {
-      update.workspaceIds = FieldValue.arrayUnion(workspaceId)
     }
 
     await userRef.update(update)
+
+    if (workspaceId) {
+      const email = readString(userData.email)
+      const displayName = readString(userData.displayName) || readString(userData.full_name) || email
+
+      let role = "collaborator"
+      const memberships = userData.memberships && typeof userData.memberships === "object" && !Array.isArray(userData.memberships)
+        ? (userData.memberships as Record<string, any>)
+        : {}
+      const membership = memberships[clientId]
+      if (membership && typeof membership === "object" && typeof membership.role === "string") {
+        role = membership.role
+      } else {
+        const parsed = readString(userData.role) || readString(userData.userRole)
+        if (parsed) role = parsed
+      }
+
+      const canonicalRole =
+        role === "owner" ||
+        role === "developer" ||
+        role === "collaborator" ||
+        role === "employee-of-client" ||
+        role === "beam-participant"
+          ? role
+          : "collaborator"
+
+      await assignUserToWorkspace({
+        db,
+        workspaceId,
+        uid,
+        email,
+        displayName,
+        role: canonicalRole,
+        source: "admin-client-people-assignment",
+      })
+    }
 
     await writeAuditLog({
       collection: "users",
