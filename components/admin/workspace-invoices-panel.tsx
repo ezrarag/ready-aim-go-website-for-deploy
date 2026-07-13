@@ -21,6 +21,102 @@ type InvoiceTemplateId = (typeof INVOICE_TEMPLATES)[number]["id"]
 type ContractOption = {
   id: string
   title: string
+  paymentDates?: string[]
+}
+
+function ContractMilestoneTimeline({
+  contract,
+  invoices,
+  onBillMilestone,
+}: {
+  contract: ContractOption
+  invoices: ClientInvoice[]
+  onBillMilestone: (index: number) => void
+}) {
+  const milestones = contract.paymentDates || []
+  if (milestones.length === 0) return null
+
+  return (
+    <div className="mt-4 border rounded-lg p-4 bg-muted/10">
+      <p className="text-sm font-medium">Contract Milestones Progress</p>
+      <div className="mt-4 relative flex flex-col space-y-4">
+        {milestones.map((milestone, idx) => {
+          const matchingInvoice = invoices.find(
+            (inv) => inv.contractId === contract.id && inv.installmentIndex === idx
+          )
+          
+          let status: "unbilled" | "draft" | "pending" | "paid" = "unbilled"
+          if (matchingInvoice) {
+            if (matchingInvoice.status === "paid") status = "paid"
+            else if (matchingInvoice.status === "draft") status = "draft"
+            else status = "pending"
+          }
+
+          return (
+            <div key={idx} className="flex items-start gap-3">
+              <div className="flex flex-col items-center">
+                <div
+                  className={[
+                    "h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors border",
+                    status === "paid"
+                      ? "bg-emerald-500 text-white border-emerald-600"
+                      : status === "pending"
+                      ? "bg-orange-500 text-white border-orange-600"
+                      : status === "draft"
+                      ? "bg-blue-500 text-white border-blue-600"
+                      : "bg-background text-muted-foreground border-input",
+                  ].join(" ")}
+                >
+                  {idx + 1}
+                </div>
+                {idx < milestones.length - 1 && (
+                  <div className="h-8 w-px bg-border mt-1 shrink-0" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate" title={milestone}>{milestone}</p>
+                    {matchingInvoice && (
+                      <p className="text-xs text-muted-foreground">
+                        Invoice {matchingInvoice.invoiceNumber} · Due {matchingInvoice.dueDate}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {status === "unbilled" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onBillMilestone(idx)}
+                        className="h-7 text-xs px-2"
+                      >
+                        Bill Milestone
+                      </Button>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className={[
+                          "text-xs border",
+                          status === "paid"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            : status === "pending"
+                            ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
+                            : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                        ].join(" ")}
+                      >
+                        {status === "paid" ? "Paid" : status === "pending" ? "Pending" : "Draft"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function formatCurrency(cents: number) {
@@ -64,6 +160,7 @@ export function WorkspaceInvoicesPanel({
     billToCompany: defaultBillTo.company,
     billToAddress: defaultBillTo.address,
     billToEmail: defaultBillTo.email,
+    installmentIndex: "" as "" | number,
   })
 
   const loadInvoices = async () => {
@@ -113,6 +210,7 @@ export function WorkspaceInvoicesPanel({
           billToCompany: form.billToCompany,
           billToAddress: form.billToAddress,
           billToEmail: form.billToEmail,
+          installmentIndex: form.installmentIndex === "" ? null : form.installmentIndex,
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -120,7 +218,7 @@ export function WorkspaceInvoicesPanel({
         throw new Error(payload.error || "Unable to create invoice.")
       }
       setInvoices((current) => [payload.data as ClientInvoice, ...current])
-      setForm((current) => ({ ...current, amount: "", description: "" }))
+      setForm((current) => ({ ...current, amount: "", description: "", installmentIndex: "" }))
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to create invoice.")
     } finally {
@@ -181,6 +279,9 @@ export function WorkspaceInvoicesPanel({
     }
   }
 
+  const selectedContract = contracts.find((c) => c.id === form.contractId)
+  const milestoneOptions = selectedContract?.paymentDates || []
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border p-4">
@@ -192,7 +293,7 @@ export function WorkspaceInvoicesPanel({
           <select
             className="h-10 rounded-md border bg-background px-3 text-sm"
             value={form.contractId}
-            onChange={(event) => setForm((current) => ({ ...current, contractId: event.target.value, title: current.title || `${contracts.find((entry) => entry.id === event.target.value)?.title || "Invoice"} invoice` }))}
+            onChange={(event) => setForm((current) => ({ ...current, contractId: event.target.value, title: current.title || `${contracts.find((entry) => entry.id === event.target.value)?.title || "Invoice"} invoice`, installmentIndex: "" }))}
           >
             <option value="">No contract linked</option>
             {contracts.map((contract) => (
@@ -208,6 +309,30 @@ export function WorkspaceInvoicesPanel({
               <option key={template.id} value={template.id}>{template.label}</option>
             ))}
           </select>
+          {milestoneOptions.length > 0 && (
+            <select
+              className="h-10 rounded-md border bg-background px-3 text-sm md:col-span-2"
+              value={form.installmentIndex}
+              onChange={(event) => {
+                const val = event.target.value
+                const idx = val === "" ? "" : parseInt(val, 10)
+                setForm((current) => {
+                  const prefillTitle = typeof idx === "number" ? `${selectedContract?.title || "Milestone"} - ${milestoneOptions[idx]}` : current.title
+                  return {
+                    ...current,
+                    installmentIndex: idx,
+                    title: prefillTitle,
+                    description: typeof idx === "number" ? `Milestone payment for: ${milestoneOptions[idx]}` : current.description,
+                  }
+                })
+              }}
+            >
+              <option value="">Select Milestone / Installment</option>
+              {milestoneOptions.map((milestone, idx) => (
+                <option key={idx} value={idx}>Milestone {idx + 1}: {milestone}</option>
+              ))}
+            </select>
+          )}
           <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Invoice title" />
           <Input value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} placeholder="Amount in USD" inputMode="decimal" />
           <Input value={form.billingPeriod} onChange={(event) => setForm((current) => ({ ...current, billingPeriod: event.target.value }))} placeholder="Billing period" />
@@ -219,6 +344,20 @@ export function WorkspaceInvoicesPanel({
         </div>
         <Textarea className="mt-3 min-h-[88px]" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Line item description override" />
         {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+        {selectedContract && milestoneOptions.length > 0 && (
+          <ContractMilestoneTimeline
+            contract={selectedContract}
+            invoices={invoices}
+            onBillMilestone={(idx) => {
+              setForm((current) => ({
+                ...current,
+                installmentIndex: idx,
+                title: `${selectedContract.title} - ${milestoneOptions[idx]}`,
+                description: `Milestone payment for: ${milestoneOptions[idx]}`,
+              }))
+            }}
+          />
+        )}
         <Button className="mt-3" onClick={() => void createInvoice()} disabled={saving || !clientId}>
           {saving ? "Generating..." : "Generate invoice"}
         </Button>
@@ -239,7 +378,14 @@ export function WorkspaceInvoicesPanel({
               <div key={invoice.id} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium">{invoice.title}</p>
+                    <p className="font-medium flex items-center flex-wrap gap-2">
+                      {invoice.title}
+                      {invoice.installmentIndex !== null && invoice.installmentIndex !== undefined && (
+                        <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-orange-500/25">
+                          Milestone {invoice.installmentIndex + 1}
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {invoice.invoiceNumber} · due {invoice.dueDate}
                     </p>

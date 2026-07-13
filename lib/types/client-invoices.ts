@@ -48,4 +48,5 @@ export type ClientInvoice = {
   paidAt?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  installmentIndex?: number | null
 }

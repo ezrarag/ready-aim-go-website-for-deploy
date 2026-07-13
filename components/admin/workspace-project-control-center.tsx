@@ -1085,6 +1085,7 @@ export function WorkspaceProjectControlCenter({
                 contracts={contracts.map((contract) => ({
                   id: contract.id,
                   title: contract.title,
+                  paymentDates: contract.paymentDates,
                 }))}
                 defaultBillTo={{
                   name: detail.client?.name || detail.workspace.name || "",

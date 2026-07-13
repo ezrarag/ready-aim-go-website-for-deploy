@@ -108,6 +108,7 @@ export function normalizeInvoiceDocument(id: string, input: Record<string, unkno
     paidAt: readString(serialized.paidAt),
     createdAt: readString(serialized.createdAt),
     updatedAt: readString(serialized.updatedAt),
+    installmentIndex: typeof serialized.installmentIndex === "number" ? serialized.installmentIndex : null,
   }
 }
 
@@ -265,6 +266,7 @@ export function buildDefaultInvoiceFromContract(input: {
   from: InvoiceParty
   billTo: InvoiceParty
   description?: string
+  installmentIndex?: number | null
 }): Omit<ClientInvoice, "id"> {
   const template = getInvoiceTemplate(input.templateId)
   if (!template) {
@@ -306,6 +308,7 @@ export function buildDefaultInvoiceFromContract(input: {
     paidAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    installmentIndex: input.installmentIndex !== undefined ? input.installmentIndex : null,
   }
 }
 

@@ -65,6 +65,9 @@ export async function POST(request: NextRequest, context: Params) {
       return NextResponse.json({ success: false, error: "title and templateId are required" }, { status: 400 })
     }
 
+    const rawIndex = body.installmentIndex
+    const installmentIndex = typeof rawIndex === "number" ? rawIndex : (typeof rawIndex === "string" ? parseInt(rawIndex, 10) : null)
+
     const invoice = buildDefaultInvoiceFromContract({
       clientId,
       workspaceId: readString(body.workspaceId) || null,
@@ -88,6 +91,7 @@ export async function POST(request: NextRequest, context: Params) {
         email: readString(body.billToEmail) || "",
       },
       description: readString(body.description) || undefined,
+      installmentIndex: Number.isNaN(installmentIndex) ? null : installmentIndex,
     })
 
     const ref = db.collection("clients").doc(clientId).collection("invoices").doc()
