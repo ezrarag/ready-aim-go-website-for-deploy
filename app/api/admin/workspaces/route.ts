@@ -3,9 +3,19 @@ import { type NextRequest, NextResponse } from "next/server"
 import type { ModuleKey } from "@/lib/client-directory"
 import { getAdminDb } from "@/lib/firebase/admin"
 import { getSuggestedWorkspacePublicUrl } from "@/lib/admin/workspace-frontend"
-import { isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import { isInternalMutationAuthorized, isInternalReadAuthorized } from "@/lib/internal-api-auth"
+import { writeAuditLog, extractActorKey } from "@/lib/audit-log"
+import { parseRepoSlug } from "@/lib/pulse-selectors"
 
 export const dynamic = "force-dynamic"
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
+}
 
 function toIso(value: unknown): string {
   if (!value) return new Date().toISOString()
@@ -80,5 +90,100 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("GET /api/admin/workspaces error:", error)
     return NextResponse.json({ error: "Unable to load workspaces." }, { status: 500 })
+  }
+}
+
+/**
+ * POST /api/admin/workspaces
+ *
+ * Creates a workspace record, primarily for external tools (e.g. raCommand)
+ * that already ran their own local git-clone + Codex-thread setup and are
+ * pushing that workspace into the admin system of record.
+ *
+ * Body: { name: string, clientId?: string, repoUrl?: string, tags?: string[], source?: string }
+ * Returns: { success, workspace: { id, slug, name, clientId, repoSlug } }
+ */
+export async function POST(request: NextRequest) {
+  if (!isInternalMutationAuthorized(request)) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const db = getAdminDb()
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+
+    const name = readString(body.name)
+    if (!name) {
+      return NextResponse.json({ success: false, error: "name is required." }, { status: 400 })
+    }
+
+    const clientId = readString(body.clientId) || null
+    const repoUrl = readString(body.repoUrl)
+    const repoSlug = repoUrl ? parseRepoSlug(repoUrl) : null
+    const tags = readStringArray(body.tags)
+    const source = readString(body.source) || "racommand"
+
+    const now = new Date().toISOString()
+    const workspacePayload = {
+      name,
+      clientId,
+      githubOrg: repoSlug ? repoSlug.split("/")[0] : null,
+      showOnFrontend: false,
+      frontEndProducts: [] as string[],
+      frontEndTags: tags,
+      repos: [] as unknown[],
+      source,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const workspaceRef = await db.collection("workspaces").add(workspacePayload)
+
+    if (repoSlug) {
+      const existingRepoSnap = await db
+        .collection("repos")
+        .where("repoSlug", "==", repoSlug)
+        .limit(1)
+        .get()
+
+      const repoPayload = {
+        clientId,
+        workspaceId: workspaceRef.id,
+        repoSlug,
+        htmlUrl: repoUrl,
+        updatedAt: now,
+      }
+
+      if (!existingRepoSnap.empty) {
+        await existingRepoSnap.docs[0].ref.set(repoPayload, { merge: true })
+      } else {
+        await db.collection("repos").add({ ...repoPayload, createdAt: now })
+      }
+    }
+
+    await writeAuditLog({
+      collection: "workspaces",
+      docId: workspaceRef.id,
+      action: "create",
+      actorKey: extractActorKey(request.headers.get("authorization")),
+      payload: { name, clientId, repoSlug, source },
+    })
+
+    return NextResponse.json({
+      success: true,
+      workspace: {
+        id: workspaceRef.id,
+        slug: workspaceRef.id,
+        name,
+        clientId,
+        repoSlug,
+      },
+    })
+  } catch (error) {
+    console.error("POST /api/admin/workspaces error:", error)
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "Unable to create workspace." },
+      { status: 500 }
+    )
   }
 }

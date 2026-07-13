@@ -7,10 +7,28 @@ type DesktopClientPayload = {
   id: string
   name: string
   storyId: string | null
+  email: string | null
+  workspaceId: string | null
+  activeProducts: string[]
+  status: string | null
+  updatedAt: string
 }
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
+}
+
+function toIso(value: unknown): string {
+  if (!value) return new Date().toISOString()
+  if (typeof value === "string") return value
+  if (value && typeof (value as { toDate?: () => Date }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString()
+  }
+  return new Date().toISOString()
 }
 
 export async function GET(request: NextRequest) {
@@ -36,6 +54,11 @@ export async function GET(request: NextRequest) {
           id: doc.id,
           name: name || storyId || doc.id,
           storyId: storyId || null,
+          email: readString(data.contactEmail) || readString(data.clientPortalEmail) || null,
+          workspaceId: readString(data.workspaceId) || null,
+          activeProducts: readStringArray(data.activeProducts),
+          status: readString(data.status) || null,
+          updatedAt: toIso(data.updatedAt),
         }
       })
       .filter((client): client is DesktopClientPayload => Boolean(client))

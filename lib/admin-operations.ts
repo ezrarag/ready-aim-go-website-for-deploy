@@ -151,7 +151,7 @@ export function clientMatchesArea(client: ClientDirectoryEntry, areaId: AdminAre
     case "beam-participants":
       return containsAny(text, ["beam"])
     default:
-      return false
+      return clientHasWebsiteSignal(client)
   }
 }
 
@@ -231,7 +231,7 @@ export function vercelProjectMatchesArea(project: AdminVercelProject, areaId: Ad
     case "beam-participants":
       return containsAny(text, ["beam"])
     default:
-      return false
+      return true
   }
 }
 
@@ -330,7 +330,8 @@ export function pulseEventMatchesArea(event: AdminPulseEvent, areaId: AdminAreaI
     case "beam-participants":
       return containsAny(text, ["beam"])
     default:
-      return false
+      if (event.source === "github" || event.source === "vercel") return true
+      return containsAny(text, ["web", "website", "deploy", "deployment", "repo", "github", "vercel", "dashboard", "api"])
   }
 }
 

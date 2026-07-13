@@ -293,9 +293,22 @@ export async function loadAdminWorkspaceDetail(
   db: Firestore,
   workspaceId: string
 ): Promise<AdminWorkspaceDetail | null> {
-  const workspaceSnap = await db.collection("workspaces").doc(workspaceId).get()
-  if (!workspaceSnap.exists) return null
+  let workspaceSnap = await db.collection("workspaces").doc(workspaceId).get()
+  if (!workspaceSnap.exists) {
+    const querySnap = await db.collection("workspaces").where("slug", "==", workspaceId).limit(1).get()
+    if (querySnap.empty) {
+      const querySnap2 = await db.collection("workspaces").where("name", "==", workspaceId).limit(1).get()
+      if (querySnap2.empty) {
+        return null
+      } else {
+        workspaceSnap = querySnap2.docs[0]
+      }
+    } else {
+      workspaceSnap = querySnap.docs[0]
+    }
+  }
 
+  const actualWorkspaceId = workspaceSnap.id
   const workspaceData = workspaceSnap.data() as Record<string, unknown>
   const workspaceClientId = readString(workspaceData.clientId)
 
@@ -305,7 +318,7 @@ export async function loadAdminWorkspaceDetail(
   const fallbackClientSnap =
     directClientSnap?.exists
       ? null
-      : await db.collection("clients").where("workspaceId", "==", workspaceId).limit(1).get()
+      : await db.collection("clients").where("workspaceId", "==", actualWorkspaceId).limit(1).get()
 
   const clientSnap = directClientSnap?.exists
     ? directClientSnap
@@ -315,21 +328,21 @@ export async function loadAdminWorkspaceDetail(
 
   const [contractsByWorkspace, contractsByClient, membersSnap, invitesSnap, emailsSnap, messagesSnap, workspaceFilesSnap, eventsSnap, statusVideoData] =
     await Promise.all([
-      db.collection("contracts").where("workspaceId", "==", workspaceId).limit(50).get().catch(() => null),
+      db.collection("contracts").where("workspaceId", "==", actualWorkspaceId).limit(50).get().catch(() => null),
       clientId
         ? db.collection("contracts").where("clientId", "==", clientId).limit(50).get().catch(() => null)
         : Promise.resolve(null),
-      db.collection("workspaces").doc(workspaceId).collection("members").limit(100).get().catch(() => null),
-      db.collection("workspaces").doc(workspaceId).collection("pendingInvites").limit(100).get().catch(() => null),
+      db.collection("workspaces").doc(actualWorkspaceId).collection("members").limit(100).get().catch(() => null),
+      db.collection("workspaces").doc(actualWorkspaceId).collection("pendingInvites").limit(100).get().catch(() => null),
       clientId
         ? db.collection("clientComms").doc(clientId).collection("emails").limit(20).get().catch(() => null)
         : Promise.resolve(null),
-      db.collection("workspaces").doc(workspaceId).collection("messages").limit(40).get().catch(() => null),
-      db.collection("workspaces").doc(workspaceId).collection("files").limit(40).get().catch(() => null),
+      db.collection("workspaces").doc(actualWorkspaceId).collection("messages").limit(40).get().catch(() => null),
+      db.collection("workspaces").doc(actualWorkspaceId).collection("files").limit(40).get().catch(() => null),
       clientId
         ? db.collection("clientComms").doc(clientId).collection("events").limit(20).get().catch(() => null)
         : Promise.resolve(null),
-      listWorkspaceStatusVideos(db, workspaceId, 12).catch(() => ({ candidates: null, videos: [] as PortalStatusVideo[] })),
+      listWorkspaceStatusVideos(db, actualWorkspaceId, 12).catch(() => ({ candidates: null, videos: [] as PortalStatusVideo[] })),
     ])
 
   const contracts = uniqueById(
@@ -344,7 +357,7 @@ export async function loadAdminWorkspaceDetail(
   })
 
   const updates = clientId
-    ? (await getClientUpdates(clientId, { limit: 24 })).filter((update) => !update.workspaceId || update.workspaceId === workspaceId)
+    ? (await getClientUpdates(clientId, { limit: 24 })).filter((update) => !update.workspaceId || update.workspaceId === actualWorkspaceId)
     : []
   const members = (membersSnap?.docs ?? []).map((doc) => normalizeMember(doc.id, doc.data() as Record<string, unknown>))
   const pendingInvites = (invitesSnap?.docs ?? []).map((doc) => normalizeInvite(doc.id, doc.data() as Record<string, unknown>))
@@ -449,8 +462,8 @@ export async function loadAdminWorkspaceDetail(
 
   return {
     workspace: {
-      id: workspaceId,
-      name: readString(workspaceData.name) || workspaceId,
+      id: actualWorkspaceId,
+      name: readString(workspaceData.name) || actualWorkspaceId,
       clientId,
       clientEmail: readString(workspaceData.clientEmail),
       publicUrl: readString(workspaceData.publicUrl),

@@ -33,7 +33,7 @@ export default async function AdminWorkspaceClientViewPage(props: Props) {
 
   if (!detail) notFound()
 
-  const openWorkspaceHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}`
+  const openWorkspaceHref = `/dashboard/workspaces/${encodeURIComponent(detail.workspace.id)}`
   const livePortalHref = detail.client
     ? "https://clients.readyaimgo.biz/dashboard/client"
     : null

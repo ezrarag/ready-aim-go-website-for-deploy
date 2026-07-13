@@ -33,11 +33,11 @@ export default async function AdminWorkspaceDetailPage(props: Props) {
     notFound()
   }
 
-  const quickEditHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(workspaceId)}&panel=edit`
-  const quickReposHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(workspaceId)}&panel=repos`
-  const clientViewHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}/client-view`
-  const uploadContractHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}?tab=contracts`
-  const createInvoiceHref = `/dashboard/workspaces/${encodeURIComponent(workspaceId)}?tab=deliverables`
+  const quickEditHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(detail.workspace.id)}&panel=edit`
+  const quickReposHref = `/dashboard?view=workspaces&workspace=${encodeURIComponent(detail.workspace.id)}&panel=repos`
+  const clientViewHref = `/dashboard/workspaces/${encodeURIComponent(detail.workspace.id)}/client-view`
+  const uploadContractHref = `/dashboard/workspaces/${encodeURIComponent(detail.workspace.id)}?tab=contracts`
+  const createInvoiceHref = `/dashboard/workspaces/${encodeURIComponent(detail.workspace.id)}?tab=deliverables`
 
   return (
     <DashboardLayout>
