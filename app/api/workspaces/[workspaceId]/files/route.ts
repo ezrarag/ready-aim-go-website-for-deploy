@@ -73,6 +73,7 @@ export async function POST(request: NextRequest, context: Params) {
     const url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`
 
     const now = new Date().toISOString()
+    const scope = readString(form.get("scope"), 120) || "workspace"
     await fileRef.set({
       id: fileRef.id,
       workspaceId,
@@ -83,10 +84,18 @@ export async function POST(request: NextRequest, context: Params) {
       size: file.size,
       url,
       storagePath,
-      scope: readString(form.get("scope"), 120) || "workspace",
+      scope,
       authorKind: "admin",
       createdAt: now,
       updatedAt: now,
+
+      // Client Hub compatibility fields:
+      name: title || file.name,
+      contentType: file.type || "application/octet-stream",
+      downloadUrl: url,
+      category: scope === "contract" ? "contract" : "general",
+      uploadedByUid: "admin",
+      uploadedByEmail: "support@readyaimgo.biz",
     })
 
     return NextResponse.json({ success: true, id: fileRef.id, url }, { status: 201 })

@@ -398,11 +398,11 @@ export async function loadAdminWorkspaceDetail(
       const serialized = serializeFirestoreDocument(doc.id, doc.data() as Record<string, unknown>)
       return {
         id: `workspace-file:${doc.id}`,
-        label: readString(serialized.title) || readString(serialized.filename) || doc.id,
-        url: readString(serialized.url) || "",
+        label: readString(serialized.title) || readString(serialized.filename) || readString(serialized.name) || doc.id,
+        url: readString(serialized.url) || readString(serialized.downloadUrl) || "",
         source: "workspace-file" as const,
         projectId: readString(serialized.projectId),
-        scope: readString(serialized.scope),
+        scope: readString(serialized.scope) || (serialized.category === "contract" ? "contract" : "workspace"),
         updatedAt: toIsoString(serialized.updatedAt) || toIsoString(serialized.createdAt),
       }
     }).filter((entry) => Boolean(entry.url)),

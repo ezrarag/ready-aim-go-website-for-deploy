@@ -30,9 +30,17 @@ export async function GET(request: NextRequest) {
     if (status) query = query.where("status", "==", status)
 
     const snap = await query.limit(limit).get()
+    const data = snap.docs.map((doc) => {
+      const serialized = serializeFirestoreDocument(doc.id, doc.data()) as Record<string, any>
+      const fileLink = serialized.fileUrl || serialized.documentUrl || serialized.attachmentUrl || null
+      serialized.fileUrl = fileLink
+      serialized.documentUrl = fileLink
+      serialized.attachmentUrl = fileLink
+      return serialized
+    })
     return NextResponse.json({
       success: true,
-      data: snap.docs.map((doc) => serializeFirestoreDocument(doc.id, doc.data())),
+      data,
     })
   } catch (error) {
     console.error("GET /api/contracts:", error)
@@ -100,6 +108,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const attachmentUrl = uploadedFileUrl || readString(payload.attachmentUrl, 2000) || null
+    const fileUrl = uploadedFileUrl || readString(payload.fileUrl, 2000) || null
+    const documentUrl = fileUrl || attachmentUrl || readString(payload.documentUrl, 2000) || null
+
     const now = new Date().toISOString()
     const doc = {
       workspaceId,
@@ -108,13 +120,18 @@ export async function POST(request: NextRequest) {
       status: readString(payload.status, 120) || "draft",
       type: readString(payload.type, 120) || "scope_of_work",
       notes: readString(payload.notes, 12000) || null,
-      attachmentUrl: uploadedFileUrl || readString(payload.attachmentUrl, 2000) || null,
-      fileUrl: uploadedFileUrl || readString(payload.fileUrl, 2000) || null,
+      attachmentUrl,
+      fileUrl,
+      documentUrl,
       storagePath,
       createdAt: now,
       updatedAt: now,
       createdByUid: "admin",
       authorSource: "admin",
+      // Client compatibility:
+      createdBy: "admin",
+      clientEmail: readString(payload.clientEmail, 240) || "",
+      clientName: readString(payload.clientName, 240) || "",
     }
 
     const ref = await db.collection("contracts").add(doc)
