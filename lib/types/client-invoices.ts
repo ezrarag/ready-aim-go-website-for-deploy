@@ -49,4 +49,14 @@ export type ClientInvoice = {
   createdAt?: string | null
   updatedAt?: string | null
   installmentIndex?: number | null
+  allocation?: InvoiceAllocation | null
 }
+
+export type InvoiceAllocation = {
+  directedTo: "nexus" | "space" | "motion" | "cohort" | "as_invoiced"
+  amountCents: number
+  allocatedAt: string
+  clientNote?: string | null
+  clientFeedbackStatus: "pending" | "reviewed" | "approved"
+}
+

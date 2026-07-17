@@ -1,7 +1,29 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { ExternalLink, Eye } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ExternalLink, Eye, Plus, Trash2 } from "lucide-react"
+
+interface SafeIframeProps extends React.IframeHTMLAttributes<HTMLIFrameElement> {
+  html: string
+}
+
+function SafeIframe({ html, ...props }: SafeIframeProps) {
+  const ref = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    if (ref.current) {
+      const doc = ref.current.contentWindow?.document
+      if (doc) {
+        doc.open()
+        doc.write(html)
+        doc.close()
+      }
+    }
+  }, [html])
+
+  return <iframe ref={ref} {...props} />
+}
+
 
 import { Button } from "@/components/ui/button"
 import {
@@ -163,6 +185,14 @@ export function WorkspaceInvoicesPanel({
     installmentIndex: "" as "" | number,
   })
 
+  const [uploadSaving, setUploadSaving] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    amount: "",
+    file: null as File | null,
+  })
+
   const loadInvoices = async () => {
     if (!clientId) return
     setLoading(true)
@@ -237,6 +267,8 @@ export function WorkspaceInvoicesPanel({
           title: invoice.title,
           status: invoice.status,
           billTo: invoice.billTo,
+          lineItems: invoice.lineItems,
+          allocation: invoice.allocation,
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -276,6 +308,78 @@ export function WorkspaceInvoicesPanel({
       setError(nextError instanceof Error ? nextError.message : "Unable to generate checkout link.")
     } finally {
       setCheckoutLoadingId(null)
+    }
+  }
+
+  const handleUploadExternalInvoice = async () => {
+    if (!clientId) return
+    if (!uploadForm.file) {
+      setUploadError("Please select a PDF or image file to upload.")
+      return
+    }
+    if (!uploadForm.title.trim()) {
+      setUploadError("Please enter a title for the invoice.")
+      return
+    }
+    if (!uploadForm.amount.trim() || Number.isNaN(Number(uploadForm.amount))) {
+      setUploadError("Please enter a valid amount.")
+      return
+    }
+
+    setUploadSaving(true)
+    setUploadError(null)
+    try {
+      // 1. Upload the file to the workspace files API
+      const fileData = new FormData()
+      fileData.set("file", uploadForm.file)
+      fileData.set("title", `Invoice File - ${uploadForm.title}`)
+      fileData.set("scope", "workspace")
+
+      const fileRes = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/files`, {
+        method: "POST",
+        body: fileData,
+      })
+      const filePayload = await fileRes.json().catch(() => ({}))
+      if (!fileRes.ok || filePayload.success === false) {
+        throw new Error(filePayload.error || "Failed to upload invoice file.")
+      }
+      const fileUrl = filePayload.url as string
+
+      // 2. Post to the clients invoices API with pdfUrl
+      const amountCents = Math.round(Number(uploadForm.amount) * 100)
+      const invRes = await fetch(`/api/clients/${encodeURIComponent(clientId)}/invoices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          contractId: null,
+          templateId: "contract_milestone",
+          title: uploadForm.title,
+          amountCents,
+          billingPeriod: "",
+          dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          description: `Uploaded invoice document: ${uploadForm.file.name}`,
+          billToName: defaultBillTo.name,
+          billToCompany: defaultBillTo.company,
+          billToAddress: defaultBillTo.address,
+          billToEmail: defaultBillTo.email,
+          installmentIndex: null,
+          pdfUrl: fileUrl,
+        }),
+      })
+      const invPayload = await invRes.json().catch(() => ({}))
+      if (!invRes.ok || invPayload.success === false) {
+        throw new Error(invPayload.error || "Failed to create invoice record.")
+      }
+
+      setInvoices((current) => [invPayload.data as ClientInvoice, ...current])
+      setUploadForm({ title: "", amount: "", file: null })
+      const fileInput = document.getElementById("external-invoice-file") as HTMLInputElement
+      if (fileInput) fileInput.value = ""
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Failed to upload external invoice.")
+    } finally {
+      setUploadSaving(false)
     }
   }
 
@@ -364,6 +468,36 @@ export function WorkspaceInvoicesPanel({
       </div>
 
       <div className="rounded-lg border p-4">
+        <p className="font-medium">Upload already generated invoice</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Upload an external invoice PDF or image to link it. The client can preview and pay it directly.
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <Input
+            value={uploadForm.title}
+            onChange={(event) => setUploadForm((current) => ({ ...current, title: event.target.value }))}
+            placeholder="Invoice title (e.g. MKE Black Monthly)"
+          />
+          <Input
+            value={uploadForm.amount}
+            onChange={(event) => setUploadForm((current) => ({ ...current, amount: event.target.value }))}
+            placeholder="Amount in USD"
+            inputMode="decimal"
+          />
+          <Input
+            id="external-invoice-file"
+            type="file"
+            accept="application/pdf,image/*"
+            onChange={(event) => setUploadForm((current) => ({ ...current, file: event.target.files?.[0] || null }))}
+          />
+        </div>
+        {uploadError ? <p className="mt-3 text-sm text-rose-600">{uploadError}</p> : null}
+        <Button className="mt-3" onClick={() => void handleUploadExternalInvoice()} disabled={uploadSaving || !clientId}>
+          {uploadSaving ? "Uploading & Saving..." : "Upload & Save"}
+        </Button>
+      </div>
+
+      <div className="rounded-lg border p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="font-medium">Invoices</p>
           <Badge variant="secondary">{invoices.length}</Badge>
@@ -438,6 +572,255 @@ export function WorkspaceInvoicesPanel({
                     placeholder="Bill-to company"
                   />
                 </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Input
+                    value={invoice.billTo.email || ""}
+                    onChange={(event) =>
+                      setInvoices((current) =>
+                        current.map((entry) => entry.id === invoice.id ? { ...entry, billTo: { ...entry.billTo, email: event.target.value } } : entry)
+                      )
+                    }
+                    placeholder="Bill-to email"
+                  />
+                  <Input
+                    value={invoice.billTo.address || ""}
+                    onChange={(event) =>
+                      setInvoices((current) =>
+                        current.map((entry) => entry.id === invoice.id ? { ...entry, billTo: { ...entry.billTo, address: event.target.value } } : entry)
+                      )
+                    }
+                    placeholder="Bill-to address"
+                  />
+                </div>
+
+                <div className="mt-4 border-t pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Line Items</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs flex items-center gap-1"
+                      onClick={() =>
+                        setInvoices((current) =>
+                          current.map((entry) => {
+                            if (entry.id !== invoice.id) return entry
+                            const items = [
+                              ...entry.lineItems,
+                              { description: "", period: "", quantity: 1, rateCents: 0, amountCents: 0 }
+                            ]
+                            return { ...entry, lineItems: items }
+                          })
+                        )
+                      }
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add Item
+                    </Button>
+                  </div>
+                  {invoice.lineItems.map((item, itemIdx) => (
+                    <div key={itemIdx} className="grid gap-2 md:grid-cols-5 items-center border-b pb-2 last:border-b-0 last:pb-0">
+                      <Input
+                        className="md:col-span-2 text-sm"
+                        value={item.description}
+                        placeholder="Description"
+                        onChange={(event) =>
+                          setInvoices((current) =>
+                            current.map((entry) => {
+                              if (entry.id !== invoice.id) return entry
+                              const items = [...entry.lineItems]
+                              items[itemIdx] = { ...items[itemIdx], description: event.target.value }
+                              return { ...entry, lineItems: items }
+                            })
+                          )
+                        }
+                      />
+                      <Input
+                        className="text-sm"
+                        value={item.period}
+                        placeholder="Period (e.g. 1-3)"
+                        onChange={(event) =>
+                          setInvoices((current) =>
+                            current.map((entry) => {
+                              if (entry.id !== invoice.id) return entry
+                              const items = [...entry.lineItems]
+                              items[itemIdx] = { ...items[itemIdx], period: event.target.value }
+                              return { ...entry, lineItems: items }
+                            })
+                          )
+                        }
+                      />
+                      <Input
+                        className="text-sm"
+                        type="number"
+                        placeholder="Qty"
+                        value={item.quantity}
+                        onChange={(event) =>
+                          setInvoices((current) =>
+                            current.map((entry) => {
+                              if (entry.id !== invoice.id) return entry
+                              const items = [...entry.lineItems]
+                              const qty = parseInt(event.target.value, 10) || 1
+                              const rate = items[itemIdx].rateCents
+                              items[itemIdx] = {
+                                ...items[itemIdx],
+                                quantity: qty,
+                                amountCents: qty * rate
+                              }
+                              return { ...entry, lineItems: items }
+                            })
+                          )
+                        }
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">$</span>
+                        <Input
+                          className="text-sm"
+                          value={(item.rateCents / 100).toFixed(2)}
+                          placeholder="Rate"
+                          onChange={(event) => {
+                            const val = parseFloat(event.target.value) || 0
+                            const rateCents = Math.round(val * 100)
+                            setInvoices((current) =>
+                              current.map((entry) => {
+                                if (entry.id !== invoice.id) return entry
+                                const items = [...entry.lineItems]
+                                const qty = items[itemIdx].quantity
+                                items[itemIdx] = {
+                                  ...items[itemIdx],
+                                  rateCents,
+                                  amountCents: qty * rateCents
+                                }
+                                return { ...entry, lineItems: items }
+                              })
+                            )
+                          }}
+                        />
+                        {invoice.lineItems.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 shrink-0 p-0"
+                            onClick={() =>
+                              setInvoices((current) =>
+                                current.map((entry) => {
+                                  if (entry.id !== invoice.id) return entry
+                                  const items = entry.lineItems.filter((_, idx) => idx !== itemIdx)
+                                  return { ...entry, lineItems: items }
+                                })
+                              )
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {invoice.status === "paid" && (
+                  <div className="mt-4 border-t pt-3 space-y-3 bg-muted/10 p-3 rounded-md border border-dashed">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Retainer / Fee Allocation</p>
+                    {invoice.allocation ? (
+                      <div className="space-y-1 text-sm">
+                        <div>
+                          <span className="font-medium text-muted-foreground">Directed to:</span>{" "}
+                          <span className="font-semibold text-foreground uppercase">{invoice.allocation.directedTo}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-muted-foreground">Allocated at:</span>{" "}
+                          <span>{new Date(invoice.allocation.allocatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-muted-foreground">Client Feedback:</span>{" "}
+                          <Badge variant="outline" className={
+                            invoice.allocation.clientFeedbackStatus === "approved"
+                              ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/5 ml-1.5"
+                              : "border-orange-500/30 text-orange-600 bg-orange-500/5 ml-1.5"
+                          }>
+                            {invoice.allocation.clientFeedbackStatus}
+                          </Badge>
+                        </div>
+                        {invoice.allocation.clientNote && (
+                          <div className="mt-2 bg-background p-2 rounded border text-xs">
+                            <span className="font-semibold block mb-0.5">Client Note/Suggestion:</span>
+                            <span className="italic text-muted-foreground">"{invoice.allocation.clientNote}"</span>
+                          </div>
+                        )}
+                        
+                        {/* Option to re-allocate */}
+                        <div className="pt-2 flex items-center gap-2">
+                          <select
+                            className="h-8 rounded border bg-background px-2 text-xs"
+                            defaultValue={invoice.allocation.directedTo}
+                            id={`allocation-select-${invoice.id}`}
+                          >
+                            <option value="nexus">Nexus</option>
+                            <option value="space">Space</option>
+                            <option value="motion">Motion</option>
+                            <option value="cohort">Cohort</option>
+                            <option value="as_invoiced">As Invoiced</option>
+                          </select>
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs px-3"
+                            onClick={async () => {
+                              const selectEl = document.getElementById(`allocation-select-${invoice.id}`) as HTMLSelectElement
+                              const directedTo = selectEl?.value
+                              if (directedTo) {
+                                const updatedAllocation = {
+                                  directedTo,
+                                  amountCents: invoice.totalCents,
+                                  allocatedAt: new Date().toISOString(),
+                                  clientFeedbackStatus: "pending" as const,
+                                  clientNote: null,
+                                }
+                                await saveInvoice({ ...invoice, allocation: updatedAllocation })
+                              }
+                            }}
+                          >
+                            Change Target
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="h-8 rounded border bg-background px-2 text-xs"
+                          defaultValue="as_invoiced"
+                          id={`allocation-select-${invoice.id}`}
+                        >
+                          <option value="as_invoiced">As Invoiced</option>
+                          <option value="nexus">Nexus</option>
+                          <option value="space">Space</option>
+                          <option value="motion">Motion</option>
+                          <option value="cohort">Cohort</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs px-3"
+                          onClick={async () => {
+                            const selectEl = document.getElementById(`allocation-select-${invoice.id}`) as HTMLSelectElement
+                            const directedTo = selectEl?.value
+                            if (directedTo) {
+                              const updatedAllocation = {
+                                directedTo,
+                                amountCents: invoice.totalCents,
+                                allocatedAt: new Date().toISOString(),
+                                clientFeedbackStatus: "pending" as const,
+                                clientNote: null,
+                              }
+                              await saveInvoice({ ...invoice, allocation: updatedAllocation })
+                            }
+                          }}
+                        >
+                          Confirm Allocation
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => void saveInvoice(invoice)}>Save invoice</Button>
                   <Button size="sm" variant="outline" onClick={() => setPreviewInvoice(invoice)}>
@@ -461,7 +844,9 @@ export function WorkspaceInvoicesPanel({
             <DialogTitle>{previewInvoice?.title || "Invoice preview"}</DialogTitle>
           </DialogHeader>
           {previewInvoice?.renderedHtml ? (
-            <iframe title="Invoice preview" srcDoc={previewInvoice.renderedHtml} className="h-[75vh] w-full rounded-md border" />
+            <SafeIframe title="Invoice preview" html={previewInvoice.renderedHtml} className="h-[75vh] w-full rounded-md border" />
+          ) : previewInvoice?.pdfUrl ? (
+            <iframe title="Invoice preview" src={previewInvoice.pdfUrl} className="h-[75vh] w-full rounded-md border" />
           ) : (
             <p className="text-sm text-muted-foreground">Preview unavailable.</p>
           )}

@@ -95,9 +95,21 @@ export async function POST(request: NextRequest, context: Params) {
     })
 
     const ref = db.collection("clients").doc(clientId).collection("invoices").doc()
-    await ref.set(invoice)
-    const rendered = await upsertInvoiceRender(db, clientId, ref.id)
-    return NextResponse.json({ success: true, data: { ...rendered, id: ref.id } }, { status: 201 })
+    const pdfUrl = readString(body.pdfUrl)
+    if (pdfUrl) {
+      const invoicePayload = {
+        ...invoice,
+        pdfUrl,
+        paymentLink: pdfUrl,
+        renderedHtml: null,
+      }
+      await ref.set(invoicePayload)
+      return NextResponse.json({ success: true, data: { ...invoicePayload, id: ref.id } }, { status: 201 })
+    } else {
+      await ref.set(invoice)
+      const rendered = await upsertInvoiceRender(db, clientId, ref.id)
+      return NextResponse.json({ success: true, data: { ...rendered, id: ref.id } }, { status: 201 })
+    }
   } catch (error) {
     console.error("POST /api/clients/[id]/invoices:", error)
     return NextResponse.json(

@@ -131,6 +131,7 @@ export function getStorageBucket(): ReturnType<ReturnType<typeof import("firebas
       process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
     const bucketName =
       process.env.FIREBASE_STORAGE_BUCKET ||
+      (projectId ? `${projectId}.firebasestorage.app` : null) ||
       (projectId ? `${projectId}.appspot.com` : null)
     if (!bucketName) return null
     return getStorage().bucket(bucketName)

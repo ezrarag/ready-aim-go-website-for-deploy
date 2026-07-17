@@ -90,6 +90,20 @@ export async function PATCH(request: NextRequest, context: Params) {
         : null
       patch.totalCents = (invoice?.subtotalCents ?? 0) + (patch.taxCents as number)
     }
+    if ("allocation" in body) {
+      if (body.allocation && typeof body.allocation === "object") {
+        patch.allocation = {
+          directedTo: readString((body.allocation as Record<string, unknown>).directedTo) || "as_invoiced",
+          amountCents: readNumber((body.allocation as Record<string, unknown>).amountCents) || 0,
+          allocatedAt: readString((body.allocation as Record<string, unknown>).allocatedAt) || new Date().toISOString(),
+          clientNote: readString((body.allocation as Record<string, unknown>).clientNote) || null,
+          clientFeedbackStatus: readString((body.allocation as Record<string, unknown>).clientFeedbackStatus) || "pending",
+        }
+      } else {
+        patch.allocation = null
+      }
+    }
+
 
     await db.collection("clients").doc(clientId).collection("invoices").doc(invoiceId).set(patch, { merge: true })
     const rendered = await upsertInvoiceRender(db, clientId, invoiceId)

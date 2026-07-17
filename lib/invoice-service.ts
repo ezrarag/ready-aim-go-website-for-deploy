@@ -109,6 +109,15 @@ export function normalizeInvoiceDocument(id: string, input: Record<string, unkno
     createdAt: readString(serialized.createdAt),
     updatedAt: readString(serialized.updatedAt),
     installmentIndex: typeof serialized.installmentIndex === "number" ? serialized.installmentIndex : null,
+    allocation: serialized.allocation && typeof serialized.allocation === "object"
+      ? {
+          directedTo: (serialized.allocation as any).directedTo || "as_invoiced",
+          amountCents: typeof (serialized.allocation as any).amountCents === "number" ? (serialized.allocation as any).amountCents : 0,
+          allocatedAt: (serialized.allocation as any).allocatedAt || new Date().toISOString(),
+          clientNote: (serialized.allocation as any).clientNote || null,
+          clientFeedbackStatus: (serialized.allocation as any).clientFeedbackStatus || "pending",
+        }
+      : null,
   }
 }
 
