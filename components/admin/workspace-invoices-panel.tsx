@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ExternalLink, Eye, Plus, Trash2 } from "lucide-react"
+import { ExternalLink, Eye, Plus, Trash2, Copy, Link, Printer } from "lucide-react"
 
 interface SafeIframeProps extends React.IframeHTMLAttributes<HTMLIFrameElement> {
   html: string
@@ -172,6 +172,8 @@ export function WorkspaceInvoicesPanel({
   const [previewInvoice, setPreviewInvoice] = useState<ClientInvoice | null>(null)
   const [savingInvoiceId, setSavingInvoiceId] = useState<string | null>(null)
   const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string | null>>({})
+  const [copiedPortalId, setCopiedPortalId] = useState<string | null>(null)
+  const [copiedPayId, setCopiedPayId] = useState<string | null>(null)
   const [form, setForm] = useState({
     contractId: contracts[0]?.id || "",
     templateId: (INVOICE_TEMPLATES[0]?.id || "nexus") as InvoiceTemplateId,
@@ -839,10 +841,38 @@ export function WorkspaceInvoicesPanel({
                     <Eye className="mr-2 h-4 w-4" />
                     Preview
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => void createCheckoutLink(invoice.id)} disabled={checkoutLoadingId === invoice.id}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    {checkoutLoadingId === invoice.id ? "Generating pay link..." : "Generate pay link"}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const portalLink = `https://clients.readyaimgo.biz/workspace/${workspaceId}`
+                      await navigator.clipboard.writeText(portalLink)
+                      setCopiedPortalId(invoice.id)
+                      setTimeout(() => setCopiedPortalId(null), 2000)
+                    }}
+                  >
+                    <Link className="mr-2 h-4 w-4" />
+                    {copiedPortalId === invoice.id ? "Copied!" : "Copy portal link"}
                   </Button>
+                  {invoice.paymentLink ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(invoice.paymentLink!)
+                        setCopiedPayId(invoice.id)
+                        setTimeout(() => setCopiedPayId(null), 2000)
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {copiedPayId === invoice.id ? "Copied!" : "Copy pay link"}
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => void createCheckoutLink(invoice.id)} disabled={checkoutLoadingId === invoice.id}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      {checkoutLoadingId === invoice.id ? "Generating pay link..." : "Generate pay link"}
+                    </Button>
+                  )}
                 </div>
                 {invoiceErrors[invoice.id] && (
                   <p className="mt-2 text-xs font-semibold text-rose-600">{invoiceErrors[invoice.id]}</p>
@@ -855,8 +885,24 @@ export function WorkspaceInvoicesPanel({
 
       <Dialog open={Boolean(previewInvoice)} onOpenChange={(open) => !open && setPreviewInvoice(null)}>
         <DialogContent className="max-w-5xl">
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-center justify-between pr-6">
             <DialogTitle>{previewInvoice?.title || "Invoice preview"}</DialogTitle>
+            {previewInvoice?.renderedHtml && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const iframe = document.querySelector('iframe[title="Invoice preview"]') as HTMLIFrameElement
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.focus()
+                    iframe.contentWindow.print()
+                  }
+                }}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print / Save PDF
+              </Button>
+            )}
           </DialogHeader>
           {previewInvoice?.renderedHtml ? (
             <SafeIframe title="Invoice preview" html={previewInvoice.renderedHtml} className="h-[75vh] w-full rounded-md border" />
