@@ -170,6 +170,8 @@ export function WorkspaceInvoicesPanel({
   const [checkoutLoadingId, setCheckoutLoadingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [previewInvoice, setPreviewInvoice] = useState<ClientInvoice | null>(null)
+  const [savingInvoiceId, setSavingInvoiceId] = useState<string | null>(null)
+  const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string | null>>({})
   const [form, setForm] = useState({
     contractId: contracts[0]?.id || "",
     templateId: (INVOICE_TEMPLATES[0]?.id || "nexus") as InvoiceTemplateId,
@@ -258,7 +260,8 @@ export function WorkspaceInvoicesPanel({
 
   const saveInvoice = async (invoice: ClientInvoice) => {
     if (!clientId) return
-    setError(null)
+    setSavingInvoiceId(invoice.id)
+    setInvoiceErrors((current) => ({ ...current, [invoice.id]: null }))
     try {
       const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}/invoices/${encodeURIComponent(invoice.id)}`, {
         method: "PATCH",
@@ -280,7 +283,10 @@ export function WorkspaceInvoicesPanel({
         setPreviewInvoice(payload.data as ClientInvoice)
       }
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to save invoice.")
+      const msg = nextError instanceof Error ? nextError.message : "Unable to save invoice."
+      setInvoiceErrors((current) => ({ ...current, [invoice.id]: msg }))
+    } finally {
+      setSavingInvoiceId(null)
     }
   }
 
@@ -822,7 +828,13 @@ export function WorkspaceInvoicesPanel({
                 )}
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => void saveInvoice(invoice)}>Save invoice</Button>
+                  <Button
+                    size="sm"
+                    onClick={() => void saveInvoice(invoice)}
+                    disabled={savingInvoiceId === invoice.id}
+                  >
+                    {savingInvoiceId === invoice.id ? "Saving..." : "Save invoice"}
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => setPreviewInvoice(invoice)}>
                     <Eye className="mr-2 h-4 w-4" />
                     Preview
@@ -832,6 +844,9 @@ export function WorkspaceInvoicesPanel({
                     {checkoutLoadingId === invoice.id ? "Generating pay link..." : "Generate pay link"}
                   </Button>
                 </div>
+                {invoiceErrors[invoice.id] && (
+                  <p className="mt-2 text-xs font-semibold text-rose-600">{invoiceErrors[invoice.id]}</p>
+                )}
               </div>
             ))}
           </div>
