@@ -914,7 +914,6 @@ export default function DashboardPage() {
               </CardContent>
             </AdminPanel>
 
-            <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
             <AdminPanel className="overflow-hidden">
               <CardHeader>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1155,8 +1154,6 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </AdminPanel>
-
-            </div>
           </div>
         ) : null}
 

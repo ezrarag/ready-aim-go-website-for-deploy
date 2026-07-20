@@ -18,6 +18,9 @@ import {
   type WalletPool,
 } from "@/lib/wallet-pools"
 
+import { RetainerLedgerControl } from "@/components/admin/retainer-ledger-control"
+import { normalizeInvoiceDocument } from "@/lib/invoice-service"
+
 export const metadata: Metadata = {
   title: "Finance | ReadyAimGo",
   description: "Retainer ledger overview for pooled client wallet commitments and allocations.",
@@ -82,15 +85,19 @@ async function loadLedgerData() {
       pools: [] as WalletPool[],
       contributions: [] as WalletContribution[],
       allocations: [] as WalletAllocation[],
+      transactions: [],
+      invoices: [],
       error: "Firebase Admin is not configured.",
     }
   }
 
   await ensureTFHPoolIfEligible()
 
-  const [clients, poolsSnap] = await Promise.all([
+  const [clients, poolsSnap, ledgerSnap, invoicesSnap] = await Promise.all([
     getAllClientDirectoryEntries(),
     db.collection("walletPools").get(),
+    db.collectionGroup("retainerLedger").limit(200).get().catch(() => ({ docs: [] })),
+    db.collectionGroup("invoices").limit(200).get().catch(() => ({ docs: [] })),
   ])
 
   const pools = poolsSnap.docs.map((doc) =>
@@ -115,11 +122,23 @@ async function loadLedgerData() {
     )
   )
 
-  return { clients, pools, contributions, allocations, error: null as string | null }
+  const transactions = ledgerSnap.docs
+    .map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Record<string, unknown>),
+    }))
+    .sort((a, b) => (b.createdAt as string || "").localeCompare(a.createdAt as string || ""))
+
+  const invoicesList = invoicesSnap.docs.map((doc) =>
+    normalizeInvoiceDocument(doc.id, doc.data() as Record<string, unknown>)
+  )
+
+  return { clients, pools, contributions, allocations, transactions, invoices: invoicesList, error: null as string | null }
 }
 
 export default async function FinancePage() {
-  const { clients, pools, contributions, allocations, error } = await loadLedgerData()
+  const { clients, pools, contributions, allocations, transactions, invoices, error } = await loadLedgerData()
+
 
   const activeRetainers = clients.filter((client) => client.retainer?.active)
   const totalCommitted = activeRetainers.reduce(
@@ -187,8 +206,20 @@ export default async function FinancePage() {
             value={formatCurrency(allocatedThisMonth)}
             hint={`${allocations.length} allocation${allocations.length === 1 ? "" : "s"} total`}
             trailing={<PiggyBank className="h-8 w-8 text-muted-foreground" />}
-          />
         </div>
+
+        <RetainerLedgerControl
+          clients={clients.map((c) => ({ id: c.id, name: c.name || c.id }))}
+          invoices={invoices.map((inv) => ({
+            id: inv.id,
+            clientId: inv.clientId,
+            invoiceNumber: inv.invoiceNumber,
+            title: inv.title,
+            totalCents: inv.totalCents,
+            status: inv.status,
+          }))}
+          initialTransactions={transactions as any}
+        />
 
         <AdminPanel className="overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
