@@ -1,4 +1,4 @@
-export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "billing" | "guides"
+export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "finance" | "billing" | "guides"
 
 export type AdminNavItem = {
   id: AdminHubView
@@ -10,6 +10,7 @@ export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
   { id: "clients", label: "People", href: "/dashboard?view=clients" },
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
   { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
+  { id: "finance", label: "Finance & Retainers", href: "/dashboard/finance" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
   { id: "guides", label: "Guides", href: "/dashboard?view=guides" },
 ]
@@ -21,6 +22,7 @@ export const CLIENT_SECTION_ITEMS: AdminNavItem[] = [
   { id: "clients", label: "People", href: "/dashboard?view=clients" },
   { id: "workspaces", label: "Workspaces", href: "/dashboard?view=workspaces" },
   { id: "tasks", label: "Tasks", href: "/dashboard?view=tasks" },
+  { id: "finance", label: "Finance & Retainers", href: "/dashboard/finance" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
 ]
 
@@ -38,7 +40,6 @@ export const ADMIN_ROUTE_REDIRECTS: Record<string, string> = {
   "/dashboard/command": "/dashboard?view=tasks",
   "/dashboard/web-development": "/dashboard?view=workspaces",
   "/dashboard/web-development/app-store-sync": "/dashboard?view=workspaces",
-  "/dashboard/finance": "/dashboard?view=billing",
   "/dashboard/admin/services": "/dashboard?view=billing",
 }
 
@@ -48,6 +49,7 @@ export function normalizeAdminHubView(value: string | null | undefined): AdminHu
     : value === "clients" ||
     value === "workspaces" ||
     value === "tasks" ||
+    value === "finance" ||
     value === "billing" ||
     value === "guides"
     ? value

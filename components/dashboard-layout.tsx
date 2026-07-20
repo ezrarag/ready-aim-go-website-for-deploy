@@ -214,6 +214,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
+                    <Link href="/dashboard/finance">Finance & Retainers</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/dashboard/operations-snapshot">Operations snapshot</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
