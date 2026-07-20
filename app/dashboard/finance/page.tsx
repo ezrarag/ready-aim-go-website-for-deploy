@@ -206,6 +206,7 @@ export default async function FinancePage() {
             value={formatCurrency(allocatedThisMonth)}
             hint={`${allocations.length} allocation${allocations.length === 1 ? "" : "s"} total`}
             trailing={<PiggyBank className="h-8 w-8 text-muted-foreground" />}
+          />
         </div>
 
         <RetainerLedgerControl
