@@ -1,13 +1,20 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, Eye, FileText, Pencil, ReceiptText, Settings } from "lucide-react"
+import { ArrowLeft, ChevronDown, Eye, FileText, Pencil, ReceiptText, Settings } from "lucide-react"
 
 import DashboardLayout from "@/components/dashboard-layout"
 import { AdminMetricTile, AdminPanel, AdminPanelTitle } from "@/components/admin/admin-panel"
 import { WorkspaceProjectControlCenter } from "@/components/admin/workspace-project-control-center"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { CardContent, CardHeader } from "@/components/ui/card"
 import { getAdminDb } from "@/lib/firebase/admin"
 import { loadAdminWorkspaceDetail } from "@/lib/admin/workspace-detail"
@@ -56,45 +63,57 @@ export default async function AdminWorkspaceDetailPage(props: Props) {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2">
             <Button asChild variant="outline">
               <Link href="/dashboard?view=workspaces">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Workspaces
               </Link>
             </Button>
-            {detail.client ? (
-              <Button asChild variant="outline">
-                <Link href={clientViewHref}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  See Client View
-                </Link>
-              </Button>
-            ) : null}
-            <Button asChild variant="outline">
-              <Link href={uploadContractHref}>
-                <FileText className="mr-2 h-4 w-4" />
-                Upload contract
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={createInvoiceHref}>
-                <ReceiptText className="mr-2 h-4 w-4" />
-                Create invoice
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={quickEditHref}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Quick Edit
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href={quickReposHref}>
-                <Settings className="mr-2 h-4 w-4" />
-                Manage Repos
-              </Link>
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-1.5">
+                  <span>Workspace Actions</span>
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {detail.client ? (
+                  <DropdownMenuItem asChild>
+                    <Link href={clientViewHref} className="cursor-pointer">
+                      <Eye className="mr-2 h-4 w-4 text-blue-500" />
+                      See Client View
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem asChild>
+                  <Link href={uploadContractHref} className="cursor-pointer">
+                    <FileText className="mr-2 h-4 w-4 text-emerald-500" />
+                    Upload Contract
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={createInvoiceHref} className="cursor-pointer">
+                    <ReceiptText className="mr-2 h-4 w-4 text-purple-500" />
+                    Create Invoice
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={quickEditHref} className="cursor-pointer">
+                    <Pencil className="mr-2 h-4 w-4 text-amber-500" />
+                    Quick Edit
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={quickReposHref} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4 text-slate-500" />
+                    Manage Repos
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

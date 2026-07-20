@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowDownLeft, ArrowUpRight, Plus, Receipt, Send } from "lucide-react"
+import { ArrowDownLeft, ArrowUpRight, Building2, Plus, Receipt, Send } from "lucide-react"
 
 export interface ClientOption {
   id: string
@@ -69,8 +69,29 @@ export function RetainerLedgerControl({
   const [transactions, setTransactions] = useState<RetainerTransactionItem[]>(initialTransactions)
   const [depositOpen, setDepositOpen] = useState(false)
   const [drawdownOpen, setDrawdownOpen] = useState(false)
+  const [plaidOpen, setPlaidOpen] = useState(false)
+  const [plaidInfo, setPlaidInfo] = useState<{ message?: string; linkToken?: string; isDemo?: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handlePlaidConnect = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/plaid/link-token", { method: "POST" })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setPlaidInfo(data)
+        setPlaidOpen(true)
+      } else {
+        setError(data.error || "Failed to initialize Plaid Open Banking.")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error connecting Plaid.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Deposit Form state
   const [depositForm, setDepositForm] = useState({
@@ -217,7 +238,11 @@ export function RetainerLedgerControl({
             Ingest external payments (CashApp, Apple Pay, Zelle) and authorize retainer drawdowns with statements of purpose.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={handlePlaidConnect} className="gap-1.5 text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20">
+            <Building2 className="h-4 w-4 text-emerald-600" />
+            Link CashApp / Bank (Plaid)
+          </Button>
           <Button onClick={() => setDepositOpen(true)} className="gap-1.5 text-xs">
             <Plus className="h-4 w-4" />
             Log External Payment / CashApp
@@ -469,6 +494,56 @@ export function RetainerLedgerControl({
               </Button>
               <Button onClick={handleDrawdownSubmit} disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white">
                 {loading ? "Recording Drawdown..." : "Authorize Drawdown & Log Rationale"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 3: Plaid Open Banking Account Link */}
+      <Dialog open={plaidOpen} onOpenChange={setPlaidOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-emerald-600" />
+              Link CashApp / Bank Account (Plaid Open Banking)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-xs">
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-800 dark:text-emerald-300">
+              <p className="font-semibold text-sm">Automated Real-Time Open Banking Sync</p>
+              <p className="mt-1 leading-relaxed">
+                Connect your CashApp or Lincoln Savings Bank account directly via Plaid Open Banking OAuth (the same secure system used by Microsoft Outlook, QuickBooks, and Mint).
+              </p>
+            </div>
+
+            {plaidInfo?.message && (
+              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-300 text-xs">
+                {plaidInfo.message}
+              </div>
+            )}
+
+            <div className="space-y-2 rounded border bg-muted/30 p-3">
+              <p className="font-semibold uppercase tracking-wider text-[11px] text-muted-foreground">How Automated Ingestion Works:</p>
+              <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                <li>Sign into CashApp via Plaid's official OAuth authorization window.</li>
+                <li>Incoming payments (like Rick's $189 CashApp transfer) trigger real-time webhooks.</li>
+                <li>ReadyAimGo automatically matches deposits to client retainers without manual data entry.</li>
+              </ul>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setPlaidOpen(false)}>
+                Close
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => {
+                  alert(`Plaid Link Token: ${plaidInfo?.linkToken || "demo-mode"}. Set PLAID_CLIENT_ID & PLAID_SECRET in .env.local for live production OAuth login.`)
+                  setPlaidOpen(false)
+                }}
+              >
+                Launch Plaid OAuth Connection Window
               </Button>
             </div>
           </div>
