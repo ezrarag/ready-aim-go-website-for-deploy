@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { WorkspaceInvoicesPanel } from "@/components/admin/workspace-invoices-panel"
 import { WorkspaceQuestionnairesPanel } from "@/components/admin/workspace-questionnaires-panel"
+import { GitReleaseEngine } from "@/components/admin/git-release-engine"
 
 type ProjectRecord = {
   id: string
@@ -168,6 +169,13 @@ type InvoiceDraft = {
   title: string
   amount: string
   summary: string
+}
+
+type ProjectDraft = {
+  title: string
+  description: string
+  projectType: "webdev" | "participant" | "transportation" | "real-estate"
+  repoSlug: string
 }
 
 type WorkspaceFileRecord = {
@@ -322,6 +330,14 @@ export function WorkspaceProjectControlCenter({
 }) {
   const router = useRouter()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
+  const [projectDraft, setProjectDraft] = useState<ProjectDraft>({
+    title: "",
+    description: "",
+    projectType: "webdev",
+    repoSlug: "",
+  })
+  const [projectSaving, setProjectSaving] = useState(false)
+  const [projectError, setProjectError] = useState<string | null>(null)
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [deliverables, setDeliverables] = useState<DeliverableRecord[]>([])
   const [repos, setRepos] = useState<RepoRecord[]>([])
@@ -502,6 +518,40 @@ export function WorkspaceProjectControlCenter({
       setPulseAuditError(error instanceof Error ? error.message : "Failed to run pulse audit")
     } finally {
       setPulseAuditLoading(false)
+    }
+  }
+
+  const handleCreateProject = async () => {
+    if (!projectDraft.title.trim()) return
+    setProjectSaving(true)
+    setProjectError(null)
+    try {
+      const response = await fetch(
+        `/api/admin/workspaces/${encodeURIComponent(workspaceId)}/projects`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: projectDraft.title.trim(),
+            description: projectDraft.description.trim(),
+            projectType: projectDraft.projectType,
+            assetProjectType: projectDraft.projectType,
+            repoSlug: projectDraft.repoSlug.trim() || null,
+            status: "scoping",
+          }),
+        }
+      )
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.success === false || !payload.project) {
+        throw new Error(payload.error || "Unable to create project")
+      }
+      setProjectDraft({ title: "", description: "", projectType: "webdev", repoSlug: "" })
+      await loadWorkspaceMap()
+      router.refresh()
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : "Unable to create project")
+    } finally {
+      setProjectSaving(false)
     }
   }
 
@@ -902,6 +952,7 @@ export function WorkspaceProjectControlCenter({
         <CardContent>
           <Tabs defaultValue={initialTab || "suggestions"} className="space-y-4">
             <TabsList className="flex h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsTrigger value="projects"><FolderOpen className="mr-2 h-4 w-4" />Projects</TabsTrigger>
               <TabsTrigger value="suggestions"><MessageSquare className="mr-2 h-4 w-4" />Suggestions</TabsTrigger>
               <TabsTrigger value="contracts"><FileText className="mr-2 h-4 w-4" />Contracts</TabsTrigger>
               <TabsTrigger value="invoices"><Wallet className="mr-2 h-4 w-4" />Invoices</TabsTrigger>
@@ -914,6 +965,77 @@ export function WorkspaceProjectControlCenter({
               <TabsTrigger value="repos"><Link2 className="mr-2 h-4 w-4" />Repos / Hosting</TabsTrigger>
               <TabsTrigger value="audit"><BarChart3 className="mr-2 h-4 w-4" />Audit</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="projects" className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">Create a child project</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  This creates a separate piece of work inside {workspaceName || "this workspace"}. It does not create another client workspace.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <Input
+                    value={projectDraft.title}
+                    onChange={(event) => setProjectDraft((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Website prototype"
+                  />
+                  <select
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                    value={projectDraft.projectType}
+                    onChange={(event) => setProjectDraft((current) => ({
+                      ...current,
+                      projectType: event.target.value as ProjectDraft["projectType"],
+                    }))}
+                  >
+                    <option value="webdev">Nexus / web development</option>
+                    <option value="participant">Cohort Network</option>
+                    <option value="transportation">Motion Network</option>
+                    <option value="real-estate">Space Network</option>
+                  </select>
+                  <Textarea
+                    className="min-h-[110px] md:col-span-2"
+                    value={projectDraft.description}
+                    onChange={(event) => setProjectDraft((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="What outcome should this project produce?"
+                  />
+                  <Input
+                    className="md:col-span-2"
+                    value={projectDraft.repoSlug}
+                    onChange={(event) => setProjectDraft((current) => ({ ...current, repoSlug: event.target.value }))}
+                    placeholder="Optional GitHub repository, for example ready-aim-go/project-name"
+                  />
+                </div>
+                {projectError ? <p className="mt-3 text-sm text-rose-600">{projectError}</p> : null}
+                <Button className="mt-4" onClick={() => void handleCreateProject()} disabled={projectSaving || !projectDraft.title.trim()}>
+                  {projectSaving ? "Creating..." : "Create child project"}
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Canonical workspace projects</p>
+                  <Badge variant="secondary">{projects.length}</Badge>
+                </div>
+                {projects.length === 0 ? (
+                  <p className="rounded-lg border p-4 text-sm text-muted-foreground">No child projects are linked yet.</p>
+                ) : projects.map((project) => (
+                  <div key={project.id} className="rounded-lg border p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{recordTitle(project)}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{project.id}</p>
+                      </div>
+                      <Badge variant="outline">{project.status || "scoping"}</Badge>
+                    </div>
+                    {project.description || project.summary ? (
+                      <p className="mt-3 text-sm text-muted-foreground">{project.description || project.summary}</p>
+                    ) : null}
+                    {project.repoSlug || project.githubRepo ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Repository: {project.repoSlug || project.githubRepo}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
 
             <TabsContent value="suggestions" className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -1247,6 +1369,7 @@ export function WorkspaceProjectControlCenter({
             </TabsContent>
 
             <TabsContent value="updates" className="space-y-4">
+              <GitReleaseEngine workspaceId={detail.workspace.id} onPublished={() => { router.refresh() }} />
               <div className="rounded-lg border p-4">
                 <p className="font-medium">Post admin update</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
