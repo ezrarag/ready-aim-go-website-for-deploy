@@ -155,7 +155,7 @@ export function StoryOverlay({ isOpen, onClose, currentStory, client, moduleKeys
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/96 backdrop-blur-md z-40"
             onClick={onClose}
           />
 

@@ -27,6 +27,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   const [showActOverlay, setShowActOverlay] = useState(false)
   const [showRoleOverlay, setShowRoleOverlay] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
+  const [isIdle, setIsIdle] = useState(false)
 
   const activeScene = getLandingScene(activeSceneId)
   const activeArea = getLandingArea(activeScene.area)
@@ -41,6 +42,35 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
     const area = getLandingArea(areaId)
     setActiveSceneId(area.defaultSceneId)
   }
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+
+    const handleActivity = () => {
+      setIsIdle(false)
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        setIsIdle(true)
+      }, 2500)
+    }
+
+    handleActivity()
+
+    window.addEventListener("mousemove", handleActivity)
+    window.addEventListener("touchstart", handleActivity)
+    window.addEventListener("touchmove", handleActivity)
+    window.addEventListener("click", handleActivity)
+    window.addEventListener("keydown", handleActivity)
+
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener("mousemove", handleActivity)
+      window.removeEventListener("touchstart", handleActivity)
+      window.removeEventListener("touchmove", handleActivity)
+      window.removeEventListener("click", handleActivity)
+      window.removeEventListener("keydown", handleActivity)
+    }
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -63,7 +93,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
   }, [router, showActOverlay, showRoleOverlay])
 
   return (
-    <section className="fixed inset-0 z-0 flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+    <section className="fixed inset-0 z-0 flex h-screen w-screen items-center justify-center overflow-hidden bg-black font-sans">
       <SceneVideoPlayer
         scene={activeScene}
         onLoadScene={loadScene}
@@ -73,13 +103,18 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
 
       <div className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.34)_36%,rgba(0,0,0,0.08)_70%)]" />
 
-      {/* Main Left HUD Cluster */}
+      {/* Main Left HUD Cluster - Fades out on idle */}
       <div className="absolute left-5 top-1/2 z-20 -translate-y-1/2 sm:left-8 md:left-16">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col gap-2"
+          animate={{
+            opacity: isIdle && !menuOverlayOpen ? 0 : 1,
+            x: 0,
+          }}
+          transition={{ duration: 0.5 }}
+          className={`flex flex-col gap-2 transition-opacity duration-700 ${
+            isIdle && !menuOverlayOpen ? "pointer-events-none" : "pointer-events-auto"
+          }`}
         >
           <div className="flex flex-col items-start">
             {/* Broadcast Network Logo Lockup Bug */}
@@ -131,12 +166,17 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
             </h2>
           </button>
 
-          {/* Subtitle & Metrics */}
+          {/* Dynamic Subtitle & Metrics specific to activeArea */}
           <div className="mt-4 max-w-lg border-l-2 border-orange-400/80 pl-4 space-y-2">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.12em] leading-relaxed text-white/90">
-              Home turf: Milwaukee. Loadout: websites, apps, cohorts, property operations. Client base: local businesses across the city.
+              {activeArea.id === "space"
+                ? "Home turf: Milwaukee. Loadout: websites, apps, cohorts, property operations. Client base: local businesses across the city."
+                : `${activeArea.label.toUpperCase()} · ${activeArea.subtitle}`}
             </p>
-            <div className="flex items-center gap-2.5 font-mono text-xs font-black tracking-widest text-orange-400 uppercase">
+            <p className="text-xs font-medium leading-relaxed text-white/75">
+              {activeArea.description}
+            </p>
+            <div className="flex items-center gap-2.5 font-mono text-xs font-black tracking-widest text-orange-400 uppercase pt-1">
               <span>24 PROJECTS</span>
               <span>·</span>
               <span>6 IN BUILD</span>
@@ -145,7 +185,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
         </motion.div>
       </div>
 
-      {/* Bottom-Right HUD Group: PORTFOLIO & ESC/OPTIONS Stacked */}
+      {/* Bottom-Right HUD Group: PORTFOLIO & ESC/OPTIONS Stacked (Stays Solid) */}
       <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-8 sm:right-8 md:bottom-12 md:right-16">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
