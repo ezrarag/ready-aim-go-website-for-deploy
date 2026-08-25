@@ -95,7 +95,7 @@ function buildPortalPersonFromUser(uid: string, user: Record<string, unknown>) {
     commits: 0,
     lastDeploy: "",
     storyVideoUrl: "",
-    showOnFrontend: false,
+    showOnFrontend: true,
     isNewStory: false,
     websiteUrl: "",
     appUrl: "",

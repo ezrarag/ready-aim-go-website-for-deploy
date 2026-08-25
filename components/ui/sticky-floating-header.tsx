@@ -148,36 +148,36 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
                     damping: 25,
                     duration: 0.2
                   }}
-                  className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-[200px] overflow-hidden"
+                  className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-none shadow-xl border border-black/20 py-2 z-50 min-w-[200px] overflow-hidden font-mono"
                 >
                   <motion.button
                     onClick={handleAdminSignIn}
                     whileHover={{ backgroundColor: "#f3f4f6" }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
                   >
-                    <Shield className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm font-semibold text-gray-900">Admin</span>
+                    <Shield className="h-4 w-4 text-blue-600" />
+                    <span className="text-xs font-black uppercase tracking-[0.14em] text-gray-900">Admin</span>
                   </motion.button>
                   
                   <motion.button
                     onClick={handleClientSignIn}
                     whileHover={{ backgroundColor: "#f3f4f6" }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-gray-100"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-colors border-t border-gray-200"
                   >
-                    <Users className="h-5 w-5 text-green-600" />
-                    <span className="text-sm font-semibold text-gray-900">Clients</span>
+                    <Users className="h-4 w-4 text-green-600" />
+                    <span className="text-xs font-black uppercase tracking-[0.14em] text-gray-900">Clients</span>
                   </motion.button>
                   
                   <motion.button
                     onClick={handlePartnerSignIn}
                     whileHover={{ backgroundColor: "#f3f4f6" }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-gray-100"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-colors border-t border-gray-200"
                   >
-                    <Handshake className="h-5 w-5 text-purple-600" />
-                    <span className="text-sm font-semibold text-gray-900">Partners</span>
+                    <Handshake className="h-4 w-4 text-purple-600" />
+                    <span className="text-xs font-black uppercase tracking-[0.14em] text-gray-900">Partners</span>
                   </motion.button>
                 </motion.div>
               )}

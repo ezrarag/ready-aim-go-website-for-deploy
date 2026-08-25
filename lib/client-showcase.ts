@@ -162,7 +162,7 @@ export function toShowcaseClients(
   const byId = new Map<string, PublicShowcaseClient>(showcase.map((entry) => [entry.id, entry]))
 
   for (const workspace of workspaces) {
-    if (!workspace.showOnFrontend) continue
+    if (workspace.showOnFrontend === false) continue
     const client = workspace.clientId ? entries.find((entry) => entry.id === workspace.clientId) : null
 
     if (client) {

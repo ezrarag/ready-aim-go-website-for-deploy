@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       id: workspaceId,
       name: `${partnerName} Workspace`,
       repoURL,
-      showOnFrontend: false,
+      showOnFrontend: true,
       vercelProductionUrl: "",
       vercelProjectId: "",
       githubSlug: repoURL.split("/").pop() || workspaceId,

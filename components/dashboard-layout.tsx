@@ -70,6 +70,43 @@ function NavLinks({
   )
 }
 
+function AdminLoadingState() {
+  const [progress, setProgress] = useState(15)
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setProgress(45), 150)
+    const t2 = setTimeout(() => setProgress(78), 400)
+    const t3 = setTimeout(() => setProgress(95), 700)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+    }
+  }, [])
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted/20 p-6 text-foreground">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+            <h1 className="text-base font-semibold">Loading administrator workspace</h1>
+          </div>
+          <span className="font-mono text-xs font-bold text-orange-500">{progress}%</span>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-orange-500 transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AccessState({
   title,
   description,
@@ -141,20 +178,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   if (requiresAdmin && authLoading) {
-    return (
-      <AccessState
-        title="Checking administrator access"
-        description="Reading the Firebase auth session and users/{uid} admin profile."
-        busy
-      />
-    )
+    return <AdminLoadingState />
   }
 
   if (requiresAdmin && authError) {
     return (
       <AccessState
-        title="Unable to check administrator access"
-        description={authError}
+        title="Unable to verify administrator access"
+        description="Please sign in to access the administrator workspace."
         actionHref={`/login?redirect=${encodeURIComponent(pathname)}`}
         actionLabel="Return to login"
       />
@@ -162,20 +193,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   if (requiresAdmin && !session) {
-    return (
-      <AccessState
-        title="Redirecting to administrator login"
-        description="No active Firebase session was found for this browser."
-        busy
-      />
-    )
+    return <AdminLoadingState />
   }
 
   if (requiresAdmin && session && session.profile?.role !== "admin") {
     return (
       <AccessState
         title="Administrator access required"
-        description={`Signed in as ${session.email ?? "this user"}, but users/{uid}.role is not admin.`}
+        description="Your account is not authorized for administrator privileges."
         onAction={handleSignOut}
         actionLabel="Use another account"
       />

@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     const repoSlug = repoUrl ? parseRepoSlug(repoUrl) : null
     const tags = readStringArray(body.tags)
     const source = readString(body.source) || "racommand"
-    const showOnFrontend = body.showOnFrontend === true || (Boolean(publicUrl) && body.showOnFrontend !== false)
+    const showOnFrontend = body.showOnFrontend !== false
 
     const now = new Date().toISOString()
     const workspacePayload = {
