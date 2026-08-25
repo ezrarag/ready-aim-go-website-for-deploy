@@ -73,6 +73,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
 
       <div className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.34)_36%,rgba(0,0,0,0.08)_70%)]" />
 
+      {/* Main Left HUD Cluster */}
       <div className="absolute left-5 top-1/2 z-20 -translate-y-1/2 sm:left-8 md:left-16">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -81,9 +82,18 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           className="flex flex-col gap-2"
         >
           <div className="flex flex-col items-start">
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.34em] text-orange-400">
-              {activeScene.roleLabel} · {activeScene.actLabel}
-            </p>
+            {/* Broadcast Network Logo Lockup Bug */}
+            <div className="mb-3 flex items-center gap-2.5">
+              <div className="inline-flex items-center gap-1.5 border border-orange-400/80 bg-orange-500/15 px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.24em] text-orange-400 shadow-sm backdrop-blur-sm">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
+                {activeScene.roleLabel.toUpperCase()}
+              </div>
+              <span className="text-white/40 text-xs font-bold">·</span>
+              <span className="font-mono text-xs font-black uppercase tracking-[0.2em] text-white/70">
+                {activeScene.actLabel.toUpperCase()}
+              </span>
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
@@ -91,7 +101,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
                   onWatchDemo?.()
                   setShowActOverlay(true)
                 }}
-                className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="text-left text-white transition hover:text-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-400"
               >
                 <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
                   Story
@@ -101,7 +111,7 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
               <button
                 type="button"
                 onClick={() => setIsMuted((current) => !current)}
-                className="inline-flex items-center gap-1 border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-orange-300 transition hover:bg-orange-400 hover:text-black focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="inline-flex items-center gap-1.5 border border-orange-400/50 bg-black/60 px-2.5 py-1 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-orange-400 transition hover:bg-orange-400 hover:text-black focus:outline-none focus:ring-2 focus:ring-orange-400"
                 aria-label={isMuted ? "Enable sound for this act" : "Mute sound for this act"}
                 title={isMuted ? "Enable sound" : "Mute sound"}
               >
@@ -114,60 +124,61 @@ export function Hero({ onWatchDemo, onViewProjects }: HeroProps) {
           <button
             type="button"
             onClick={() => setShowRoleOverlay(true)}
-            className="text-left text-white transition hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="text-left text-white transition hover:text-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-400"
           >
             <h2 className="text-[4rem] font-black uppercase leading-[0.82] tracking-tight sm:text-8xl md:text-9xl">
               Roster
             </h2>
           </button>
+
+          {/* Subtitle & Metrics */}
+          <div className="mt-4 max-w-lg border-l-2 border-orange-400/80 pl-4 space-y-2">
+            <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.12em] leading-relaxed text-white/90">
+              Home turf: Milwaukee. Loadout: websites, apps, cohorts, property operations. Client base: local businesses across the city.
+            </p>
+            <div className="flex items-center gap-2.5 font-mono text-xs font-black tracking-widest text-orange-400 uppercase">
+              <span>24 PROJECTS</span>
+              <span>·</span>
+              <span>6 IN BUILD</span>
+            </div>
+          </div>
         </motion.div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, delay: 0.2 }}
-        className="absolute bottom-6 left-5 z-20 hidden max-w-sm border border-white/15 bg-black/55 p-4 text-white backdrop-blur-sm sm:block md:left-16"
-      >
-        <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
-          Selected role
-        </p>
-        <h3 className="mt-2 text-2xl font-black uppercase leading-none">{activeArea.label}</h3>
-        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/48">
-          {activeArea.subtitle}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <a
-            href={activeArea.serviceHref}
-            className="inline-flex items-center gap-2 border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"
-          >
-            Service brief
-            <ArrowRight className="h-3.5 w-3.5" />
-          </a>
+      {/* Bottom-Right HUD Group: PORTFOLIO & ESC/OPTIONS Stacked */}
+      <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-8 sm:right-8 md:bottom-12 md:right-16">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="group flex items-center overflow-hidden border border-white/20 bg-black/70 backdrop-blur-md shadow-lg transition hover:border-orange-400/80"
+        >
+          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-orange-500 px-3 py-2 font-mono text-xs font-black uppercase text-slate-950 transition group-hover:bg-orange-400">
+            PORT
+          </div>
           <button
             type="button"
-            onClick={onViewProjects}
-            className="inline-flex items-center border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"
+            onClick={() => router.push("/work")}
+            className="flex items-center gap-2 bg-transparent px-4 py-2 font-mono text-xs font-black uppercase tracking-[0.2em] text-white transition group-hover:text-orange-400"
           >
-            Projects
+            Portfolio
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
-        </div>
-      </motion.div>
+        </motion.div>
 
-      <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-8 sm:right-8 sm:flex-row md:bottom-12 md:right-16 md:gap-4">
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex items-center overflow-hidden"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="flex items-center overflow-hidden border border-white/20 bg-black/70 backdrop-blur-md shadow-lg"
         >
-          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 text-xs font-black uppercase text-white">
+          <div className="flex min-w-[38px] items-center justify-center border-r border-white/30 bg-gray-600 px-3 py-2 font-mono text-xs font-black uppercase text-white">
             ESC
           </div>
           <button
             type="button"
             onClick={() => router.push("/business")}
-            className="bg-transparent px-4 py-2 text-sm font-black uppercase text-white transition hover:text-white/80"
+            className="bg-transparent px-4 py-2 font-mono text-xs font-black uppercase tracking-[0.2em] text-white transition hover:text-white/80"
           >
             Options
           </button>

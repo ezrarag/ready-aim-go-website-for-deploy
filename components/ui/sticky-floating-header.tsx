@@ -117,9 +117,9 @@ export const StickyFloatingHeader: React.FC<StickyFloatingHeaderProps> = ({ page
           <div ref={signInMenuRef} className="relative">
             <button
               onClick={user ? handleMenuClick : handleSignIn}
-              className="flex items-center gap-3 bg-white rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 bg-white rounded-none border border-white/30 px-4 py-2.5 hover:bg-gray-100 transition-colors shadow-md font-mono"
             >
-              <span className="text-black text-sm font-semibold uppercase tracking-wide">
+              <span className="text-black text-xs font-black uppercase tracking-[0.16em]">
                 {user ? (user.user_metadata?.full_name || user.email?.split('@')[0] || 'USER').toUpperCase() : 'SIGN IN'}
               </span>
               

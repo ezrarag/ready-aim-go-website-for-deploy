@@ -30,16 +30,32 @@ const MODULE_URL_FIELDS: Record<ModuleKey, keyof ClientDirectoryEntry> = {
 
 const MODULE_ORDER: ModuleKey[] = ["web", "app", "rd", "housing", "transportation", "insurance"]
 
+export type ShowcaseStatus = "live" | "in_build" | "ongoing" | "discovery"
+
+export interface ShowcaseMilestone {
+  label: string
+  status: "complete" | "in_progress" | "not_started"
+}
+
 /** Minimal, public-safe client shape sent to the /work page. */
 export interface PublicShowcaseClient {
   id: string
+  slug: string
   name: string
   tagline: string | null
-  siteUrl: string
+  siteUrl: string | null
   previewImageUrl: string | null
   products: ModuleKey[]
   tags: string[]
   storyId: string | null
+  status: ShowcaseStatus
+  summary: string | null
+  problem?: string | null
+  whatWeBuilt?: string | null
+  milestones?: ShowcaseMilestone[]
+  gallery?: string[]
+  sector?: string | null
+  location?: string | null
 }
 
 export interface WorkspaceShowcaseSeed {
@@ -51,6 +67,15 @@ export interface WorkspaceShowcaseSeed {
   showOnFrontend: boolean
   frontEndProducts: ModuleKey[]
   frontEndTags: string[]
+}
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
 /**
@@ -80,9 +105,17 @@ export function getProductsInUse(entry: ClientDirectoryEntry): ModuleKey[] {
   })
 }
 
+export function inferShowcaseStatus(entry: Partial<ClientDirectoryEntry>): ShowcaseStatus {
+  if (entry.deployStatus === "building") return "in_build"
+  if (entry.status === "onboarding") return "in_build"
+  if (entry.status === "inactive") return "discovery"
+  if (resolvePublicSiteUrl(entry as ClientDirectoryEntry)) return "live"
+  return "ongoing"
+}
+
 /**
  * Project the full directory down to public-safe showcase entries: only
- * clients with a public site that are not explicitly hidden, sorted by name.
+ * clients with showOnFrontend enabled, sorted by name.
  */
 export function toShowcaseClients(
   entries: ClientDirectoryEntry[],
@@ -99,61 +132,67 @@ export function toShowcaseClients(
     .filter((entry) => {
       if (entry.showOnFrontend === false) return false
       if (!isVisible(entry.publicProfile, "roster")) return false
-      return Boolean(resolvePublicSiteUrl(entry))
+      return true
     })
-    .map((entry) => ({
-      id: entry.id,
-      name: resolveDisplayName(entry.name, entry.publicProfile),
-      tagline:
-        entry.publicProfile?.identity?.tagline ||
-        entry.publicProfile?.taxonomy?.industry ||
-        null,
-      siteUrl: resolvePublicSiteUrl(entry) as string,
-      previewImageUrl: workspaceByClientId.get(entry.id)?.previewImageUrl ?? null,
-      products: getProductsInUse(entry),
-      tags:
-        (workspaceByClientId.get(entry.id)?.frontEndTags.length
-          ? workspaceByClientId.get(entry.id)?.frontEndTags
-          : entry.brands) ?? [],
-      storyId: entry.storyId ?? null,
-    }))
+    .map((entry) => {
+      const displayName = resolveDisplayName(entry.name, entry.publicProfile)
+      return {
+        id: entry.id,
+        slug: slugify(displayName),
+        name: displayName,
+        tagline:
+          entry.publicProfile?.identity?.tagline ||
+          entry.publicProfile?.taxonomy?.industry ||
+          null,
+        siteUrl: resolvePublicSiteUrl(entry),
+        previewImageUrl: workspaceByClientId.get(entry.id)?.previewImageUrl ?? null,
+        products: getProductsInUse(entry),
+        tags:
+          (workspaceByClientId.get(entry.id)?.frontEndTags.length
+            ? workspaceByClientId.get(entry.id)?.frontEndTags
+            : entry.brands) ?? [],
+        storyId: entry.storyId ?? null,
+        status: inferShowcaseStatus(entry),
+        summary: entry.publicProfile?.identity?.tagline || entry.pulseSummary || null,
+        sector: entry.publicProfile?.taxonomy?.industry || null,
+        location: entry.publicProfile?.identity?.location || "Milwaukee, WI",
+      }
+    })
 
   const byId = new Map<string, PublicShowcaseClient>(showcase.map((entry) => [entry.id, entry]))
 
   for (const workspace of workspaces) {
-    const workspacePublicUrl = workspace.publicUrl
-    if (!workspace.showOnFrontend || !workspacePublicUrl) continue
+    if (!workspace.showOnFrontend) continue
     const client = workspace.clientId ? entries.find((entry) => entry.id === workspace.clientId) : null
 
     if (client) {
-      const clientSiteUrl = resolvePublicSiteUrl(client)
-      if (!clientSiteUrl) {
+      const existing = byId.get(client.id)
+      if (existing) {
         byId.set(client.id, {
-          id: client.id,
-          name: resolveDisplayName(client.name, client.publicProfile),
-          tagline:
-            client.publicProfile?.identity?.tagline ||
-            client.publicProfile?.taxonomy?.industry ||
-            null,
-          siteUrl: workspacePublicUrl,
-          previewImageUrl: workspace.previewImageUrl,
-          products: getProductsInUse(client),
-          tags: workspace.frontEndTags.length > 0 ? workspace.frontEndTags : client.brands ?? [],
-          storyId: client.storyId ?? null,
+          ...existing,
+          siteUrl: existing.siteUrl || workspace.publicUrl,
+          previewImageUrl: existing.previewImageUrl || workspace.previewImageUrl,
+          tags: workspace.frontEndTags.length > 0 ? workspace.frontEndTags : existing.tags,
         })
       }
       continue
     }
 
+    const name = workspace.name
     byId.set(`workspace:${workspace.id}`, {
       id: `workspace:${workspace.id}`,
-      name: workspace.name,
+      slug: slugify(name),
+      name: name,
       tagline: null,
-      siteUrl: workspacePublicUrl,
+      siteUrl: workspace.publicUrl,
       previewImageUrl: workspace.previewImageUrl,
       products: workspace.frontEndProducts.length > 0 ? workspace.frontEndProducts : ["web"],
       tags: workspace.frontEndTags,
       storyId: null,
+      status: workspace.publicUrl ? "live" : "in_build",
+      summary: null,
+      sector: null,
+      location: "Milwaukee, WI",
     })
   }
 

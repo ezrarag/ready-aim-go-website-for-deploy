@@ -205,35 +205,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Badge variant="outline" className="max-w-[220px] truncate">
                 {session?.email ?? "Admin"}
               </Badge>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    Menu
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/finance">Finance & Retainers</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/operations-snapshot">Operations snapshot</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/briefing">Daily window</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/workspace-diagnostics">Workspace diagnostics</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Diagnostics
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               <Button
                 variant="outline"
                 size="icon"
@@ -267,24 +238,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="space-y-4 rounded-xl border border-border bg-card p-3 lg:hidden">
               <NavLinks activeView={activeView} onNavigate={() => setMobileNavOpen(false)} />
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/operations-snapshot">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Operations snapshot
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/briefing">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Daily window
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/workspace-diagnostics">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Workspace diagnostics
-                  </Link>
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -292,12 +245,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
                   Theme
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Diagnostics
-                  </Link>
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />

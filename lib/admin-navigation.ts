@@ -1,4 +1,15 @@
-export type AdminHubView = "clients" | "people" | "workspaces" | "tasks" | "finance" | "billing" | "guides"
+export type AdminHubView =
+  | "clients"
+  | "people"
+  | "workspaces"
+  | "tasks"
+  | "finance"
+  | "billing"
+  | "guides"
+  | "ops"
+  | "briefing"
+  | "diagnostics"
+  | "settings"
 
 export type AdminNavItem = {
   id: AdminHubView
@@ -13,6 +24,9 @@ export const ADMIN_HUB_VIEWS: AdminNavItem[] = [
   { id: "finance", label: "Finance & Retainers", href: "/dashboard/finance" },
   { id: "billing", label: "Billing", href: "/dashboard?view=billing" },
   { id: "guides", label: "Guides", href: "/dashboard?view=guides" },
+  { id: "ops", label: "Operations Snapshot", href: "/dashboard/operations-snapshot" },
+  { id: "briefing", label: "Daily Window", href: "/dashboard/briefing" },
+  { id: "diagnostics", label: "Diagnostics", href: "/dashboard/workspace-diagnostics" },
 ]
 
 export const ADMIN_NAV_ITEMS = ADMIN_HUB_VIEWS

@@ -119,16 +119,19 @@ export async function POST(request: NextRequest) {
 
     const clientId = readString(body.clientId) || null
     const repoUrl = readString(body.repoUrl)
+    const publicUrl = readString(body.publicUrl) || null
     const repoSlug = repoUrl ? parseRepoSlug(repoUrl) : null
     const tags = readStringArray(body.tags)
     const source = readString(body.source) || "racommand"
+    const showOnFrontend = body.showOnFrontend === true || (Boolean(publicUrl) && body.showOnFrontend !== false)
 
     const now = new Date().toISOString()
     const workspacePayload = {
       name,
       clientId,
       githubOrg: repoSlug ? repoSlug.split("/")[0] : null,
-      showOnFrontend: false,
+      publicUrl,
+      showOnFrontend,
       frontEndProducts: [] as string[],
       frontEndTags: tags,
       repos: [] as unknown[],

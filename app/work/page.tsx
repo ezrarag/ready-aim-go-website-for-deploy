@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowUpRight, Globe, Briefcase } from "lucide-react"
-import { MODULE_LABELS, type PublicShowcaseClient } from "@/lib/client-showcase"
+import { ArrowLeft, ArrowUpRight, Globe, Briefcase, ArrowRight } from "lucide-react"
+import { MODULE_LABELS, type PublicShowcaseClient, type ShowcaseStatus } from "@/lib/client-showcase"
 import type { ModuleKey } from "@/lib/client-directory"
 
 function screenshotUrl(siteUrl: string): string {
@@ -16,6 +16,20 @@ function stripProtocol(url: string): string {
   return url.replace(/^https?:\/\//, "").replace(/\/$/, "")
 }
 
+const STATUS_BADGE_STYLE: Record<ShowcaseStatus, string> = {
+  live: "bg-emerald-500 text-slate-950 font-bold",
+  in_build: "bg-orange-500 text-slate-950 font-bold",
+  ongoing: "bg-white text-slate-950 font-bold",
+  discovery: "bg-purple-400 text-slate-950 font-bold",
+}
+
+const STATUS_LABELS: Record<ShowcaseStatus, string> = {
+  live: "Live",
+  in_build: "In Build",
+  ongoing: "Ongoing",
+  discovery: "Discovery",
+}
+
 export default function WorkPage() {
   const [clients, setClients] = useState<PublicShowcaseClient[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,13 +37,14 @@ export default function WorkPage() {
   const [search, setSearch] = useState("")
   const [selectedTag, setSelectedTag] = useState("all")
   const [selectedProduct, setSelectedProduct] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [imgErrorIds, setImgErrorIds] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     let active = true
 
     const load = async (initial = false) => {
       try {
-        // Public projection: PII-free, server-filtered to front-end clients.
         const res = await fetch("/api/clients?public=1", { cache: "no-store" })
         const data = await res.json()
         if (!active) return
@@ -71,7 +86,7 @@ export default function WorkPage() {
   const availableProducts = useMemo(
     () =>
       Array.from(new Set(clients.flatMap((client) => client.products)))
-        .sort((a, b) => MODULE_LABELS[a].localeCompare(MODULE_LABELS[b])),
+        .sort((a, b) => (MODULE_LABELS[a] || a).localeCompare(MODULE_LABELS[b] || b)),
     [clients]
   )
 
@@ -80,16 +95,25 @@ export default function WorkPage() {
     return clients.filter((client) => {
       const matchesSearch =
         !query ||
-        [client.name, client.tagline, client.siteUrl, ...(client.tags || []), ...client.products]
+        [client.name, client.tagline, client.siteUrl || "", ...(client.tags || []), ...client.products]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
           .includes(query)
       const matchesTag = selectedTag === "all" || client.tags.includes(selectedTag)
       const matchesProduct = selectedProduct === "all" || client.products.includes(selectedProduct as ModuleKey)
-      return matchesSearch && matchesTag && matchesProduct
+      const matchesStatus = selectedStatus === "all" || client.status === selectedStatus
+      return matchesSearch && matchesTag && matchesProduct && matchesStatus
     })
-  }, [clients, search, selectedProduct, selectedTag])
+  }, [clients, search, selectedProduct, selectedStatus, selectedTag])
+
+  const statusCounts = useMemo(() => {
+    const counts = { live: 0, in_build: 0, ongoing: 0, discovery: 0 }
+    clients.forEach((c) => {
+      if (counts[c.status] !== undefined) counts[c.status]++
+    })
+    return counts
+  }, [clients])
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -105,13 +129,14 @@ export default function WorkPage() {
           </Link>
 
           <h1 className="mt-6 text-5xl font-black uppercase leading-[0.9] tracking-tight sm:text-7xl">
-            Our Work
+            The Work
           </h1>
           <p className="mt-4 max-w-2xl text-sm font-medium uppercase tracking-[0.16em] text-white/55">
-            Client sites we&apos;ve built and the ReadyAimGo products powering them.
+            Everything we have built or are building — websites, apps, cohorts, and property operations.
           </p>
         </header>
 
+        {/* Filter Bar */}
         <section className="mb-8 space-y-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <input
@@ -135,14 +160,46 @@ export default function WorkPage() {
                   onClick={() => setSelectedProduct(product)}
                   className={selectedProduct === product ? "border border-orange-400/50 bg-orange-400/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-orange-300" : "border border-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/65"}
                 >
-                  {MODULE_LABELS[product]}
+                  {MODULE_LABELS[product] || product}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Status Filters */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("all")}
+              className={selectedStatus === "all" ? "border border-orange-400/50 bg-orange-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-orange-300" : "border border-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white/65"}
+            >
+              All Status ({clients.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("live")}
+              className={selectedStatus === "live" ? "border border-emerald-400/50 bg-emerald-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-emerald-300" : "border border-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white/65"}
+            >
+              Live ({statusCounts.live})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("in_build")}
+              className={selectedStatus === "in_build" ? "border border-orange-400/50 bg-orange-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-orange-300" : "border border-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white/65"}
+            >
+              In Build ({statusCounts.in_build})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("ongoing")}
+              className={selectedStatus === "ongoing" ? "border border-white/50 bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white" : "border border-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white/65"}
+            >
+              Ongoing ({statusCounts.ongoing})
+            </button>
+          </div>
+
           {availableTags.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setSelectedTag("all")}
@@ -190,101 +247,127 @@ export default function WorkPage() {
             <p className="mt-2 max-w-md text-sm text-white/45">
               {error
                 ? error
-                : "Try a different search, product, or tag filter."}
+                : "Try a different search, product, or status filter."}
             </p>
           </div>
         ) : (
           <>
             <div className="mb-6 text-xs font-black uppercase tracking-[0.3em] text-orange-400">
-              {visibleClients.length} {visibleClients.length === 1 ? "client" : "clients"}
+              {visibleClients.length} {visibleClients.length === 1 ? "project" : "projects"}
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleClients.map((client) => (
-                <article
-                  key={client.id}
-                  className="group flex flex-col overflow-hidden border border-white/12 bg-white/[0.03] transition hover:border-white/30"
-                >
-                  <a
-                    href={client.siteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="relative block aspect-[16/10] w-full overflow-hidden bg-neutral-900"
+              {visibleClients.map((client) => {
+                const targetHref = `/work/${encodeURIComponent(client.slug || client.id)}`
+                const hasValidImg =
+                  !imgErrorIds[client.id] &&
+                  (client.previewImageUrl || (client.siteUrl ? screenshotUrl(client.siteUrl) : null))
+
+                return (
+                  <article
+                    key={client.id}
+                    className="group flex flex-col overflow-hidden border border-white/12 bg-white/[0.03] transition hover:border-white/30"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={client.previewImageUrl || screenshotUrl(client.siteUrl)}
-                      alt={`${client.name} website preview`}
-                      loading="lazy"
-                      className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.03]"
-                      onError={(e) => {
-                        ;(e.target as HTMLImageElement).style.display = "none"
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-                  </a>
-
-                  <div className="flex flex-1 flex-col p-5">
-                    <h2 className="text-xl font-black uppercase leading-tight tracking-tight">
-                      {client.name}
-                    </h2>
-                    {client.tagline ? (
-                      <p className="mt-2 line-clamp-2 text-sm text-white/55">{client.tagline}</p>
-                    ) : null}
-
-                    {client.tags.length > 0 ? (
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {client.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="border border-white/12 bg-white/[0.04] px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70"
-                          >
-                            {tag}
+                    <Link
+                      href={targetHref}
+                      className="relative block aspect-[16/10] w-full overflow-hidden bg-neutral-900"
+                    >
+                      {hasValidImg ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={client.previewImageUrl || (client.siteUrl ? screenshotUrl(client.siteUrl) : "")}
+                          alt={`${client.name} preview`}
+                          loading="lazy"
+                          className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.03]"
+                          onError={() => {
+                            setImgErrorIds((prev) => ({ ...prev, [client.id]: true }))
+                          }}
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-[repeating-linear-gradient(45deg,#15171C_0_12px,#1b1e24_12px_24px)] flex items-center justify-center">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
+                            no preview yet
                           </span>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {client.products.length > 0 ? (
-                      <div className="mt-4">
-                        <div className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/40">
-                          Products in use
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {client.products.map((key) => (
+                      )}
+
+                      {/* Status Badge Overlay */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <span
+                          className={`inline-block px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.16em] ${
+                            STATUS_BADGE_STYLE[client.status]
+                          }`}
+                        >
+                          {STATUS_LABELS[client.status]}
+                        </span>
+                      </div>
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                    </Link>
+
+                    <div className="flex flex-1 flex-col p-5">
+                      <Link href={targetHref} className="group-hover:text-orange-400 transition">
+                        <h2 className="text-xl font-black uppercase leading-tight tracking-tight">
+                          {client.name}
+                        </h2>
+                      </Link>
+                      {client.tagline ? (
+                        <p className="mt-2 line-clamp-2 text-sm text-white/55">{client.tagline}</p>
+                      ) : null}
+
+                      {client.tags.length > 0 ? (
+                        <div className="mt-4 flex flex-wrap gap-1.5">
+                          {client.tags.map((tag) => (
                             <span
-                              key={key}
-                              className="border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-300"
+                              key={tag}
+                              className="border border-white/12 bg-white/[0.04] px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70"
                             >
-                              {MODULE_LABELS[key]}
+                              {tag}
                             </span>
                           ))}
                         </div>
-                      </div>
-                    ) : null}
-
-                    <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
-                      <a
-                        href={client.siteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white transition hover:text-orange-300"
-                      >
-                        <Globe className="h-3.5 w-3.5" />
-                        {stripProtocol(client.siteUrl)}
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </a>
-                      {client.storyId ? (
-                        <Link
-                          href={`/story/${encodeURIComponent(client.storyId)}/website`}
-                          className="ml-auto text-xs font-black uppercase tracking-[0.16em] text-white/45 transition hover:text-white"
-                        >
-                          Story
-                        </Link>
                       ) : null}
+
+                      {client.products.length > 0 ? (
+                        <div className="mt-4">
+                          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/40">
+                            Products
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {client.products.map((key) => (
+                              <span
+                                key={key}
+                                className="border border-orange-400/40 bg-orange-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-orange-300"
+                              >
+                                {MODULE_LABELS[key] || key}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+                        <Link
+                          href={targetHref}
+                          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white transition hover:text-orange-300"
+                        >
+                          View project <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+
+                        {client.siteUrl ? (
+                          <a
+                            href={client.siteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.16em] text-orange-400 hover:text-orange-300 transition"
+                          >
+                            Visit <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                )
+              })}
             </div>
           </>
         )}
