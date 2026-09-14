@@ -13,6 +13,10 @@ import {
   Layers,
   Search,
   ExternalLink,
+  Printer,
+  Mail,
+  Check,
+  Copy,
 } from "lucide-react"
 
 import DashboardLayout from "@/components/dashboard-layout"
@@ -74,6 +78,8 @@ export default function AdminInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewTitle, setPreviewTitle] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [emailStatusMessage, setEmailStatusMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchInvoices = async () => {
@@ -120,6 +126,25 @@ export default function AdminInvoicesPage() {
     } finally {
       setUpdatingId(null)
     }
+  }
+
+  const handleCopyLink = (invoiceId: string) => {
+    const url = `${window.location.origin}/admin/invoices/${encodeURIComponent(invoiceId)}/print`
+    void navigator.clipboard.writeText(url)
+    setCopiedId(invoiceId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleEmailClient = (invoice: Invoice) => {
+    const printUrl = `${window.location.origin}/admin/invoices/${encodeURIComponent(invoice.id)}/print`
+    const email = invoice.billTo?.email || "friends@1kfriends.org"
+    const subject = encodeURIComponent(`ReadyAimGo Invoice — ${invoice.invoiceNumber} (${invoice.title})`)
+    const body = encodeURIComponent(
+      `Hello ${invoice.billTo?.name || "Team"},\n\nPlease review your invoice ${invoice.invoiceNumber} for ${invoice.title} ($${(invoice.totalCents / 100).toFixed(2)}).\n\nView / Download PDF Invoice: ${printUrl}\n\nThank you,\nEzra Haugabrooks\nReadyAimGo`
+    )
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_blank")
+    setEmailStatusMessage(`Prepared email draft for ${email}`)
+    setTimeout(() => setEmailStatusMessage(null), 3000)
   }
 
   const filteredInvoices = useMemo(() => {
@@ -179,6 +204,13 @@ export default function AdminInvoicesPage() {
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {emailStatusMessage && (
+          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <Mail className="h-4 w-4 shrink-0" />
+            <span>{emailStatusMessage}</span>
           </div>
         )}
 
@@ -302,15 +334,15 @@ export default function AdminInvoicesPage() {
                             variant={isPaid ? "default" : "outline"}
                             className={
                               isPaid
-                                ? "bg-emerald-600 hover:bg-emerald-700"
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                                 : isReview
-                                ? "border-amber-500 text-amber-600 dark:text-amber-400"
+                                ? "border-amber-500 text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10"
                                 : isDraft
                                 ? "border-muted-foreground text-muted-foreground"
                                 : ""
                             }
                           >
-                            {invoice.status.replace("_", " ")}
+                            {isPaid ? "PAID" : isReview ? "Awaiting Payment" : invoice.status.replace("_", " ")}
                           </Badge>
                           <span className="text-xs text-muted-foreground font-mono">
                             Client: {invoice.billTo?.company || invoice.clientId}
@@ -340,7 +372,25 @@ export default function AdminInvoicesPage() {
                           {formatCurrency(invoice.totalCents)}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/admin/invoices/${encodeURIComponent(invoice.id)}/print`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-accent transition-colors"
+                          >
+                            <Printer className="h-3.5 w-3.5 text-blue-500" /> Print PDF
+                          </a>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEmailClient(invoice)}
+                            className="h-8 gap-1.5 text-xs"
+                          >
+                            <Mail className="h-3.5 w-3.5 text-orange-500" /> Email
+                          </Button>
+
                           {invoice.renderedHtml && (
                             <Button
                               size="sm"
@@ -351,7 +401,7 @@ export default function AdminInvoicesPage() {
                               }}
                               className="h-8 gap-1.5 text-xs"
                             >
-                              <Eye className="h-3.5 w-3.5 text-orange-500" /> HTML Preview
+                              <Eye className="h-3.5 w-3.5 text-slate-500" /> Preview
                             </Button>
                           )}
 
@@ -360,7 +410,7 @@ export default function AdminInvoicesPage() {
                               size="sm"
                               onClick={() => handleUpdateStatus(invoice, "paid")}
                               disabled={updatingId === invoice.id}
-                              className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" /> Mark Paid
                             </Button>
