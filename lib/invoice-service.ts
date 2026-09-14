@@ -246,7 +246,14 @@ export async function renderInvoiceHtml(invoice: ClientInvoice) {
     throw new Error(`Unknown invoice template "${invoice.templateId}".`)
   }
 
-  let html = await readFile(invoiceTemplatePath(template.fileName), "utf8")
+  let html = ""
+  try {
+    html = await readFile(invoiceTemplatePath(template.fileName), "utf8")
+  } catch (err) {
+    console.warn(`Could not read template file "${template.fileName}" from disk, using base HTML template:`, err)
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title></head><body><div style="max-width:800px;margin:0 auto;padding:40px;font-family:sans-serif;"><div style="display:flex;justify-space-between;border-bottom:2px solid #111827;padding-bottom:20px;"><div><div style="font-size:24px;font-weight:900;">READYAIMGO</div><div style="font-size:11px;color:#666;">CONTRACT WORK</div></div><div style="text-align:right;"><div style="font-size:24px;font-weight:900;">INVOICE</div><div style="font-family:monospace;font-size:14px;color:#555;">${escapeHtml(template.seedInvoiceNumber)}</div></div></div><!-- meta row --><!-- from / bill to --><!-- line items --><!-- totals --><!-- payment --><!-- footer --></div></body></html>`
+  }
+
   html = html.replaceAll(template.seedInvoiceNumber, invoice.invoiceNumber)
 
   // JSON-escape the block replacements to avoid syntax errors inside the JSON template script tag

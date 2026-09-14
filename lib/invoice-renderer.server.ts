@@ -33,6 +33,54 @@ function invoiceTemplatePath(fileName: string) {
   return path.join(process.cwd(), "docs", "invoices", fileName)
 }
 
+function getEmbeddedBaseInvoiceHtml(seedInvoiceNumber: string) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ReadyAimGo Invoice</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111827; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px 20px; }
+    .invoice-container { background: #ffffff; width: 100%; max-width: 820px; padding: 48px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 20px; }
+    .logo-title { font-size: 24px; font-weight: 900; tracking: 0.05em; color: #111827; text-transform: uppercase; }
+    .sub-logo { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: #6b7280; margin-top: 4px; }
+    .inv-title { font-size: 24px; font-weight: 900; text-transform: uppercase; color: #111827; text-align: right; }
+    .inv-number { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #4b5563; text-align: right; margin-top: 4px; }
+    sc-raw-table { display: table; width: 100%; border-collapse: collapse; }
+    sc-raw-thead { display: table-header-group; }
+    sc-raw-tbody { display: table-row-group; }
+    sc-raw-tr { display: table-row; }
+    sc-raw-th { display: table-cell; }
+    sc-raw-td { display: table-cell; }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="header-row">
+      <div>
+        <div class="logo-title">READYAIMGO</div>
+        <div class="sub-logo">CONTRACT WORK</div>
+      </div>
+      <div>
+        <div class="inv-title">INVOICE</div>
+        <div class="inv-number">${escapeHtml(seedInvoiceNumber)}</div>
+      </div>
+    </div>
+    <!-- meta row -->
+    <!-- from / bill to -->
+    <!-- contract summary -->
+    <!-- line items -->
+    <!-- milestone table -->
+    <!-- totals -->
+    <!-- payment -->
+    <!-- footer -->
+  </div>
+</body>
+</html>`
+}
+
 function buildMetaBlock(invoice: ClientInvoice) {
   const thirdFieldLabel = invoice.templateId === "client_milestone" ? "Project" : "Billing period"
   const thirdFieldValue = invoice.templateId === "client_milestone" ? (invoice.title || invoice.billingPeriod) : invoice.billingPeriod
@@ -121,7 +169,7 @@ function buildMilestoneTableBlock(
 
   const rows = milestones.map((m, idx) => {
     const isCurrent = idx === currentIdx
-    const isPaid = paidInstallmentIndexes.has(idx)
+    const isPaid = paidInstallmentIndexes.has(idx) || (invoice.status === "paid" && idx === 0)
 
     let statusLabel = "Not yet due"
     let statusColor = "#999"
@@ -132,8 +180,8 @@ function buildMilestoneTableBlock(
     if (isPaid) {
       statusLabel = "Paid"
       statusColor = "#1B7A46"
-      fontStyle = "color: #111827;"
-      amountStyle = "color: #111827; text-align: right;"
+      fontStyle = "color: #111827; font-weight: 600;"
+      amountStyle = "color: #111827; text-align: right; font-weight: 600;"
     } else if (isCurrent) {
       statusLabel = "Due — this invoice"
       statusColor = "#F97316"
@@ -246,9 +294,9 @@ function buildPaymentBlock(invoice: ClientInvoice) {
     parts.push(
       `<div style="font-weight: 600; margin-top: ${stripeEnabled ? "14px" : "0"}; color: #111827;">Direct Payment Options (Zelle / Apple Cash / Bank Transfer):</div>` +
       `<div style="font-size: 13.5px; color: #374151; margin-top: 6px; line-height: 1.6;">` +
-      `<strong>Zelle:</strong> ${escapeHtml(zelle.handle)} or ${escapeHtml(zelle.altHandle || "")} (${escapeHtml(zelle.recipientName)})<br>` +
-      `<strong>Apple Cash:</strong> ${escapeHtml(applePay.number)}<br>` +
-      `<strong>ACH / Bank Transfer:</strong> ${escapeHtml(ach.bankName)} | Routing: <code>${escapeHtml(ach.routingNumber)}</code> | Account: <code>${escapeHtml(ach.accountNumber)}</code> (${escapeHtml(ach.accountName)})` +
+      `<strong>Option 1: Zelle:</strong> ${escapeHtml(zelle.handle)} or ${escapeHtml(zelle.altHandle || "")} (${escapeHtml(zelle.recipientName)})<br>` +
+      `<strong>Option 2: Apple Cash / Apple Pay:</strong> ${escapeHtml(applePay.number)}<br>` +
+      `<strong>Option 3: ACH / Bank Transfer:</strong> ${escapeHtml(ach.bankName)} | Routing: <code>${escapeHtml(ach.routingNumber)}</code> | Account: <code>${escapeHtml(ach.accountNumber)}</code> (${escapeHtml(ach.accountName)})` +
       `</div>`
     )
   }
@@ -318,7 +366,14 @@ export async function renderInvoiceHtml(
     }
   }
 
-  let html = await readFile(invoiceTemplatePath(template.fileName), "utf8")
+  let html = ""
+  try {
+    html = await readFile(invoiceTemplatePath(template.fileName), "utf8")
+  } catch (err) {
+    console.warn(`Could not read template file "${template.fileName}" from disk, using embedded HTML template:`, err)
+    html = getEmbeddedBaseInvoiceHtml(template.seedInvoiceNumber)
+  }
+
   html = html.replaceAll(template.seedInvoiceNumber, invoice.invoiceNumber)
 
   // JSON-escape block replacements

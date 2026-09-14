@@ -52,7 +52,7 @@ export const INVOICE_TEMPLATES: InvoiceTemplateDefinition[] = [
     id: "client_milestone",
     label: "Client Milestone",
     productLabel: "Client Milestone",
-    fileName: "ReadyAimGo Invoice - Client Milestone.html",
+    fileName: "ReadyAimGo Invoice - Contract Milestone.html",
     seedInvoiceNumber: "RAG-2026-0001",
     defaultDescription: "Client project milestone",
   },
