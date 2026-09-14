@@ -414,9 +414,13 @@ export default function AdminContractsPage() {
                       ) : (
                         <div className="grid gap-3 md:grid-cols-3">
                           {milestones.map((milestone, idx) => {
-                            const milestoneInvoice = contractInvoices.find(
-                              (inv) => inv.installmentIndex === idx || inv.milestoneLabel === milestone || inv.id.endsWith(`-${idx + 1}`)
-                            )
+                            const milestoneInvoice =
+                              contractInvoices.find(
+                                (inv) => inv.status === "paid" && (inv.installmentIndex === idx || inv.milestoneLabel === milestone || inv.id.endsWith(`-${idx + 1}`) || inv.id === contract.id)
+                              ) ||
+                              contractInvoices.find(
+                                (inv) => inv.installmentIndex === idx || inv.milestoneLabel === milestone || inv.id.endsWith(`-${idx + 1}`)
+                              )
                             const amount = amounts[idx] ?? Math.round((contract.totalContractValueCents || 0) / milestones.length)
                             const isPaid = milestoneInvoice?.status === "paid"
                             const isReview = milestoneInvoice?.status === "client_review" || milestoneInvoice?.status === "accepted"

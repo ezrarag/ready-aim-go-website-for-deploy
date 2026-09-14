@@ -146,12 +146,22 @@ export async function POST(request: NextRequest) {
     for (const inv of invoicesToSeed) {
       const contract = contracts.find((c) => c.id === inv.contractId)
       const renderedHtml = await renderInvoiceHtml(inv, contract)
+      
+      // Save primary doc RAG-TFH-MW1-1
       await db
         .collection("clients")
         .doc(inv.clientId)
         .collection("invoices")
         .doc(inv.id)
         .set({ ...inv, renderedHtml }, { merge: true })
+
+      // Save secondary alias doc RAG-TFH-MW1 for cross-app parity with clients.readyaimgo.biz
+      await db
+        .collection("clients")
+        .doc(inv.clientId)
+        .collection("invoices")
+        .doc(inv.contractId)
+        .set({ ...inv, id: inv.contractId, renderedHtml }, { merge: true })
     }
 
     return NextResponse.json({
