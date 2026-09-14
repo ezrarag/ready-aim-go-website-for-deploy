@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, context: Params) {
 
     const milestoneLabel = milestones[nextIndex] || `Milestone ${nextIndex + 1}`
     const milestoneAmountCents = milestoneAmounts[nextIndex] ?? Math.round((contract.totalContractValueCents || 0) / milestones.length)
-    const invoiceId = `INV-${contract.clientId.toUpperCase()}-${nextIndex + 1}`
+    const invoiceId = `${contractId}-${nextIndex + 1}`
 
     const now = new Date().toISOString()
     const invoice: ClientInvoice = {
@@ -79,23 +79,23 @@ export async function POST(request: NextRequest, context: Params) {
       workspaceId: contract.workspaceId || null,
       contractId: contract.id,
       templateId: "client_milestone",
-      invoiceNumber: invoiceId,
-      title: `${contract.title} — ${milestoneLabel}`,
+      invoiceNumber: contractId,
+      title: contract.title,
       status: "client_review",
       issueDate: now,
       dueDate: "Upon receipt",
       billingPeriod: `Milestone ${nextIndex + 1}`,
       from: {
-        name: "ReadyAimGo Admin",
-        company: "The Aranda Group / ReadyAimGo",
+        name: "ReadyAimGo",
+        company: "Ezra Haugabrooks, sole operator",
         address: "Milwaukee, WI",
-        email: "billing@readyaimgo.biz",
+        email: "support@readyaimgo.biz",
       },
       billTo: {
-        name: contract.clientName || "Client",
-        company: contract.clientName || "Client Company",
-        address: "Milwaukee, WI",
-        email: contract.clientEmail || "",
+        name: "1000 Friends of Wisconsin",
+        company: contract.clientName || "Attn: Solana Patterson-Ramos, Advocacy Manager",
+        address: "P.O. Box 25, Stevens Point, WI 54481",
+        email: contract.clientEmail || "friends@1kfriends.org",
       },
       lineItems: [
         {
@@ -129,7 +129,8 @@ export async function POST(request: NextRequest, context: Params) {
       .doc(invoice.id)
       .set(invoice, { merge: true })
 
-    return NextResponse.json({ success: true, data: invoice })
+    // Return dual payload format for Next.js web admin & Swift raCommand compatibility
+    return NextResponse.json({ success: true, data: invoice, invoice })
   } catch (error) {
     console.error("POST /api/contracts/[contractId]/generate-invoice error:", error)
     return NextResponse.json(
